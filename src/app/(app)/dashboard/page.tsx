@@ -1,0 +1,528 @@
+"use client";
+
+import { Bell, Lock } from "lucide-react";
+import Link from "next/link";
+import { EmptyState } from "@/components/shared/empty-state";
+import { PulseDot } from "@/components/shared/pulse-dot";
+import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { useAppState } from "@/lib/app-state";
+import { formatAge, formatClock, formatTime, isAging } from "@/lib/format";
+import {
+  ATTENTION_ITEMS,
+  BUILDINGS,
+  buildingStats,
+  EQUIPMENT,
+  LOG_BOOK,
+  MAINTENANCE_REQUESTS,
+  powerSeries,
+  roomsForBuilding,
+} from "@/lib/mock-data";
+import { canAct } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
+
+const PRIORITY_TONE: Record<string, Tone> = {
+  high: "danger",
+  normal: "neutral",
+};
+const STATUS_LABEL: Record<string, string> = {
+  pending: "PENDING",
+  "in-progress": "IN PROGRESS",
+  resolved: "RESOLVED",
+  completed: "COMPLETED",
+};
+const STATUS_TONE: Record<string, Tone> = {
+  pending: "warning",
+  "in-progress": "info",
+  resolved: "success",
+  completed: "neutral",
+};
+
+export default function DashboardPage() {
+  const {
+    role,
+    activeBuildingId,
+    setActiveBuildingId,
+    alarmActive,
+    alarmSeconds,
+    requestStatus,
+    advanceRequest,
+  } = useAppState();
+  const staff = !canAct(role);
+  const visibleBuildings = staff
+    ? BUILDINGS.filter((b) => b.id === activeBuildingId)
+    : BUILDINGS;
+  const building =
+    BUILDINGS.find((b) => b.id === activeBuildingId) ?? BUILDINGS[0];
+  const rooms = roomsForBuilding(activeBuildingId);
+
+  const eqForBuilding = EQUIPMENT.filter(
+    (e) => e.buildingId === activeBuildingId,
+  );
+  const eqRunning = eqForBuilding.reduce((a, e) => a + e.running, 0);
+  const eqMaint = eqForBuilding.reduce((a, e) => a + e.underMaintenance, 0);
+  const eqFaulty = eqForBuilding.reduce((a, e) => a + e.faulty, 0);
+  const eqTotal = Math.max(1, eqRunning + eqMaint + eqFaulty);
+
+  const bars = powerSeries(activeBuildingId);
+  const maxBar = Math.max(...bars);
+  const kwNow = bars[bars.length - 1];
+  const kwhToday =
+    Math.round(bars.reduce((a, b) => a + b, 0) / bars.length) * 24;
+
+  const buildingAlarm = activeBuildingId === "b216" && alarmActive;
+
+  const scopedRequests = MAINTENANCE_REQUESTS.filter(
+    (r) => !staff || r.buildingId === activeBuildingId,
+  ).filter((r) => {
+    const s = requestStatus(r);
+    return s === "pending" || s === "in-progress";
+  });
+  const decisionQueue = [...scopedRequests]
+    .sort((a, b) => {
+      const aging =
+        Number(isAging(b.submittedAt, b.priority)) -
+        Number(isAging(a.submittedAt, a.priority));
+      if (aging !== 0) return aging;
+      return (
+        new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
+      );
+    })
+    .slice(0, 4);
+  const escalatedCount = scopedRequests.filter((r) =>
+    isAging(r.submittedAt, r.priority),
+  ).length;
+
+  const attentionItems = ATTENTION_ITEMS.filter(
+    (a) => !staff || a.buildingId === activeBuildingId,
+  );
+  const feed = LOG_BOOK.filter(
+    (e) => !staff || e.buildingId === activeBuildingId,
+  ).slice(0, 7);
+
+  return (
+    <div className="grid items-start gap-4 xl:grid-cols-[1fr_308px]">
+      <div className="flex min-w-0 flex-col gap-4">
+        {/* Building header */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-[19px] font-semibold">{building.name}</h2>
+              {!staff && (
+                <select
+                  value={activeBuildingId}
+                  onChange={(e) => setActiveBuildingId(e.target.value)}
+                  className="border-border bg-card rounded-md border px-2 py-1 text-[11.5px] font-medium"
+                >
+                  {BUILDINGS.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="text-muted-foreground mt-1 text-[12px]">
+              {rooms.length} rooms monitored · last poll {formatClock()}
+            </div>
+          </div>
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-md px-2.5 py-1.5",
+              buildingAlarm ? "bg-danger-muted" : "bg-success-muted",
+            )}
+          >
+            <PulseDot tone={buildingAlarm ? "danger" : "success"} pulse />
+            <span
+              className={cn(
+                "font-mono text-[11px] font-medium tracking-wider",
+                buildingAlarm
+                  ? "text-danger-foreground"
+                  : "text-success-foreground",
+              )}
+            >
+              {buildingAlarm ? `ALARM · ${alarmSeconds}s` : "ALL NORMAL"}
+            </span>
+          </div>
+        </div>
+
+        {/* Equipment status + Power */}
+        <div className="grid gap-3.5 sm:grid-cols-2">
+          <Card className="gap-3 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground font-mono text-[10.5px] tracking-wider">
+                EQUIPMENT STATUS
+              </span>
+              <Link
+                href="/equipment"
+                className="text-primary text-[11px] font-medium hover:underline"
+              >
+                Open register
+              </Link>
+            </div>
+            <div className="flex gap-5">
+              <Stat
+                value={eqRunning}
+                label="Running"
+                className="text-success"
+              />
+              <Stat
+                value={eqMaint}
+                label="Under maint."
+                className="text-warning"
+              />
+              <Stat value={eqFaulty} label="Faulty" className="text-danger" />
+              <Stat
+                value={eqRunning + eqMaint + eqFaulty}
+                label="Total units"
+                className="text-muted-foreground ml-auto text-right"
+              />
+            </div>
+            <div className="bg-muted flex h-1.5 overflow-hidden rounded-full">
+              <div
+                className="bg-success h-full"
+                style={{ width: `${(eqRunning / eqTotal) * 100}%` }}
+              />
+              <div
+                className="bg-warning h-full"
+                style={{ width: `${(eqMaint / eqTotal) * 100}%` }}
+              />
+              <div
+                className="bg-danger h-full"
+                style={{ width: `${(eqFaulty / eqTotal) * 100}%` }}
+              />
+            </div>
+          </Card>
+
+          <Card className="gap-3 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground font-mono text-[10.5px] tracking-wider">
+                POWER CONSUMPTION
+              </span>
+              <span className="text-success-foreground flex items-center gap-1 font-mono text-[9.5px]">
+                <PulseDot tone="success" pulse /> LIVE
+              </span>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="font-mono text-[34px] leading-none font-semibold tracking-tight">
+                {kwNow}
+              </span>
+              <span className="text-muted-foreground text-[13px]">
+                kW demand
+              </span>
+            </div>
+            <div className="flex h-8.5 items-end gap-[3px]">
+              {bars.map((v, i) => (
+                <div
+                  // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length hourly series, no natural id
+                  key={i}
+                  className="bg-primary/70 flex-1 rounded-[1px]"
+                  style={{ height: `${Math.max(6, (v / maxBar) * 100)}%` }}
+                />
+              ))}
+            </div>
+            <div className="border-border text-muted-foreground flex justify-between border-t pt-2.5 text-[11px]">
+              <span>Last 24h</span>
+              <span className="text-foreground font-mono font-medium">
+                {kwhToday.toLocaleString()} kWh today
+              </span>
+            </div>
+          </Card>
+        </div>
+
+        {/* Estate overview */}
+        <Card className="gap-0 overflow-hidden p-0">
+          <div className="border-border flex items-center border-b px-4 py-3">
+            <span className="text-[13px] font-semibold">Estate overview</span>
+            <div className="flex-1" />
+            <span className="text-muted-foreground text-[11px]">
+              {visibleBuildings.length} of {BUILDINGS.length} sites shown
+            </span>
+          </div>
+          <div className="bg-surface-subtle border-border text-muted-foreground flex border-b px-4 py-2 font-mono text-[10px] tracking-wider">
+            <span className="flex-1">BUILDING</span>
+            <span className="w-21">STATUS</span>
+            <span className="w-16 text-right">FAULTY</span>
+            <span className="w-17 text-right">MAINT.</span>
+            <span className="w-19 text-right">OPEN REQ</span>
+            <span className="w-18 text-right">LOAD</span>
+          </div>
+          {visibleBuildings.map((b) => {
+            const stats = buildingStats(b.id);
+            const tone: Tone =
+              stats.faulty > 0
+                ? "danger"
+                : stats.maint > 0
+                  ? "warning"
+                  : "success";
+            const label =
+              stats.faulty > 0
+                ? "Attention"
+                : stats.maint > 0
+                  ? "In service"
+                  : "Normal";
+            return (
+              <div
+                key={b.id}
+                className="border-border flex items-center border-b px-4 py-3 last:border-b-0"
+              >
+                <span className="flex flex-1 items-center gap-2">
+                  <PulseDot tone={tone} />
+                  <span className="text-[12.5px] font-medium">{b.name}</span>
+                  <span className="text-muted-foreground font-mono text-[11px]">
+                    {stats.roomCount} rooms
+                  </span>
+                </span>
+                <span
+                  className={cn(
+                    "w-21 text-[11.5px]",
+                    tone === "danger" && "text-danger-foreground",
+                    tone === "warning" && "text-warning-foreground",
+                    tone === "success" && "text-success-foreground",
+                  )}
+                >
+                  {label}
+                </span>
+                <span
+                  className={cn(
+                    "w-16 text-right font-mono text-[12px] font-medium",
+                    stats.faulty > 0
+                      ? "text-danger-foreground"
+                      : "text-foreground/70",
+                  )}
+                >
+                  {stats.faulty}
+                </span>
+                <span className="text-foreground/70 w-17 text-right font-mono text-[12px] font-medium">
+                  {stats.maint}
+                </span>
+                <span className="text-foreground/70 w-19 text-right font-mono text-[12px] font-medium">
+                  {stats.openReq}
+                </span>
+                <span className="text-foreground/70 w-18 text-right font-mono text-[12px] font-medium">
+                  {stats.kw} kW
+                </span>
+              </div>
+            );
+          })}
+        </Card>
+
+        {/* Requests needing a decision */}
+        <Card className="gap-0 overflow-hidden p-0">
+          <div className="border-border flex items-center border-b px-4 py-3">
+            <span className="text-[13px] font-semibold">
+              Requests needing a decision
+            </span>
+            <div className="flex-1" />
+            {escalatedCount > 0 && (
+              <ToneBadge tone="danger">{escalatedCount} escalated</ToneBadge>
+            )}
+          </div>
+          {decisionQueue.length === 0 && (
+            <EmptyState className="m-4">
+              Nothing needs a decision right now.
+            </EmptyState>
+          )}
+          {decisionQueue.map((r) => {
+            const status = requestStatus(r);
+            const aging = isAging(r.submittedAt, r.priority);
+            return (
+              <div
+                key={r.id}
+                className={cn(
+                  "border-border flex items-center gap-3 border-b px-4 py-2.5 last:border-b-0",
+                  aging && "bg-danger-muted/40",
+                )}
+              >
+                <span className="text-primary w-16.5 shrink-0 font-mono text-[11px] font-medium">
+                  {r.id}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12.5px] font-[450]">
+                    {r.issue}
+                  </div>
+                  <div className="text-muted-foreground mt-0.5 truncate text-[11px]">
+                    {r.roomId.includes("216")
+                      ? "216"
+                      : r.roomId.includes("209")
+                        ? "209"
+                        : "JSQ"}{" "}
+                    · {r.submittedByName}
+                  </div>
+                </div>
+                <ToneBadge
+                  tone={PRIORITY_TONE[r.priority]}
+                  className="w-14 justify-center"
+                >
+                  {r.priority}
+                </ToneBadge>
+                <ToneBadge
+                  tone={STATUS_TONE[status]}
+                  className="w-22 justify-center"
+                >
+                  {STATUS_LABEL[status]}
+                </ToneBadge>
+                <span
+                  className={cn(
+                    "w-12 text-right font-mono text-[11px] font-medium",
+                    aging ? "text-danger-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {formatAge(r.submittedAt)}
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={staff}
+                  onClick={() => advanceRequest(r.id)}
+                  className="w-28 shrink-0 text-[11px]"
+                >
+                  {staff && <Lock className="size-2.5" />}
+                  Advance
+                </Button>
+              </div>
+            );
+          })}
+        </Card>
+      </div>
+
+      {/* Right rail */}
+      <aside className="flex flex-col gap-4">
+        <Card className="gap-0 overflow-hidden p-0">
+          <div className="border-border flex items-center gap-2 border-b px-4 py-3">
+            <Bell className="size-3.5" />
+            <span className="text-[12.5px] font-semibold">Live alerts</span>
+            <ToneBadge
+              tone={buildingAlarm ? "danger" : "neutral"}
+              className="ml-auto"
+            >
+              {(buildingAlarm ? 1 : 0) + attentionItems.length}
+            </ToneBadge>
+          </div>
+          <div className="border-border flex flex-col gap-2.5 border-b p-3">
+            {buildingAlarm && (
+              <div className="border-danger bg-danger-muted rounded-md border border-l-3 p-3">
+                <div className="flex items-center gap-1.5">
+                  <PulseDot tone="danger" pulse />
+                  <span className="text-danger-foreground font-mono text-[9.5px] font-medium tracking-wider">
+                    FIRE
+                  </span>
+                  <span className="flex-1" />
+                  <span className="text-muted-foreground font-mono text-[10px]">
+                    {alarmSeconds}s
+                  </span>
+                </div>
+                <div className="mt-1.5 text-[12.5px] font-medium">
+                  Fire detector triggered
+                </div>
+                <div className="text-muted-foreground mt-0.5 text-[11px]">
+                  Building 216 / Room 302 · FD-216-14
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={staff}
+                  nativeButton={staff}
+                  render={staff ? undefined : <Link href="/sensors" />}
+                  className="border-danger text-danger-foreground mt-2 w-full text-[11px]"
+                >
+                  {staff && <Lock className="size-2.5" />}
+                  Acknowledge
+                </Button>
+              </div>
+            )}
+            {attentionItems.map((item) => (
+              <div
+                key={item.id}
+                className="border-border rounded-md border p-3"
+              >
+                <div className="flex items-center gap-1.5">
+                  <PulseDot
+                    tone={
+                      item.sev === "faulty"
+                        ? "danger"
+                        : item.sev === "offline"
+                          ? "neutral"
+                          : "warning"
+                    }
+                  />
+                  <span className="text-muted-foreground font-mono text-[9.5px] tracking-wider uppercase">
+                    {item.sev}
+                  </span>
+                  <span className="flex-1" />
+                  <span className="text-muted-foreground font-mono text-[10px]">
+                    {item.since}
+                  </span>
+                </div>
+                <div className="mt-1.5 text-[12.5px] font-medium">
+                  {item.detail}
+                </div>
+                <div className="text-muted-foreground mt-0.5 text-[11px]">
+                  {item.location}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={staff}
+                  className="mt-2 w-full text-[11px]"
+                >
+                  {staff && <Lock className="size-2.5" />}
+                  {item.action}
+                </Button>
+              </div>
+            ))}
+          </div>
+          <div className="px-4 pt-3 pb-1">
+            <span className="text-muted-foreground font-mono text-[11px] tracking-wider">
+              LOG BOOK — LIVE
+            </span>
+          </div>
+          <div className="flex flex-col px-4 pb-3.5">
+            {feed.map((f) => (
+              <div
+                key={f.id}
+                className="border-border flex gap-2.5 border-b py-2 last:border-b-0"
+              >
+                <span className="text-muted-foreground w-11 shrink-0 font-mono text-[10.5px]">
+                  {formatTime(f.timestamp)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11.5px] leading-snug">{f.title}</div>
+                  <div className="text-muted-foreground mt-0.5 text-[10.5px]">
+                    {f.actorName}
+                  </div>
+                </div>
+              </div>
+            ))}
+            <Link
+              href="/logbook"
+              className="text-primary mt-2.5 text-[11px] hover:underline"
+            >
+              Open Log Book →
+            </Link>
+          </div>
+        </Card>
+      </aside>
+    </div>
+  );
+}
+
+function Stat({
+  value,
+  label,
+  className,
+}: {
+  value: number;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <div className="font-mono text-[27px] leading-none font-semibold">
+        {value}
+      </div>
+      <div className="text-muted-foreground mt-1 text-[11px]">{label}</div>
+    </div>
+  );
+}
