@@ -57,19 +57,35 @@ Helpers: `buildingStats()`, `roomsForBuilding()`, `roomLabel()`, `buildingName()
 Lookups: `BUILDING_META`, `BUILDING_LOAD_KW`, `LOG_BOOK_SOURCE_META`,
 `REQUEST_NEXT_STATUS`, `REQUEST_NEXT_ACTION`, `CURRENT_USERS`, `LIVE_ALARM_SENSOR_ID`.
 
+**`lib/derive.ts`** — the values that look like fields and are not. Pure rules,
+no data imports, so the layering stays `format → derive → mock-data → app-state`.
+Escalation (high + open + past `ESCALATION_WINDOW_HOURS`), due-service (healthy
+within `DUE_SERVICE_DAYS` — a board column, not a condition), offline and alarm
+status, `countOpenRequests` / `countEscalated`, and `kpiPasses`. Change a
+threshold here, not in a migration. **Never re-implement one of these inline.**
+
 **`lib/app-state.tsx`** — `useAppState()`, the single client-side store.
 Holds the signed-in role, active building, a 1s `elapsed` tick, notifications, and
-in-memory override maps so an action on one page shows up on every other page:
-`requestStatus/advanceRequest`, `sensorStatus/setSensorStatus`,
-`equipmentCondition/setEquipmentCondition`. `resetDemo()` clears all of it.
+in-memory overrides so an action on one page shows up on every other page.
+`requests` / `scopedRequests` / `openRequestCount` are the one resolved list and
+the one count — the sidebar badge, toolbar chips, building cards and dashboard
+tiles all read them, so they cannot disagree. `moveRequest(id, "next" | "prev")`
+walks a request one step; `resetDemo()` clears everything.
 
 **`lib/permissions.ts`** — `roleRank()` (ceo=1, admin=2, staff=3), `roleLabel`, and
-`can*` predicates. Gate on **rank**, never on role equality.
+`can*` predicates. Gate on **rank**, never on role equality. Administration is
+split: `canManageEstate` (CEO) vs `canManageAccounts` (Admin Manager + CEO), with
+`canEditUser(actor, target)` limiting an Admin Manager to Office Staff rows. The
+`*_LOCK_REASON` strings are the tooltips shown on padlocked controls.
 
-**`lib/format.ts`** — `ageHours`, `formatAge`, `isAging`, `formatClock`, `formatTime`,
+**`lib/format.ts`** — `ageHours`, `formatAge`, `formatClock`, `formatTime`,
 `formatDayLabel`, `formatDate`, `formatMmk`, `formatRelative`.
+Never call `formatClock()` during render — use `useLiveClock()` (`src/hooks`), or
+the server and client disagree by a second and hydration fails.
 
-**`lib/nav.ts`** — `NAV_ITEMS`, each with `minRank` and an optional badge key.
+**`lib/nav.ts`** — `NAV_ITEMS` (8, desktop sidebar), `MOBILE_TABS` (5, phone bottom
+bar) and `MORE_ITEMS` (the overflow listed on `/more`). Settings is reached from
+the account menu and `/more`, not the sidebar.
 
 ## Base styles
 
@@ -100,9 +116,16 @@ radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 | `shared/access-denied.tsx` | Role-locked page: states the role, offers a switch. |
 | `shared/empty-state.tsx` | Empty list/filter result. |
 
-Container rules, applied consistently: right drawer (`ui/sheet.tsx` side="right") for
-anything with fields; detail drawer (sheet + scroll-area) for a record with history and
-actions; centred modal for decisions only; toast for every result.
+| `shared/form-drawer.tsx` | `FormDrawer` — the 392px right drawer for anything with fields, plus `FormField` / `FormFieldLocked`. |
+| `shared/detail-drawer.tsx` | `DetailDrawer` — a record with history and actions (412px wide, 392px `size="narrow"`), plus `SameDevicePanel` and `DrawerAction`. |
+
+**Container rules, fixed across every page.** Fields → form drawer. A record with
+history and actions → detail drawer. Decisions only → centred 452px confirm, whose
+`note` says what the action costs in its own numbers. Every result → one toast,
+bottom-left, six seconds, no undo. On a phone both drawers become bottom sheets.
+
+A control a role may not use stays on screen under a padlock with the reason in its
+tooltip — it is never hidden.
 
 ## Pages
 
@@ -116,13 +139,20 @@ actions; centred modal for decisions only; toast for every result.
 | `/records` | Historical Records | range/building/type filters, daily grouping, CSV export |
 | `/logbook` | Log Book | live feed, source filters, pause |
 | `/reports` | Reports | library + full report view, generate sheet, PDF/CSV |
-| `/buildings` | Buildings | one card per site (**being merged into Administration**) |
-| `/admin` | Administration | Buildings / User Accounts tabs, sheets for each entity |
-| `/settings` | Settings | left rail + sections |
+| `/admin` | Administration | Buildings (photo, description, counts, room table) / User Accounts tabs |
+| `/settings` | Settings | Your account, Appearance, Password & sessions |
+| `/more` | More | phone-only overflow nav |
 
 ## Conventions
 
 - `"use client"` on every page; sub-components colocated in the same file.
+- Three widths: phone (`< md`, bottom tabs), tablet (`md..lg`, 60px icon rail),
+  desktop (`lg+`, 196px sidebar). Page toolbars must `flex-wrap`; wide tables scroll
+  inside their card via `overflow-x-auto` + a `min-w-*`, never push the page.
+- `useSearchParams()` needs its own `<Suspense>` boundary or the route fails to
+  prerender.
+- Verify a build with its **exit code** — "✓ Compiled successfully" prints before
+  the prerender step that can still fail.
 - Tailwind arbitrary values carry the design's exact sizes (`text-[12.5px]`, `size-3.5`).
 - Business logic stays in `lib/`; pages read from `useAppState()` and mock data.
 - Biome formats and lints; run `npm run lint` before finishing.
