@@ -1,46 +1,35 @@
 "use client";
 
 import {
-  Kanban,
+  Box,
+  Clock,
+  LayoutGrid,
   Lock,
   MapPin,
-  Package,
   Search,
   Table as TableIcon,
-  X,
+  Undo2,
 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
-import { PulseDot } from "@/components/shared/pulse-dot";
+import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
 import { useAppState } from "@/lib/app-state";
-import { formatAge, isAging } from "@/lib/format";
+import { ESCALATION_WINDOW_HOURS, isEscalated } from "@/lib/derive";
+import { formatAge } from "@/lib/format";
 import {
   BUILDINGS,
+  buildingName,
   EQUIPMENT_UNITS,
   equipmentUnitLabel,
-  MAINTENANCE_REQUESTS,
   REQUEST_NEXT_ACTION,
+  REQUEST_NEXT_STATUS,
+  REQUEST_PREV_ACTION,
+  REQUEST_PREV_STATUS,
   roomLabel,
+  roomsForBuilding,
 } from "@/lib/mock-data";
 import { canAdvanceRequest, isBuildingLocked } from "@/lib/permissions";
 import type {
@@ -52,585 +41,699 @@ import { cn } from "@/lib/utils";
 
 const COLUMNS: { status: RequestStatus; label: string; tone: Tone }[] = [
   { status: "pending", label: "Pending", tone: "warning" },
-  { status: "in-progress", label: "In Progress", tone: "info" },
+  { status: "in-progress", label: "In progress", tone: "info" },
   { status: "resolved", label: "Resolved", tone: "success" },
   { status: "completed", label: "Completed", tone: "neutral" },
 ];
 
-const PRIORITY_TONE: Record<RequestPriority, Tone> = {
-  high: "danger",
-  normal: "neutral",
-};
 const STATUS_TONE: Record<RequestStatus, Tone> = {
   pending: "warning",
   "in-progress": "info",
   resolved: "success",
   completed: "neutral",
 };
+
 const STATUS_LABEL: Record<RequestStatus, string> = {
-  pending: "PENDING",
-  "in-progress": "IN PROGRESS",
-  resolved: "RESOLVED",
-  completed: "COMPLETED",
+  pending: "Pending",
+  "in-progress": "In progress",
+  resolved: "Resolved",
+  completed: "Completed",
+};
+
+const TONE_DOT: Record<Tone, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
+  info: "bg-info",
+  neutral: "bg-neutral-foreground",
+};
+
+const TONE_BORDER: Record<Tone, string> = {
+  success: "border-t-success",
+  warning: "border-t-warning",
+  danger: "border-t-danger",
+  info: "border-t-info",
+  neutral: "border-t-neutral-foreground",
 };
 
 function equipmentLabel(equipmentId: string) {
-  const unit = EQUIPMENT_UNITS.find((u) => u.id === equipmentId);
+  const unit = EQUIPMENT_UNITS.find((u) => u.tag === equipmentId);
   return unit ? equipmentUnitLabel(unit) : equipmentId;
 }
 
 export default function RequestsPage() {
-  const { role, activeBuildingId, requestStatus, moveRequest } = useAppState();
-  const staff = !canAdvanceRequest(role);
-  const locked = isBuildingLocked(role);
+  const {
+    role,
+    activeBuildingId,
+    scopedRequests,
+    moveRequest,
+    addRequest,
+    currentUser,
+  } = useAppState();
+  const confirm = useConfirm();
 
-  const [view, setView] = React.useState<"kanban" | "table">("kanban");
+  const locked = isBuildingLocked(role);
+  const mayAdvance = canAdvanceRequest(role);
+
+  const [view, setView] = React.useState<"board" | "table">("board");
   const [query, setQuery] = React.useState("");
-  const [buildingFilter, setBuildingFilter] = React.useState(
-    locked ? activeBuildingId : "all",
-  );
+  const [buildingFilter, setBuildingFilter] = React.useState("all");
   const [sort, setSort] = React.useState<"time" | "priority">("time");
-  const [collapsedDone, setCollapsedDone] = React.useState(false);
+  const [doneCollapsed, setDoneCollapsed] = React.useState(false);
   const [newOpen, setNewOpen] = React.useState(false);
-  const [extra, setExtra] = React.useState<MaintenanceRequest[]>([]);
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
 
-  const all = [...extra, ...MAINTENANCE_REQUESTS];
-  const filtered = all.filter((r) => {
-    if (effectiveBuilding !== "all" && r.buildingId !== effectiveBuilding)
-      return false;
-    if (query.trim()) {
+  const filtered = scopedRequests
+    .filter((r) => {
+      if (effectiveBuilding !== "all" && r.buildingId !== effectiveBuilding)
+        return false;
+      if (query.trim().length === 0) return true;
       const q = query.toLowerCase();
-      const hay =
-        `${r.id} ${r.issue} ${roomLabel(r.roomId)} ${equipmentLabel(r.equipmentId)} ${r.submittedByName}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
-  });
-  const sorted = [...filtered].sort((a, b) => {
-    if (sort === "priority") {
-      if (a.priority !== b.priority) return a.priority === "high" ? -1 : 1;
-    }
-    return (
-      new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
-    );
-  });
-
-  const total = filtered.length;
-  const highCount = filtered.filter((r) => r.priority === "high").length;
-  const agingCount = filtered.filter((r) =>
-    isAging(r.submittedAt, r.priority),
-  ).length;
-
-  const handleAdvance = (r: MaintenanceRequest) => {
-    moveRequest(r.id, "next");
-    toast.success(`${r.id} → ${REQUEST_NEXT_ACTION[requestStatus(r)]}`, {
-      description: r.issue,
+      return (
+        r.id.toLowerCase().includes(q) ||
+        r.issue.toLowerCase().includes(q) ||
+        roomLabel(r.roomId).toLowerCase().includes(q) ||
+        r.submittedByName.toLowerCase().includes(q)
+      );
+    })
+    .sort((a, b) => {
+      if (sort === "priority") {
+        if (a.priority !== b.priority) return a.priority === "high" ? -1 : 1;
+      }
+      return (
+        new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
+      );
     });
+
+  const highCount = filtered.filter((r) => r.priority === "high").length;
+  const agingCount = filtered.filter((r) => isEscalated(r)).length;
+
+  const move = async (r: MaintenanceRequest, direction: "next" | "prev") => {
+    const target =
+      direction === "next"
+        ? REQUEST_NEXT_STATUS[r.status]
+        : REQUEST_PREV_STATUS[r.status];
+    if (!target) return;
+
+    // Going backwards always asks: work gets marked done too early, and the
+    // age never resets, so stepping back is visible rather than quiet.
+    if (direction === "prev") {
+      const result = await confirm({
+        title: `Move ${r.id} back to ${STATUS_LABEL[target]}?`,
+        body: `${r.issue}`,
+        note: `Its age stays at ${formatAge(r.submittedAt)} — stepping back does not restart the clock.`,
+        tone: "warning",
+        confirmLabel: REQUEST_PREV_ACTION[r.status] ?? "Move back",
+      });
+      if (!result.confirmed) return;
+    }
+
+    moveRequest(r.id, direction);
+    toast.success(`${r.id} → ${STATUS_LABEL[target]}`);
   };
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="flex-row flex-wrap items-center gap-2 p-2.5">
-        <div className="border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
-          <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+        <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
+          <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search requests"
-            className="w-full bg-transparent py-1.5 pr-7 pl-8 text-[12px] outline-none"
+            placeholder="Search id, issue, room or person"
+            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
           {query && (
             <button
               type="button"
+              title="Clear search"
               onClick={() => setQuery("")}
-              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2"
+              className="text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[15px] leading-none"
             >
-              <X className="size-3.5" />
+              ×
             </button>
           )}
         </div>
 
-        <Select
+        <select
           value={effectiveBuilding}
-          onValueChange={(v) => setBuildingFilter(v ?? "all")}
           disabled={locked}
+          title={
+            locked
+              ? "Office Staff are scoped to their own building."
+              : undefined
+          }
+          onChange={(e) => setBuildingFilter(e.target.value)}
+          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <SelectTrigger size="sm" className="text-[12px] font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All buildings</SelectItem>
-            {BUILDINGS.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <option value="all">All buildings</option>
+          {BUILDINGS.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
 
-        <Select
+        <select
           value={sort}
-          onValueChange={(v) => v && setSort(v as typeof sort)}
+          title="High priority first, or oldest first"
+          onChange={(e) => setSort(e.target.value as "time" | "priority")}
+          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
-          <SelectTrigger size="sm" className="text-[12px] font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="time">Time open</SelectItem>
-            <SelectItem value="priority">Priority</SelectItem>
-          </SelectContent>
-        </Select>
+          <option value="time">Time open</option>
+          <option value="priority">Priority</option>
+        </select>
 
-        <div className="bg-border h-5.5 w-px" />
+        <span className="bg-divider h-5.5 w-px shrink-0" />
 
-        <ToneBadge tone="info" title="All requests in scope">
-          {total} total
-        </ToneBadge>
-        <ToneBadge tone="warning" title="High priority">
-          {highCount} high
-        </ToneBadge>
-        <ToneBadge
-          tone="danger"
-          title="Aging — high priority unresolved past 24h"
+        <span
+          title="All requests in scope"
+          className="bg-primary shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium text-white"
         >
-          {agingCount} aging
-        </ToneBadge>
+          {filtered.length}
+        </span>
+        <span
+          title="High priority"
+          className="bg-warning-muted text-warning-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium"
+        >
+          !{highCount}
+        </span>
+        <span
+          title={`Aging — high priority unresolved past ${ESCALATION_WINDOW_HOURS}h`}
+          className={cn(
+            "flex shrink-0 items-center gap-1 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium",
+            agingCount > 0
+              ? "bg-danger-muted text-danger-foreground"
+              : "bg-neutral-muted text-neutral-foreground",
+          )}
+        >
+          <Clock className="size-3" />
+          {agingCount}
+        </span>
 
-        <div className="bg-border h-5.5 w-px" />
-
-        <div className="bg-secondary flex items-center gap-1 rounded-md p-[3px]">
+        <div className="bg-secondary border-border flex shrink-0 items-center gap-1 rounded-[5px] border p-[3px]">
           <button
             type="button"
             title="Board view"
-            onClick={() => setView("kanban")}
+            onClick={() => setView("board")}
             className={cn(
-              "rounded p-1.5",
-              view === "kanban"
+              "cursor-pointer rounded-[3px] px-2.5 py-1.75",
+              view === "board"
                 ? "bg-primary text-primary-foreground"
-                : "text-foreground/60",
+                : "text-foreground/70",
             )}
           >
-            <Kanban className="size-3.5" />
+            <LayoutGrid className="size-3.5" />
           </button>
           <button
             type="button"
             title="Table view"
             onClick={() => setView("table")}
             className={cn(
-              "rounded p-1.5",
+              "cursor-pointer rounded-[3px] px-2.5 py-1.75",
               view === "table"
                 ? "bg-primary text-primary-foreground"
-                : "text-foreground/60",
+                : "text-foreground/70",
             )}
           >
             <TableIcon className="size-3.5" />
           </button>
         </div>
 
-        <Button
-          size="sm"
-          variant="outline"
-          className="border-primary text-info-foreground"
+        <button
+          type="button"
           onClick={() => setNewOpen(true)}
+          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
         >
           New request
-        </Button>
-      </Card>
+        </button>
+      </div>
 
-      {view === "kanban" ? (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      {view === "board" ? (
+        <div
+          className="grid items-start gap-3"
+          style={{
+            // Completed collapses sideways to a rail rather than disappearing,
+            // so the board keeps its width for active work.
+            gridTemplateColumns: doneCollapsed
+              ? "repeat(3, minmax(0,1fr)) 46px"
+              : "repeat(4, minmax(0,1fr))",
+          }}
+        >
           {COLUMNS.map((col) => {
-            const items = sorted.filter((r) => requestStatus(r) === col.status);
-            const isDone = col.status === "completed";
-            if (isDone && collapsedDone) {
+            const cards = filtered.filter((r) => r.status === col.status);
+            const collapsible = col.status === "completed";
+
+            if (collapsible && doneCollapsed) {
               return (
                 <button
                   type="button"
                   key={col.status}
-                  onClick={() => setCollapsedDone(false)}
                   title="Expand completed requests"
-                  className="bg-muted hover:bg-surface-hover border-border flex min-h-85 flex-col items-center gap-2.5 rounded-md border pt-3 pb-3.5"
-                  style={{
-                    borderTop: `2px solid var(--color-neutral-foreground)`,
-                  }}
+                  onClick={() => setDoneCollapsed(false)}
+                  className={cn(
+                    "bg-neutral-muted hover:bg-neutral-muted/70 flex min-h-85 cursor-pointer flex-col items-center gap-2.75 rounded-[5px] border border-t-2 border-[#dcdfe5] px-0 pt-2.75 pb-3.5",
+                    TONE_BORDER[col.tone],
+                  )}
                 >
-                  <span className="bg-card flex size-5.5 items-center justify-center rounded font-mono text-[13px]">
-                    »
+                  <span className="border-input text-neutral-foreground flex size-5.5 items-center justify-center rounded-[3px] border bg-white font-mono text-[13px] leading-none font-medium">
+                    ‹
                   </span>
-                  <span className="bg-card rounded px-1.5 py-0.5 font-mono text-[10.5px] font-semibold">
-                    {items.length}
+                  <span className="text-neutral-foreground rounded-[3px] border border-[#dcdfe5] bg-white px-1.5 py-1 font-mono text-[10.5px] leading-none font-semibold">
+                    {cards.length}
                   </span>
-                  <span className="text-muted-foreground mt-1 [writing-mode:vertical-rl] text-[11.5px] font-semibold tracking-wide">
+                  <span
+                    className={cn(
+                      "size-1.75 shrink-0 rounded-full",
+                      TONE_DOT[col.tone],
+                    )}
+                  />
+                  <span className="text-neutral-foreground text-[11.5px] font-semibold tracking-[0.03em] [writing-mode:vertical-rl]">
                     {col.label}
                   </span>
                 </button>
               );
             }
+
             return (
               <div
                 key={col.status}
-                className="bg-muted border-border flex flex-col rounded-md border"
+                className={cn(
+                  "border-border bg-card overflow-hidden rounded-[5px] border border-t-2",
+                  TONE_BORDER[col.tone],
+                )}
               >
-                <div
-                  className="bg-card border-border flex items-center gap-2 rounded-t-[5px] border-b px-3 py-2.5"
-                  style={{
-                    borderTop: `2px solid var(--color-${col.tone === "neutral" ? "neutral-foreground" : col.tone})`,
-                  }}
-                >
-                  <PulseDot tone={col.tone} />
-                  <span className="text-[11.5px] font-semibold">
+                <div className="border-divider flex items-center gap-2 border-b px-3 py-2.5">
+                  <span
+                    className={cn(
+                      "size-1.75 shrink-0 rounded-full",
+                      TONE_DOT[col.tone],
+                    )}
+                  />
+                  <span className="flex-1 text-[11px] leading-none font-semibold">
                     {col.label}
                   </span>
-                  <span className="bg-secondary rounded px-1.5 py-0.5 font-mono text-[10.5px] font-semibold">
-                    {items.length}
-                  </span>
-                  <div className="flex-1" />
-                  {isDone && (
+                  <ToneBadge tone={col.tone}>{cards.length}</ToneBadge>
+                  {collapsible && (
                     <button
                       type="button"
                       title="Collapse completed requests"
-                      onClick={() => setCollapsedDone(true)}
-                      className="text-muted-foreground hover:text-primary text-[10px]"
+                      onClick={() => setDoneCollapsed(true)}
+                      className="text-muted-foreground hover:text-foreground cursor-pointer px-0.5 font-mono text-[13px] leading-none"
                     >
-                      Collapse
+                      ›
                     </button>
                   )}
                 </div>
-                <div className="flex flex-1 flex-col gap-2 p-2.5">
-                  {items.length === 0 && (
-                    <EmptyState>Nothing in this column</EmptyState>
+
+                <div className="flex min-h-30 flex-col gap-2 p-2.5">
+                  {cards.map((r) => (
+                    <RequestCard
+                      key={r.id}
+                      request={r}
+                      mayAdvance={mayAdvance}
+                      onMove={move}
+                    />
+                  ))}
+                  {cards.length === 0 && (
+                    <div className="text-muted-foreground px-0.5 py-2 text-[11px]">
+                      Nothing in this column
+                    </div>
                   )}
-                  {items.map((r) => {
-                    const aging = isAging(r.submittedAt, r.priority);
-                    return (
-                      <Card
-                        key={r.id}
-                        className="border-border gap-1.5 border-l-[3px] p-2.5 shadow-none"
-                        style={{
-                          borderLeftColor: aging
-                            ? "var(--color-danger)"
-                            : "var(--color-border)",
-                        }}
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-primary font-mono text-[10.5px] font-medium">
-                            {r.id}
-                          </span>
-                          <div className="flex-1" />
-                          {aging ? (
-                            <ToneBadge tone="danger">
-                              Aging {formatAge(r.submittedAt)}
-                            </ToneBadge>
-                          ) : (
-                            <span className="text-muted-foreground font-mono text-[10.5px]">
-                              {formatAge(r.submittedAt)}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-[12.5px] font-medium">
-                          {r.issue}
-                        </div>
-                        <div className="text-foreground/70 flex items-center gap-1 text-[11px]">
-                          <MapPin className="size-3" /> {roomLabel(r.roomId)}
-                        </div>
-                        <div className="text-foreground/70 flex items-center gap-1 text-[11px]">
-                          <Package className="size-3" />{" "}
-                          {equipmentLabel(r.equipmentId)}
-                        </div>
-                        <div className="border-border flex items-center justify-between border-t pt-1.5">
-                          <ToneBadge tone={PRIORITY_TONE[r.priority]}>
-                            {r.priority}
-                          </ToneBadge>
-                          <span className="text-muted-foreground text-[10.5px]">
-                            {r.submittedByName}
-                          </span>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={staff}
-                          onClick={() => handleAdvance(r)}
-                          className="mt-1 w-full text-[11px]"
-                        >
-                          {staff && <Lock className="size-2.5" />}
-                          {REQUEST_NEXT_ACTION[col.status]}
-                        </Button>
-                      </Card>
-                    );
-                  })}
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        <Card className="gap-0 overflow-hidden p-0">
-          <div className="bg-surface-subtle border-border text-muted-foreground flex border-b px-4 py-2 font-mono text-[10px] tracking-wider">
-            <span className="w-20">ID</span>
-            <span className="w-24">BUILDING</span>
-            <span className="w-30">LOCATION</span>
-            <span className="w-30">EQUIPMENT</span>
-            <span className="flex-1">ISSUE</span>
-            <span className="w-18">PRIORITY</span>
-            <span className="w-26">STATUS</span>
-            <span className="w-14 text-right">AGE</span>
-            <span className="w-24 text-right">SUBMITTED BY</span>
-            <span className="w-26 text-right">ACTION</span>
+        <div className="border-border bg-card overflow-hidden rounded-[5px] border">
+          <div className="bg-surface-subtle border-divider text-muted-foreground flex border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
+            <span className="w-22">Id</span>
+            <span className="w-28">Building</span>
+            <span className="w-28">Location</span>
+            <span className="w-36">Equipment</span>
+            <span className="flex-1">Issue</span>
+            <span className="w-22">Priority</span>
+            <span className="w-26">Status</span>
+            <span className="w-18">Age</span>
+            <span className="w-28">Submitted by</span>
+            <span className="w-40 text-right">Action</span>
           </div>
-          {sorted.length === 0 && (
-            <EmptyState className="m-4">
-              No requests match these filters.
-            </EmptyState>
-          )}
-          {sorted.map((r) => {
-            const status = requestStatus(r);
-            const aging = isAging(r.submittedAt, r.priority);
+
+          {filtered.map((r) => {
+            const aging = isEscalated(r);
             return (
               <div
                 key={r.id}
                 className={cn(
-                  "border-border flex items-center border-b border-l-[3px] px-4 py-2.5 text-[12px] last:border-b-0",
+                  "border-rule flex items-center border-b px-4 py-2.5",
+                  aging && "border-l-danger border-l-[3px]",
                 )}
-                style={{
-                  borderLeftColor: aging
-                    ? "var(--color-danger)"
-                    : "transparent",
-                }}
               >
-                <span className="text-primary w-20 font-mono text-[11px] font-medium">
+                <span className="text-accent-foreground w-22 font-mono text-[11px] font-medium">
                   {r.id}
                 </span>
-                <span className="w-24 truncate">
-                  {BUILDINGS.find((b) => b.id === r.buildingId)?.name}
+                <span className="text-neutral-foreground w-28 truncate text-[12px]">
+                  {buildingName(r.buildingId)}
                 </span>
-                <span className="text-foreground/70 w-30 truncate">
+                <span className="text-neutral-foreground w-28 truncate text-[12px]">
                   {roomLabel(r.roomId)}
                 </span>
-                <span className="text-foreground/70 w-30 truncate">
+                <span className="text-muted-foreground w-36 truncate text-[11.5px]">
                   {equipmentLabel(r.equipmentId)}
                 </span>
-                <span className="flex-1 truncate pr-3" title={r.issue}>
+                <span
+                  title={r.issue}
+                  className="min-w-0 flex-1 truncate pr-3 text-[12px] font-[450]"
+                >
                   {r.issue}
                 </span>
-                <span className="w-18">
-                  <ToneBadge tone={PRIORITY_TONE[r.priority]}>
+                <span className="w-22">
+                  <ToneBadge
+                    tone={r.priority === "high" ? "warning" : "neutral"}
+                  >
                     {r.priority}
                   </ToneBadge>
                 </span>
                 <span className="w-26">
-                  <ToneBadge tone={STATUS_TONE[status]}>
-                    {STATUS_LABEL[status]}
+                  <ToneBadge tone={STATUS_TONE[r.status]}>
+                    {STATUS_LABEL[r.status]}
                   </ToneBadge>
                 </span>
                 <span
                   className={cn(
-                    "w-14 text-right font-mono text-[11px] font-medium",
+                    "flex w-18 items-center gap-1 font-mono text-[11px]",
                     aging ? "text-danger-foreground" : "text-muted-foreground",
                   )}
                 >
+                  {aging && (
+                    <Clock
+                      className="size-3"
+                      aria-label={`Aging — unresolved past ${ESCALATION_WINDOW_HOURS}h`}
+                    />
+                  )}
                   {formatAge(r.submittedAt)}
                 </span>
-                <span className="text-foreground/70 w-24 truncate text-right text-[11.5px]">
+                <span className="text-muted-foreground w-28 truncate text-[11.5px]">
                   {r.submittedByName}
                 </span>
-                <span className="flex w-26 justify-end">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={staff}
-                    onClick={() => handleAdvance(r)}
-                    className="text-[11px]"
-                  >
-                    {staff && <Lock className="size-2.5" />}
-                    {REQUEST_NEXT_ACTION[status]}
-                  </Button>
+                <span className="flex w-40 justify-end gap-1.5">
+                  <MoveButtons
+                    request={r}
+                    mayAdvance={mayAdvance}
+                    onMove={move}
+                  />
                 </span>
               </div>
             );
           })}
-          {sorted.length > 0 && (
-            <div className="text-muted-foreground flex items-center justify-between px-4 py-2.5 text-[11.5px]">
-              <span>
-                {total} requests · {agingCount} aging past 24h
-              </span>
-              <button
-                type="button"
-                onClick={() =>
-                  toast.info("Exported filtered set to CSV (demo only).")
-                }
-                className="text-primary cursor-pointer"
-              >
-                Export filtered set to CSV
-              </button>
-            </div>
+
+          {filtered.length === 0 && (
+            <EmptyState className="m-4">
+              No requests match these filters.
+            </EmptyState>
           )}
-        </Card>
+        </div>
       )}
 
-      <NewRequestSheet
+      <NewRequestDrawer
         open={newOpen}
         onOpenChange={setNewOpen}
-        defaultBuildingId={locked ? activeBuildingId : undefined}
-        onCreate={(r) => {
-          setExtra((prev) => [r, ...prev]);
-          toast.success(`${r.id} created`, {
-            description: "Visible in this session only.",
-          });
+        defaultBuildingId={locked ? activeBuildingId : BUILDINGS[0].id}
+        onCreate={(request) => {
+          addRequest(request);
+          toast.success(`${request.id} raised`);
         }}
+        submittedBy={currentUser}
       />
     </div>
   );
 }
 
-function NewRequestSheet({
+function MoveButtons({
+  request,
+  mayAdvance,
+  onMove,
+}: {
+  request: MaintenanceRequest;
+  mayAdvance: boolean;
+  onMove: (r: MaintenanceRequest, d: "next" | "prev") => void;
+}) {
+  const nextLabel = REQUEST_NEXT_ACTION[request.status];
+  const backLabel = REQUEST_PREV_ACTION[request.status];
+  const canBack = Boolean(REQUEST_PREV_STATUS[request.status]) && mayAdvance;
+
+  return (
+    <>
+      {canBack && (
+        <button
+          type="button"
+          title={backLabel ?? "Move back"}
+          onClick={() => onMove(request, "prev")}
+          className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2"
+        >
+          <Undo2 className="size-3" />
+        </button>
+      )}
+      {nextLabel && (
+        <button
+          type="button"
+          disabled={!mayAdvance}
+          title={
+            mayAdvance
+              ? nextLabel
+              : "Office Staff submit and watch requests; Admin Managers action them."
+          }
+          onClick={() => onMove(request, "next")}
+          className={cn(
+            "bg-card flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium",
+            mayAdvance
+              ? "border-primary text-accent-foreground hover:bg-accent/40"
+              : "border-border text-muted-foreground cursor-not-allowed opacity-45",
+          )}
+        >
+          {!mayAdvance && <Lock className="size-2.5" />}
+          {nextLabel}
+        </button>
+      )}
+    </>
+  );
+}
+
+function RequestCard({
+  request,
+  mayAdvance,
+  onMove,
+}: {
+  request: MaintenanceRequest;
+  mayAdvance: boolean;
+  onMove: (r: MaintenanceRequest, d: "next" | "prev") => void;
+}) {
+  const aging = isEscalated(request);
+  return (
+    <div
+      className={cn(
+        "border-divider rounded border border-l-[3px] bg-white px-2.75 py-2.5",
+        aging
+          ? "border-l-danger"
+          : request.priority === "high"
+            ? "border-l-warning"
+            : "border-l-transparent",
+      )}
+    >
+      <div className="flex items-center gap-1.75">
+        <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
+          {request.id}
+        </span>
+        <div className="flex-1" />
+        {aging ? (
+          // Self-labelling: the red edge plus the tag, so no legend is needed.
+          <span className="bg-danger-muted text-danger-foreground flex items-center gap-1 rounded-[3px] px-1.5 py-1 font-mono text-[9.5px] leading-none font-semibold tracking-[0.05em]">
+            <Clock className="size-2.75" />
+            AGING {formatAge(request.submittedAt)}
+          </span>
+        ) : (
+          <span className="text-muted-foreground font-mono text-[10px]">
+            {formatAge(request.submittedAt)}
+          </span>
+        )}
+      </div>
+
+      <div className="mt-1.75 text-[12.5px] leading-snug font-[450] text-pretty">
+        {request.issue}
+      </div>
+
+      <div className="text-muted-foreground mt-2 flex flex-col gap-1 text-[10.5px]">
+        <span className="flex items-center gap-1.5">
+          <MapPin className="size-2.75 shrink-0" />
+          {roomLabel(request.roomId)} · {buildingName(request.buildingId)}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Box className="size-2.75 shrink-0" />
+          {equipmentLabel(request.equipmentId)}
+        </span>
+      </div>
+
+      <div className="mt-2.5 flex items-center gap-2">
+        <ToneBadge tone={request.priority === "high" ? "warning" : "neutral"}>
+          {request.priority}
+        </ToneBadge>
+        <span className="text-muted-foreground truncate text-[10.5px]">
+          {request.submittedByName}
+        </span>
+      </div>
+
+      <div className="mt-2.5 flex gap-1.5">
+        <MoveButtons
+          request={request}
+          mayAdvance={mayAdvance}
+          onMove={onMove}
+        />
+      </div>
+    </div>
+  );
+}
+
+function NewRequestDrawer({
   open,
   onOpenChange,
   defaultBuildingId,
+  submittedBy,
   onCreate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  defaultBuildingId?: string;
-  onCreate: (r: MaintenanceRequest) => void;
+  defaultBuildingId: string;
+  submittedBy: { uid: string; name: string };
+  onCreate: (request: MaintenanceRequest) => void;
 }) {
-  const [buildingId, setBuildingId] = React.useState(
-    defaultBuildingId ?? BUILDINGS[0].id,
-  );
+  const [buildingId, setBuildingId] = React.useState(defaultBuildingId);
+  const [roomId, setRoomId] = React.useState("");
   const [equipmentId, setEquipmentId] = React.useState("");
   const [issue, setIssue] = React.useState("");
   const [priority, setPriority] = React.useState<RequestPriority>("normal");
-  const { currentUser } = useAppState();
+  const [error, setError] = React.useState<string | null>(null);
 
-  const roomOptions = EQUIPMENT_UNITS.filter(
-    (u) => u.buildingId === buildingId,
-  );
-
-  const submit = () => {
-    if (!issue.trim() || !equipmentId) return;
-    const unit = EQUIPMENT_UNITS.find((u) => u.id === equipmentId);
-    if (!unit) return;
-    const now = new Date().toISOString();
-    onCreate({
-      id: `REQ-${Math.floor(4000 + Math.random() * 900)}`,
-      buildingId,
-      roomId: unit.roomId,
-      equipmentId,
-      issue: issue.trim(),
-      priority,
-      status: "pending",
-      submittedBy: currentUser.uid,
-      submittedByName: currentUser.name,
-      submittedAt: now,
-      updatedAt: now,
-    });
-    setIssue("");
+  React.useEffect(() => {
+    if (!open) return;
+    setBuildingId(defaultBuildingId);
+    setRoomId(roomsForBuilding(defaultBuildingId)[0]?.id ?? "");
     setEquipmentId("");
-    onOpenChange(false);
-  };
+    setIssue("");
+    setPriority("normal");
+    setError(null);
+  }, [open, defaultBuildingId]);
+
+  const rooms = roomsForBuilding(buildingId);
+  const units = EQUIPMENT_UNITS.filter((u) => u.roomId === roomId);
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-105">
-        <SheetHeader>
-          <SheetTitle className="font-mono text-[11px] tracking-wider uppercase">
-            New request
-          </SheetTitle>
-        </SheetHeader>
-        <div className="flex flex-col gap-3.5 px-4">
-          <Field label="Building">
-            <Select
-              value={buildingId}
-              onValueChange={(v) => {
-                if (v) {
-                  setBuildingId(v);
-                  setEquipmentId("");
-                }
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {BUILDINGS.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Equipment">
-            <Select
-              value={equipmentId}
-              onValueChange={(v) => setEquipmentId(v ?? "")}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a unit" />
-              </SelectTrigger>
-              <SelectContent>
-                {roomOptions.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.tag} · {equipmentUnitLabel(u)} · {roomLabel(u.roomId)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Issue">
-            <Textarea
-              value={issue}
-              onChange={(e) => setIssue(e.target.value)}
-              placeholder="Describe the fault"
-              className="min-h-20"
-            />
-          </Field>
-          <Field label="Priority">
-            <Select
-              value={priority}
-              onValueChange={(v) => v && setPriority(v as RequestPriority)}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="normal">Normal</SelectItem>
-                <SelectItem value="high">High</SelectItem>
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-        <SheetFooter className="flex-row">
-          <Button
-            onClick={submit}
-            className="flex-1"
-            disabled={!issue.trim() || !equipmentId}
+    <FormDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="New request"
+      description="Raised against a specific unit so the register and the request stay in step."
+      submitLabel="Raise request"
+      error={error}
+      onSubmit={() => {
+        if (issue.trim().length < 8) {
+          setError("Describe the fault in a sentence so it can be triaged.");
+          return;
+        }
+        const now = new Date().toISOString();
+        onCreate({
+          id: `REQ-${Math.floor(4200 + Math.random() * 99)}`,
+          buildingId,
+          roomId,
+          equipmentId: equipmentId || units[0]?.tag || "—",
+          issue: issue.trim(),
+          priority,
+          status: "pending",
+          submittedBy: submittedBy.uid,
+          submittedByName: submittedBy.name,
+          submittedAt: now,
+          updatedAt: now,
+        });
+        onOpenChange(false);
+      }}
+    >
+      <div className="grid grid-cols-2 gap-2.75">
+        <FormField label="Building">
+          <select
+            value={buildingId}
+            onChange={(e) => {
+              setBuildingId(e.target.value);
+              setRoomId(roomsForBuilding(e.target.value)[0]?.id ?? "");
+              setEquipmentId("");
+            }}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
           >
-            Submit request
-          </Button>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
-  );
-}
+            {BUILDINGS.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Room">
+          <select
+            value={roomId}
+            onChange={(e) => {
+              setRoomId(e.target.value);
+              setEquipmentId("");
+            }}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          >
+            {rooms.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.roomNumber}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      </div>
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
-        {label}
-      </Label>
-      {children}
-    </div>
+      <FormField label="Equipment">
+        <select
+          value={equipmentId}
+          onChange={(e) => setEquipmentId(e.target.value)}
+          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+        >
+          {units.length === 0 && (
+            <option value="">No units in this room</option>
+          )}
+          {units.map((u) => (
+            <option key={u.id} value={u.tag}>
+              {u.tag} · {equipmentUnitLabel(u)}
+            </option>
+          ))}
+        </select>
+      </FormField>
+
+      <FormField label="Issue">
+        <textarea
+          rows={4}
+          value={issue}
+          onChange={(e) => setIssue(e.target.value)}
+          placeholder="What is wrong, and what have you already tried?"
+          className="border-input focus:border-primary w-full resize-y rounded border px-2.5 py-2.25 text-[12px] leading-relaxed outline-none"
+        />
+      </FormField>
+
+      <FormField
+        label="Priority"
+        hint={`High priority is flagged as aging once it passes ${ESCALATION_WINDOW_HOURS} hours unresolved.`}
+      >
+        <select
+          value={priority}
+          onChange={(e) => setPriority(e.target.value as RequestPriority)}
+          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+        >
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+        </select>
+      </FormField>
+    </FormDrawer>
   );
 }
