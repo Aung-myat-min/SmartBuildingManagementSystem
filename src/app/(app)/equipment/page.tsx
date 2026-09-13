@@ -2,40 +2,39 @@
 
 import {
   Archive,
-  ArrowRight,
   Camera,
   CheckCircle2,
-  Kanban,
-  Lock,
+  LayoutGrid,
   MoveRight,
   Search,
   Table as TableIcon,
   Wrench,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/shared/confirm-dialog";
+import {
+  DetailDrawer,
+  DetailDrawerHeader,
+  DetailDrawerSection,
+  DetailMeta,
+  DetailMetaGrid,
+  DrawerAction,
+  DrawerActionGrid,
+  SameDevicePanel,
+} from "@/components/shared/detail-drawer";
 import { EmptyState } from "@/components/shared/empty-state";
+import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { Textarea } from "@/components/ui/textarea";
 import { useAppState } from "@/lib/app-state";
+import {
+  boardColumnFor,
+  DUE_SERVICE_DAYS,
+  daysUntilService,
+  type EquipmentBoardColumn,
+  isDueService,
+} from "@/lib/derive";
 import { formatDate, formatRelative } from "@/lib/format";
 import {
   BUILDINGS,
@@ -46,231 +45,244 @@ import {
   equipmentUnitLabel,
   roomLabel,
   roomsForBuilding,
+  sensorForEquipment,
 } from "@/lib/mock-data";
-import { canDecommissionEquipment, isBuildingLocked } from "@/lib/permissions";
+import {
+  canDecommissionEquipment,
+  DECOMMISSION_LOCK_REASON,
+  isBuildingLocked,
+} from "@/lib/permissions";
 import type { EquipmentCondition, EquipmentUnit } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const CONDITION_META: Record<
-  EquipmentCondition,
-  { label: string; tone: Tone }
+const COLUMN_META: Record<
+  EquipmentBoardColumn,
+  { label: string; tone: Tone; accent: string }
 > = {
-  healthy: { label: "HEALTHY", tone: "success" },
-  faulty: { label: "FAULTY", tone: "danger" },
-  "under-maintenance": { label: "MAINT.", tone: "warning" },
-  decommissioned: { label: "DECOMMISSIONED", tone: "neutral" },
+  healthy: { label: "Healthy", tone: "success", accent: "border-t-success" },
+  "due-service": {
+    label: "Due service",
+    tone: "warning",
+    accent: "border-t-warning",
+  },
+  faulty: { label: "Faulty", tone: "danger", accent: "border-t-danger" },
+  "under-maintenance": {
+    label: "Under maintenance",
+    tone: "info",
+    accent: "border-t-info",
+  },
+  decommissioned: {
+    label: "Decommissioned",
+    tone: "neutral",
+    accent: "border-t-neutral-foreground",
+  },
 };
 
-const BOARD_COLUMNS: EquipmentCondition[] = [
+const BOARD_ORDER: EquipmentBoardColumn[] = [
   "healthy",
-  "under-maintenance",
+  "due-service",
   "faulty",
-  "decommissioned",
+  "under-maintenance",
 ];
 
+function typeLabel(typeId: string) {
+  return EQUIPMENT_TYPES.find((t) => t.id === typeId)?.label ?? typeId;
+}
+
 export default function EquipmentPage() {
-  const { role, activeBuildingId, equipmentCondition } = useAppState();
+  const router = useRouter();
+  const { role, activeBuildingId, equipmentCondition, setEquipmentCondition } =
+    useAppState();
   const locked = isBuildingLocked(role);
 
-  const [view, setView] = React.useState<"list" | "board">("list");
+  const [view, setView] = React.useState<"register" | "board">("register");
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState(
     locked ? activeBuildingId : "all",
   );
   const [typeFilter, setTypeFilter] = React.useState("all");
-  const [showDecom, setShowDecom] = React.useState(false);
+  const [showDecommissioned, setShowDecommissioned] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
 
-  const conditionOf = (u: EquipmentUnit) =>
-    equipmentCondition(u.id, u.condition);
+  const conditionOf = React.useCallback(
+    (u: EquipmentUnit) => equipmentCondition(u.id, u.condition),
+    [equipmentCondition],
+  );
 
-  const filtered = EQUIPMENT_UNITS.filter((u) => {
+  const units = EQUIPMENT_UNITS.filter((u) => {
     const condition = conditionOf(u);
-    if (!showDecom && condition === "decommissioned") return false;
+    if (condition === "decommissioned" && !showDecommissioned) return false;
     if (effectiveBuilding !== "all" && u.buildingId !== effectiveBuilding)
       return false;
     if (typeFilter !== "all" && u.typeId !== typeFilter) return false;
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      const hay =
-        `${u.tag} ${equipmentUnitLabel(u)} ${roomLabel(u.roomId)}`.toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
-    return true;
+    if (query.trim().length === 0) return true;
+    const q = query.toLowerCase();
+    return (
+      u.tag.toLowerCase().includes(q) ||
+      typeLabel(u.typeId).toLowerCase().includes(q) ||
+      roomLabel(u.roomId).toLowerCase().includes(q)
+    );
   });
 
-  const faultyCount = filtered.filter(
-    (u) => conditionOf(u) === "faulty",
-  ).length;
-  const dueSoonCount = filtered.filter(
-    (u) => new Date(u.nextServiceDue).getTime() - Date.now() < 14 * 86400000,
-  ).length;
+  const faultyCount = units.filter((u) => conditionOf(u) === "faulty").length;
+  const dueCount = units.filter((u) => isDueService(u, conditionOf(u))).length;
 
-  const selected = EQUIPMENT_UNITS.find((u) => u.id === selectedId) ?? null;
+  const selected = selectedId
+    ? (EQUIPMENT_UNITS.find((u) => u.id === selectedId) ?? null)
+    : null;
+
+  const boardColumns = [
+    ...BOARD_ORDER,
+    ...(showDecommissioned ? (["decommissioned"] as const) : []),
+  ];
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="flex-row flex-wrap items-center gap-2 p-2.5">
-        <div className="border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
-          <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+        <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
+          <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search tag, type or room"
-            className="w-full bg-transparent py-1.5 pr-3 pl-8 text-[12px] outline-none"
+            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
         </div>
-        <Select
+
+        <select
           value={effectiveBuilding}
-          onValueChange={(v) => setBuildingFilter(v ?? "all")}
           disabled={locked}
+          title={
+            locked
+              ? "Office Staff are scoped to their own building."
+              : undefined
+          }
+          onChange={(e) => setBuildingFilter(e.target.value)}
+          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <SelectTrigger size="sm" className="text-[12px] font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All buildings</SelectItem>
-            {BUILDINGS.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+          <option value="all">All buildings</option>
+          {BUILDINGS.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+
+        <select
           value={typeFilter}
-          onValueChange={(v) => setTypeFilter(v ?? "all")}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
-          <SelectTrigger size="sm" className="text-[12px] font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            {EQUIPMENT_TYPES.map((t) => (
-              <SelectItem key={t.id} value={t.id}>
-                {t.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <option value="all">All types</option>
+          {EQUIPMENT_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+
         <button
           type="button"
           title="Decommissioned units are hidden by default"
-          onClick={() => setShowDecom((v) => !v)}
+          onClick={() => setShowDecommissioned((s) => !s)}
           className={cn(
-            "rounded-md border px-2.5 py-1.5 text-[11.5px] font-medium",
-            showDecom
-              ? "border-primary bg-accent text-info-foreground"
-              : "border-border text-foreground/70",
+            "shrink-0 cursor-pointer rounded border px-2.5 py-2 text-[11.5px] leading-none font-medium",
+            showDecommissioned
+              ? "border-primary bg-accent text-accent-foreground"
+              : "border-input text-neutral-foreground hover:border-primary",
           )}
         >
-          {showDecom ? "Hide decommissioned" : "Show decommissioned"}
+          {showDecommissioned ? "Hide" : "Show"} decommissioned
         </button>
-        <div className="bg-border h-5.5 w-px" />
-        <ToneBadge tone="info" title="Units in scope">
-          {filtered.length} in scope
-        </ToneBadge>
-        <ToneBadge tone="danger" title="Faulty">
-          {faultyCount} faulty
-        </ToneBadge>
-        <ToneBadge tone="warning" title="Service due within 14 days">
-          {dueSoonCount} due soon
-        </ToneBadge>
-        <div className="flex-1" />
-        <div className="bg-secondary flex items-center gap-1 rounded-md p-[3px]">
-          <button
-            type="button"
-            title="Register"
-            onClick={() => setView("list")}
-            className={cn(
-              "rounded p-1.5",
-              view === "list"
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground/60",
-            )}
-          >
-            <TableIcon className="size-3.5" />
-          </button>
-          <button
-            type="button"
-            title="Condition board"
-            onClick={() => setView("board")}
-            className={cn(
-              "rounded p-1.5",
-              view === "board"
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground/60",
-            )}
-          >
-            <Kanban className="size-3.5" />
-          </button>
-        </div>
-      </Card>
 
-      {view === "list" ? (
-        <Card className="gap-0 overflow-hidden p-0">
-          <div className="bg-surface-subtle border-border text-muted-foreground flex border-b px-4 py-2 font-mono text-[10px] tracking-wider">
-            <span className="w-24">TAG</span>
-            <span className="w-36">TYPE</span>
-            <span className="flex-1">LOCATION</span>
-            <span className="w-24">CONDITION</span>
-            <span className="w-22">INSTALLED</span>
-            <span className="w-24">NEXT SERVICE</span>
-            <span className="w-16 text-right">REQUESTS</span>
-            <span className="w-14 text-right">DETAIL</span>
+        <span className="bg-divider h-5.5 w-px shrink-0" />
+
+        <Chip title="Units in scope" className="bg-primary text-white">
+          {units.length}
+        </Chip>
+        <Chip title="Faulty" className="bg-danger-muted text-danger-foreground">
+          !{faultyCount}
+        </Chip>
+        <Chip
+          title={`Service due within ${DUE_SERVICE_DAYS} days`}
+          className="bg-warning-muted text-warning-foreground"
+        >
+          {dueCount}
+        </Chip>
+
+        <div className="bg-secondary border-border flex shrink-0 items-center gap-1 rounded-[5px] border p-[3px]">
+          <ViewButton
+            icon={TableIcon}
+            title="Register"
+            active={view === "register"}
+            onClick={() => setView("register")}
+          />
+          <ViewButton
+            icon={LayoutGrid}
+            title="Condition board"
+            active={view === "board"}
+            onClick={() => setView("board")}
+          />
+        </div>
+      </div>
+
+      {view === "register" ? (
+        <div className="border-border bg-card overflow-hidden rounded-[5px] border">
+          <div className="bg-surface-subtle border-divider text-muted-foreground flex border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
+            <span className="w-26">Tag</span>
+            <span className="w-37.5">Type</span>
+            <span className="flex-1">Location</span>
+            <span className="w-33">Condition</span>
+            <span className="w-24">Installed</span>
+            <span className="w-29.5">Next service</span>
+            <span className="w-20.5 text-right">Requests</span>
+            <span className="w-18.5 text-right">Detail</span>
           </div>
-          {filtered.length === 0 && (
-            <EmptyState className="m-4">
-              No equipment matches these filters.
-            </EmptyState>
-          )}
-          {filtered.map((u) => {
+
+          {units.map((u) => {
             const condition = conditionOf(u);
-            const meta = CONDITION_META[condition];
-            const dueSoon =
-              new Date(u.nextServiceDue).getTime() - Date.now() < 14 * 86400000;
+            const due = isDueService(u, condition);
             return (
               <button
                 type="button"
                 key={u.id}
                 onClick={() => setSelectedId(u.id)}
                 className={cn(
-                  "border-border hover:bg-surface-hover flex w-full items-center border-b border-l-[3px] px-4 py-2.5 text-left text-[12px] last:border-b-0",
-                  condition === "decommissioned" && "opacity-55",
+                  "border-rule hover:bg-surface-hover flex w-full items-center border-b px-4 py-2.5 text-left",
+                  condition === "faulty" && "border-l-danger border-l-[3px]",
+                  due && "border-l-warning border-l-[3px]",
                 )}
-                style={{
-                  borderLeftColor:
-                    condition === "faulty"
-                      ? "var(--color-danger)"
-                      : "transparent",
-                }}
               >
-                <span className="text-primary w-24 font-mono text-[11px] font-medium">
+                <span className="text-accent-foreground w-26 font-mono text-[11px] font-medium">
                   {u.tag}
                 </span>
-                <span className="w-36 truncate">{equipmentUnitLabel(u)}</span>
-                <span className="text-foreground/70 flex-1 truncate">
-                  {roomLabel(u.roomId)}
+                <span className="w-37.5 truncate text-[12px] font-[450]">
+                  {typeLabel(u.typeId)}
                 </span>
-                <span className="w-24">
-                  <ToneBadge tone={meta.tone}>{meta.label}</ToneBadge>
+                <span className="text-neutral-foreground min-w-0 flex-1 truncate text-[12px]">
+                  {roomLabel(u.roomId)} · {buildingName(u.buildingId)}
                 </span>
-                <span className="text-muted-foreground w-22 font-mono text-[11px]">
+                <span className="w-33">
+                  <ToneBadge tone={COLUMN_META[condition].tone}>
+                    {COLUMN_META[condition].label}
+                  </ToneBadge>
+                </span>
+                <span className="text-muted-foreground w-24 font-mono text-[11px]">
                   {formatDate(u.installedAt)}
                 </span>
                 <span
                   className={cn(
-                    "w-24 font-mono text-[11px]",
-                    dueSoon && "text-warning-foreground font-medium",
+                    "w-29.5 font-mono text-[11px]",
+                    due ? "text-warning-foreground" : "text-muted-foreground",
                   )}
                 >
                   {formatDate(u.nextServiceDue)}
                 </span>
                 <span
                   className={cn(
-                    "w-16 text-right font-mono text-[12px] font-medium",
+                    "w-20.5 text-right font-mono text-[11px] font-medium",
                     u.openRequestCount > 0
                       ? "text-warning-foreground"
                       : "text-muted-foreground",
@@ -278,331 +290,392 @@ export default function EquipmentPage() {
                 >
                   {u.openRequestCount}
                 </span>
-                <span className="text-primary flex w-14 items-center justify-end gap-0.5 text-[11px]">
-                  Open <ArrowRight className="size-3" />
+                <span className="text-accent-foreground w-18.5 text-right text-[10.5px] font-medium">
+                  Open →
                 </span>
               </button>
             );
           })}
-        </Card>
+
+          {units.length === 0 && (
+            <EmptyState className="m-4">
+              No equipment matches these filters — widen the search, or clear
+              the building and type filters.
+            </EmptyState>
+          )}
+        </div>
       ) : (
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {BOARD_COLUMNS.filter((c) => c !== "decommissioned" || showDecom).map(
-            (condition) => {
-              const items = filtered.filter(
-                (u) => conditionOf(u) === condition,
-              );
-              const meta = CONDITION_META[condition];
-              return (
+        <div
+          className="grid items-start gap-3"
+          style={{
+            gridTemplateColumns: `repeat(${boardColumns.length}, minmax(0,1fr))`,
+          }}
+        >
+          {boardColumns.map((col) => {
+            const items = units.filter(
+              (u) => boardColumnFor(u, conditionOf(u)) === col,
+            );
+            const meta = COLUMN_META[col];
+            return (
+              <div
+                key={col}
+                className="border-border bg-card overflow-hidden rounded-[5px] border"
+              >
                 <div
-                  key={condition}
-                  className="bg-muted border-border flex flex-col rounded-md border"
+                  className={cn(
+                    "border-divider flex items-center gap-2 border-t-[3px] border-b px-3 py-2.5",
+                    meta.accent,
+                  )}
                 >
-                  <div
-                    className="bg-card border-border flex items-center gap-2 rounded-t-[5px] border-b px-3 py-2.5"
-                    style={{
-                      borderTop: `2px solid var(--color-${meta.tone === "neutral" ? "neutral-foreground" : meta.tone})`,
-                    }}
-                  >
-                    <span className="text-[11px] font-semibold">
-                      {meta.label}
-                    </span>
-                    <span className="bg-secondary rounded px-1.5 py-0.5 font-mono text-[10.5px] font-semibold">
-                      {items.length}
-                    </span>
-                  </div>
-                  <div className="flex flex-1 flex-col gap-2 p-2.5">
-                    {items.length === 0 && (
-                      <EmptyState>Nothing here.</EmptyState>
-                    )}
-                    {items.map((u) => (
+                  <span className="flex-1 text-[11px] leading-none font-semibold">
+                    {meta.label}
+                  </span>
+                  <ToneBadge tone={meta.tone}>{items.length}</ToneBadge>
+                </div>
+                <div className="flex min-h-30 flex-col gap-2 p-2.5">
+                  {items.map((u) => {
+                    const days = daysUntilService(u);
+                    return (
                       <button
                         type="button"
                         key={u.id}
                         onClick={() => setSelectedId(u.id)}
-                        className="border-border hover:border-primary bg-card rounded-md border border-l-[3px] p-2.5 text-left"
-                        style={{
-                          borderLeftColor:
-                            u.openRequestCount > 0
-                              ? "var(--color-warning)"
-                              : "var(--color-border)",
-                        }}
+                        className={cn(
+                          "border-divider hover:border-primary cursor-pointer rounded border border-l-[3px] bg-white px-2.75 py-2.5 text-left",
+                          col === "faulty"
+                            ? "border-l-danger"
+                            : col === "due-service"
+                              ? "border-l-warning"
+                              : "border-l-transparent",
+                        )}
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-primary font-mono text-[10.5px] font-medium">
+                        <div className="flex items-center gap-1.75">
+                          <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
                             {u.tag}
                           </span>
-                          <span className="text-muted-foreground font-mono text-[10px]">
-                            {formatDate(u.nextServiceDue)}
+                          <div className="flex-1" />
+                          <span
+                            className={cn(
+                              "font-mono text-[10px] font-medium",
+                              col === "due-service"
+                                ? "text-warning-foreground"
+                                : "text-muted-foreground",
+                            )}
+                          >
+                            {days < 0 ? `${Math.abs(days)}d over` : `${days}d`}
                           </span>
                         </div>
-                        <div className="mt-1.5 text-[12px] font-[450]">
-                          {equipmentUnitLabel(u)}
+                        <div className="mt-1.75 text-[12px] leading-snug font-[450]">
+                          {typeLabel(u.typeId)}
                         </div>
-                        <div className="text-muted-foreground mt-0.5 text-[10.5px]">
+                        <div className="text-muted-foreground mt-0.75 text-[10.5px] leading-snug">
                           {roomLabel(u.roomId)}
                         </div>
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
+                  {items.length === 0 && (
+                    <div className="text-muted-foreground px-0.5 py-2 text-[11px]">
+                      Nothing here.
+                    </div>
+                  )}
                 </div>
-              );
-            },
-          )}
+              </div>
+            );
+          })}
         </div>
       )}
 
-      <EquipmentDrawer unit={selected} onClose={() => setSelectedId(null)} />
+      <EquipmentDrawer
+        unit={selected}
+        conditionOf={conditionOf}
+        onClose={() => setSelectedId(null)}
+        onSetCondition={setEquipmentCondition}
+        onGoToSensor={(sensorId) => {
+          setSelectedId(null);
+          router.push(`/sensors?device=${sensorId}`);
+        }}
+        canDecommission={canDecommissionEquipment(role)}
+      />
     </div>
   );
 }
 
-function EquipmentDrawer({
-  unit,
-  onClose,
+function Chip({
+  title,
+  className,
+  children,
 }: {
-  unit: EquipmentUnit | null;
-  onClose: () => void;
+  title: string;
+  className?: string;
+  children: React.ReactNode;
 }) {
-  const { role, equipmentCondition, setEquipmentCondition } = useAppState();
-  const confirm = useConfirm();
-  const canDecommission = canDecommissionEquipment(role);
-  const [form, setForm] = React.useState<"none" | "service" | "move">("none");
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: unit?.id is a deliberate reset trigger, not a value read by the effect
-  React.useEffect(() => setForm("none"), [unit?.id]);
-
-  if (!unit)
-    return (
-      <Sheet open={false} onOpenChange={onClose}>
-        <SheetContent />
-      </Sheet>
-    );
-
-  const condition = equipmentCondition(unit.id, unit.condition);
-  const meta = CONDITION_META[condition];
-  const history = EQUIPMENT_HISTORY.filter(
-    (h) => h.equipmentUnitId === unit.id,
-  );
-
-  const setCondition = async (
-    next: EquipmentCondition,
-    label: string,
-    tone: "danger" | "warning" | "info",
-    requireReason = false,
-  ) => {
-    const result = await confirm({
-      title: `${label}?`,
-      body: (
-        <>
-          {unit.tag} — {equipmentUnitLabel(unit)} in {roomLabel(unit.roomId)}.
-        </>
-      ),
-      tone,
-      confirmLabel: label,
-      requireReason,
-    });
-    if (!result.confirmed) return;
-    setEquipmentCondition(unit.id, next);
-    toast.success(`${unit.tag} → ${CONDITION_META[next].label}`);
-  };
-
   return (
-    <Sheet open={!!unit} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-full gap-0 overflow-y-auto sm:max-w-105">
-        <SheetHeader className="border-border border-b">
-          <div className="flex items-center gap-2">
-            <span className="text-primary font-mono text-[12px] font-medium">
-              {unit.tag}
-            </span>
-            <ToneBadge tone={meta.tone}>{meta.label}</ToneBadge>
-          </div>
-          <div className="mt-2 flex gap-3">
-            <div className="bg-muted text-muted-foreground flex size-21 shrink-0 items-center justify-center rounded-md">
-              <Camera className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <SheetTitle className="text-[15px] leading-tight">
-                {equipmentUnitLabel(unit)}
-              </SheetTitle>
-              <div className="text-muted-foreground mt-1 text-[11.5px]">
-                {roomLabel(unit.roomId)} · {buildingName(unit.buildingId)}
-              </div>
-              <div className="text-muted-foreground mt-1.5 font-mono text-[10px]">
-                Drop a photo of this unit
-              </div>
-            </div>
-          </div>
-        </SheetHeader>
-
-        <div className="grid grid-cols-2 gap-3 px-4 py-4">
-          <MetaField label="Installed" value={formatDate(unit.installedAt)} />
-          <MetaField
-            label="Next service"
-            value={formatDate(unit.nextServiceDue)}
-          />
-          <MetaField
-            label="Open requests"
-            value={String(unit.openRequestCount)}
-            tone={
-              unit.openRequestCount > 0 ? "text-warning-foreground" : undefined
-            }
-          />
-          <MetaField
-            label="Last service"
-            value={unit.lastServiceAt ? formatDate(unit.lastServiceAt) : "—"}
-          />
-        </div>
-
-        <div className="border-border border-t px-4 py-4">
-          <div className="text-muted-foreground mb-2 font-mono text-[9.5px] tracking-wider">
-            ACTIONS
-          </div>
-          {form === "none" && (
-            <div className="grid grid-cols-2 gap-2">
-              <ActionButton
-                icon={Wrench}
-                label="Mark faulty"
-                onClick={() =>
-                  setCondition("faulty", "Mark as faulty", "danger")
-                }
-              />
-              <ActionButton
-                icon={CheckCircle2}
-                label="Return to service"
-                onClick={() =>
-                  setCondition("healthy", "Return to service", "info")
-                }
-              />
-              <ActionButton
-                icon={Wrench}
-                label="Under maintenance"
-                onClick={() =>
-                  setCondition(
-                    "under-maintenance",
-                    "Mark under maintenance",
-                    "warning",
-                  )
-                }
-              />
-              <ActionButton
-                icon={Camera}
-                label="Record a service"
-                onClick={() => setForm("service")}
-              />
-              <ActionButton
-                icon={MoveRight}
-                label="Move unit"
-                onClick={() => setForm("move")}
-              />
-              <ActionButton
-                icon={Archive}
-                label="Decommission"
-                disabled={!canDecommission}
-                caption={
-                  !canDecommission
-                    ? "Not available for Office Staff"
-                    : undefined
-                }
-                onClick={() =>
-                  setCondition(
-                    "decommissioned",
-                    "Decommission this unit",
-                    "danger",
-                    true,
-                  )
-                }
-              />
-            </div>
-          )}
-          {form === "service" && (
-            <ServiceForm unit={unit} onDone={() => setForm("none")} />
-          )}
-          {form === "move" && (
-            <MoveForm unit={unit} onDone={() => setForm("none")} />
-          )}
-        </div>
-
-        <div className="border-border border-t px-4 py-4">
-          <div className="text-muted-foreground mb-2 font-mono text-[9.5px] tracking-wider">
-            HISTORY
-          </div>
-          <div className="flex flex-col gap-3">
-            {history.length === 0 && (
-              <p className="text-muted-foreground text-[11.5px]">
-                No history recorded yet.
-              </p>
-            )}
-            {history.map((h) => (
-              <div key={h.id} className="flex gap-2.5">
-                <span className="bg-primary mt-1 size-1.5 shrink-0 rounded-full" />
-                <div>
-                  <div className="text-[12px] font-[450]">{h.summary}</div>
-                  <div className="text-muted-foreground mt-0.5 font-mono text-[10.5px]">
-                    {formatRelative(h.at)} · {h.actorName}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </SheetContent>
-    </Sheet>
+    <span
+      title={title}
+      className={cn(
+        "shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium",
+        className,
+      )}
+    >
+      {children}
+    </span>
   );
 }
 
-function MetaField({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-}) {
-  return (
-    <div>
-      <div className="text-muted-foreground font-mono text-[9.5px] tracking-wider">
-        {label.toUpperCase()}
-      </div>
-      <div className={cn("mt-0.5 text-[12px] font-medium", tone)}>{value}</div>
-    </div>
-  );
-}
-
-function ActionButton({
+function ViewButton({
   icon: Icon,
-  label,
-  caption,
-  disabled,
+  title,
+  active,
   onClick,
 }: {
-  icon: typeof Wrench;
-  label: string;
-  caption?: string;
-  disabled?: boolean;
+  icon: React.ElementType;
+  title: string;
+  active: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      disabled={disabled}
+      title={title}
       onClick={onClick}
       className={cn(
-        "border-border flex flex-col items-start gap-1 rounded-md border p-2.5 text-left transition-colors",
-        disabled
-          ? "cursor-not-allowed opacity-50"
-          : "hover:border-primary hover:bg-accent/40",
+        "cursor-pointer rounded-[3px] px-2.5 py-1.75",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-foreground/70 hover:text-foreground",
       )}
     >
-      <span className="flex items-center gap-1.5 text-[11px] font-medium">
-        {disabled ? <Lock className="size-3" /> : <Icon className="size-3" />}
-        {label}
-      </span>
-      {caption && (
-        <span className="text-muted-foreground text-[10.5px]">{caption}</span>
-      )}
+      <Icon className="size-3.5" />
     </button>
+  );
+}
+
+// ---- Detail drawer ---------------------------------------------------------
+
+function EquipmentDrawer({
+  unit,
+  conditionOf,
+  onClose,
+  onSetCondition,
+  onGoToSensor,
+  canDecommission,
+}: {
+  unit: EquipmentUnit | null;
+  conditionOf: (u: EquipmentUnit) => EquipmentCondition;
+  onClose: () => void;
+  onSetCondition: (unitId: string, condition: EquipmentCondition) => void;
+  onGoToSensor: (sensorId: string) => void;
+  canDecommission: boolean;
+}) {
+  const confirm = useConfirm();
+  const [form, setForm] = React.useState<"none" | "service" | "move">("none");
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: unit id is the reset trigger
+  React.useEffect(() => setForm("none"), [unit?.id]);
+
+  // Rendered closed rather than unmounted, so the drawer animates out.
+  if (!unit) {
+    return (
+      <DetailDrawer open={false} onOpenChange={onClose}>
+        {null}
+      </DetailDrawer>
+    );
+  }
+
+  const condition = conditionOf(unit);
+  const meta = COLUMN_META[condition];
+  const history = EQUIPMENT_HISTORY.filter(
+    (h) => h.equipmentUnitId === unit.id,
+  );
+  const linkedSensor = sensorForEquipment(unit.tag);
+  const days = daysUntilService(unit);
+
+  const setCondition = async (
+    next: EquipmentCondition,
+    title: string,
+    tone: "danger" | "warning" | "info",
+    note?: string,
+    requireReason = false,
+  ) => {
+    const result = await confirm({
+      title,
+      body: `${unit.tag} — ${equipmentUnitLabel(unit)} in ${roomLabel(unit.roomId)}.`,
+      note,
+      tone,
+      confirmLabel: title.replace(/\?$/, ""),
+      requireReason,
+    });
+    if (!result.confirmed) return;
+    onSetCondition(unit.id, next);
+    toast.success(`${unit.tag} → ${COLUMN_META[next].label}`);
+  };
+
+  return (
+    <DetailDrawer open onOpenChange={(o) => !o && onClose()}>
+      <DetailDrawerHeader
+        tag={unit.tag}
+        chip={<ToneBadge tone={meta.tone}>{meta.label}</ToneBadge>}
+        onClose={onClose}
+      >
+        <div className="mt-3 flex gap-3">
+          <div className="border-divider bg-background flex h-21 w-28 shrink-0 items-center justify-center overflow-hidden rounded border">
+            <Camera className="text-muted-foreground size-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] leading-tight font-semibold">
+              {equipmentUnitLabel(unit)}
+            </div>
+            <div className="text-muted-foreground mt-1 text-[11.5px] leading-snug">
+              {roomLabel(unit.roomId)} · {buildingName(unit.buildingId)}
+            </div>
+            <div className="text-muted-foreground mt-2 font-mono text-[10.5px]">
+              Drop a photo of this unit
+            </div>
+          </div>
+        </div>
+      </DetailDrawerHeader>
+
+      <DetailMetaGrid>
+        <DetailMeta label="Installed" value={formatDate(unit.installedAt)} />
+        <DetailMeta
+          label="Next service"
+          value={formatDate(unit.nextServiceDue)}
+          tone={
+            isDueService(unit, condition)
+              ? "text-warning-foreground"
+              : undefined
+          }
+        />
+        <DetailMeta
+          label="Open requests"
+          value={String(unit.openRequestCount)}
+          tone={
+            unit.openRequestCount > 0 ? "text-warning-foreground" : undefined
+          }
+        />
+        <DetailMeta
+          label="Last service"
+          value={unit.lastServiceAt ? formatDate(unit.lastServiceAt) : "—"}
+        />
+        <DetailMeta
+          label="Service due in"
+          value={days < 0 ? `${Math.abs(days)} days over` : `${days} days`}
+        />
+        <DetailMeta label="Condition" value={meta.label} />
+      </DetailMetaGrid>
+
+      {linkedSensor && (
+        <SameDevicePanel
+          id={linkedSensor.id}
+          note={`${typeLabel(unit.typeId)} live state — status, last report and reset live on the sensor record.`}
+          linkLabel="Sensors →"
+          onOpen={() => onGoToSensor(linkedSensor.id)}
+        />
+      )}
+
+      <DetailDrawerSection label="Actions">
+        {form === "none" && (
+          <>
+            <DrawerActionGrid>
+              <DrawerAction
+                icon={Wrench}
+                label="Mark faulty"
+                caption="Raises it on the board and the dashboard"
+                onClick={() =>
+                  setCondition(
+                    "faulty",
+                    "Mark as faulty?",
+                    "danger",
+                    `${unit.tag} shows as faulty everywhere it is counted until it is returned to service.`,
+                  )
+                }
+              />
+              <DrawerAction
+                icon={CheckCircle2}
+                label="Return to service"
+                caption="Clears the fault and the maintenance flag"
+                onClick={() =>
+                  setCondition("healthy", "Return to service?", "info")
+                }
+              />
+              <DrawerAction
+                icon={Wrench}
+                label="Under maintenance"
+                caption="Held out of use while it is worked on"
+                onClick={() =>
+                  setCondition(
+                    "under-maintenance",
+                    "Mark under maintenance?",
+                    "warning",
+                  )
+                }
+              />
+              <DrawerAction
+                icon={Camera}
+                label="Record a service"
+                caption="Logs parts, cost and the next due date"
+                onClick={() => setForm("service")}
+              />
+              <DrawerAction
+                icon={MoveRight}
+                label="Move unit"
+                caption="Reassign it to another room"
+                onClick={() => setForm("move")}
+              />
+              <DrawerAction
+                icon={Archive}
+                label="Decommission"
+                caption="Retires the asset for good"
+                tone="danger"
+                lockedReason={
+                  canDecommission ? undefined : DECOMMISSION_LOCK_REASON
+                }
+                onClick={() =>
+                  setCondition(
+                    "decommissioned",
+                    "Decommission this unit?",
+                    "danger",
+                    `${unit.tag} stops reporting and drops out of every count on the estate. Its history stays in the Log Book.`,
+                    true,
+                  )
+                }
+              />
+            </DrawerActionGrid>
+            <p className="text-muted-foreground mt-2.25 text-[11px] leading-relaxed">
+              Every action here writes an entry to the Log Book.
+            </p>
+          </>
+        )}
+        {form === "service" && (
+          <ServiceForm unit={unit} onDone={() => setForm("none")} />
+        )}
+        {form === "move" && (
+          <MoveForm unit={unit} onDone={() => setForm("none")} />
+        )}
+      </DetailDrawerSection>
+
+      <DetailDrawerSection label="History">
+        <div className="flex flex-col gap-3">
+          {history.length === 0 && (
+            <p className="text-muted-foreground text-[11.5px]">
+              No history recorded yet.
+            </p>
+          )}
+          {history.map((h) => (
+            <div key={h.id} className="flex gap-2.5">
+              <span className="bg-primary mt-1.5 size-1.5 shrink-0 rounded-full" />
+              <div>
+                <div className="text-[12px] font-[450]">{h.summary}</div>
+                <div className="text-muted-foreground mt-0.5 font-mono text-[10.5px]">
+                  {formatRelative(h.at)} · {h.actorName}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </DetailDrawerSection>
+    </DetailDrawer>
   );
 }
 
@@ -615,51 +688,36 @@ function ServiceForm({
 }) {
   const [cost, setCost] = React.useState("");
   const [parts, setParts] = React.useState("");
-  const [notes, setNotes] = React.useState("");
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3">
-        <FormField label="Date">
-          <Input defaultValue={formatDate(new Date().toISOString())} disabled />
-        </FormField>
-        <FormField label="Cost">
-          <Input
-            value={cost}
-            onChange={(e) => setCost(e.target.value)}
-            placeholder="145,000 MMK"
-          />
-        </FormField>
-      </div>
+    <FormDrawer
+      open
+      onOpenChange={(o) => !o && onDone()}
+      title="Record a service"
+      description={`${unit.tag} — ${equipmentUnitLabel(unit)}. The next service date moves on by ${DUE_SERVICE_DAYS * 6} days.`}
+      submitLabel="Save service"
+      onSubmit={() => {
+        toast.success(`Service recorded for ${unit.tag}`);
+        onDone();
+      }}
+    >
       <FormField label="Parts used">
-        <Input
+        <input
           value={parts}
           onChange={(e) => setParts(e.target.value)}
-          placeholder="Parts used"
+          placeholder="Lamp module, filter"
+          className="border-input focus:border-primary w-full rounded border px-2.25 py-2 text-[12px] outline-none"
         />
       </FormField>
-      <FormField label="Notes">
-        <Textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Notes"
-          className="min-h-16"
+      <FormField label="Cost">
+        <input
+          value={cost}
+          onChange={(e) => setCost(e.target.value)}
+          placeholder="145,000 MMK"
+          className="border-input focus:border-primary w-full rounded border px-2.25 py-2 text-[12px] outline-none"
         />
       </FormField>
-      <div className="flex gap-2">
-        <Button
-          className="flex-1"
-          onClick={() => {
-            toast.success(`Service recorded for ${unit.tag}`);
-            onDone();
-          }}
-        >
-          Save service
-        </Button>
-        <Button variant="outline" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </div>
+    </FormDrawer>
   );
 }
 
@@ -673,75 +731,48 @@ function MoveForm({
   const [buildingId, setBuildingId] = React.useState(unit.buildingId);
   const [roomId, setRoomId] = React.useState(unit.roomId);
   const rooms = roomsForBuilding(buildingId);
+
   return (
-    <div className="flex flex-col gap-3">
+    <FormDrawer
+      open
+      onOpenChange={(o) => !o && onDone()}
+      title="Move unit"
+      description={`${unit.tag} keeps its tag and its history; only its location changes.`}
+      submitLabel="Move unit"
+      onSubmit={() => {
+        toast.success(`${unit.tag} moved to ${roomLabel(roomId)}`);
+        onDone();
+      }}
+    >
       <FormField label="Building">
-        <Select
+        <select
           value={buildingId}
-          onValueChange={(v) => {
-            if (v) {
-              setBuildingId(v);
-              setRoomId(roomsForBuilding(v)[0]?.id ?? "");
-            }
+          onChange={(e) => {
+            setBuildingId(e.target.value);
+            setRoomId(roomsForBuilding(e.target.value)[0]?.id ?? "");
           }}
+          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {BUILDINGS.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          {BUILDINGS.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
       </FormField>
       <FormField label="Room">
-        <Select value={roomId} onValueChange={(v) => v && setRoomId(v)}>
-          <SelectTrigger className="w-full">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {rooms.map((r) => (
-              <SelectItem key={r.id} value={r.id}>
-                {r.roomNumber}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </FormField>
-      <div className="flex gap-2">
-        <Button
-          className="flex-1"
-          onClick={() => {
-            toast.success(`${unit.tag} moved to ${roomLabel(roomId)}`);
-            onDone();
-          }}
+        <select
+          value={roomId}
+          onChange={(e) => setRoomId(e.target.value)}
+          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
-          Move unit
-        </Button>
-        <Button variant="outline" onClick={onDone}>
-          Cancel
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function FormField({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label className="font-mono text-[10px] tracking-wider text-muted-foreground uppercase">
-        {label}
-      </Label>
-      {children}
-    </div>
+          {rooms.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.roomNumber}
+            </option>
+          ))}
+        </select>
+      </FormField>
+    </FormDrawer>
   );
 }
