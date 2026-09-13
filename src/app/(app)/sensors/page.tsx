@@ -91,7 +91,17 @@ function statusLabel(status: string) {
   return STATUS_LABEL[status] ?? status;
 }
 
+// useSearchParams opts the subtree into client rendering, so the deep-link
+// read sits behind its own boundary rather than blocking the whole route.
 export default function SensorsPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <SensorsView />
+    </React.Suspense>
+  );
+}
+
+function SensorsView() {
   const router = useRouter();
   const params = useSearchParams();
   const { role, activeBuildingId, sensorStatus, setSensorStatus, elapsed } =
