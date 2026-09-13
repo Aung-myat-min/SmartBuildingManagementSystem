@@ -1713,7 +1713,7 @@ export function reportDetail(report: Report): ReportDetail {
     ? buildingName(report.buildingId)
     : "Whole estate";
 
-  const weeks = ["Wk 1", "Wk 2", "Wk 3", "Wk 4"].map((label) => {
+  const weeks = ["Wk 1", "Wk 2", "Wk 3", "Wk 4", "Wk 5"].map((label) => {
     const resolved = 8 + Math.floor(rnd() * 14);
     const carriedOver = Math.floor(rnd() * 5);
     return { label, resolved, carriedOver };
@@ -1728,7 +1728,7 @@ export function reportDetail(report: Report): ReportDetail {
 
   const offenderUnits = EQUIPMENT_UNITS.filter((u) =>
     report.buildingId ? u.buildingId === report.buildingId : true,
-  ).slice(0, 4);
+  ).slice(0, 5);
   const offenders = offenderUnits
     .map((u) => ({
       tag: u.tag,

@@ -10,13 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Sheet,
   SheetContent,
   SheetHeader,
@@ -45,6 +38,16 @@ const STATUS_META: Record<ReportStatus, { label: string; tone: Tone }> = {
   scheduled: { label: "SCHEDULED", tone: "warning" },
   archived: { label: "ARCHIVED", tone: "neutral" },
 };
+// Tailwind only emits the colour tokens it sees in a class, so these are real
+// utility classes rather than var(--color-*) read from an inline style.
+const TONE_BORDER_L: Record<Tone, string> = {
+  success: "border-l-success",
+  warning: "border-l-warning",
+  danger: "border-l-danger",
+  info: "border-l-info",
+  neutral: "border-l-neutral-foreground",
+};
+
 const KIND_TONE: Record<ReportKind, Tone> = {
   "maintenance-performance": "info",
   "equipment-reliability": "warning",
@@ -108,57 +111,47 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="flex-row flex-wrap items-center gap-2 p-2.5">
-        <div className="border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
-          <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+        <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
+          <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search reports"
-            className="w-full bg-transparent py-1.5 pr-3 pl-8 text-[12px] outline-none"
+            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
         </div>
-        <Select
+        <select
           value={buildingFilter}
-          onValueChange={(v) => setBuildingFilter(v ?? "all")}
+          onChange={(e) => setBuildingFilter(e.target.value)}
+          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
-          <SelectTrigger size="sm" className="text-[12px] font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All buildings</SelectItem>
-            {BUILDINGS.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
+          <option value="all">All buildings</option>
+          {BUILDINGS.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+        <select
           value={kindFilter}
-          onValueChange={(v) =>
-            setKindFilter((v as typeof kindFilter) ?? "all")
-          }
+          onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
+          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
-          <SelectTrigger size="sm" className="text-[12px] font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All kinds</SelectItem>
-            {(Object.keys(KIND_LABEL) as ReportKind[]).map((k) => (
-              <SelectItem key={k} value={k}>
-                {KIND_LABEL[k]}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <option value="all">All kinds</option>
+          {(Object.keys(KIND_LABEL) as ReportKind[]).map((k) => (
+            <option key={k} value={k}>
+              {KIND_LABEL[k]}
+            </option>
+          ))}
+        </select>
         <div className="bg-border h-5.5 w-px" />
         <ToneBadge tone="info">{filtered.length} reports</ToneBadge>
         <div className="flex-1" />
         <Button size="sm" onClick={() => setGenOpen(true)}>
           + Generate report
         </Button>
-      </Card>
+      </div>
 
       {groups.length === 0 && (
         <EmptyState className="p-6">No reports match these filters.</EmptyState>
@@ -182,10 +175,10 @@ export default function ReportsPage() {
               return (
                 <Card
                   key={r.id}
-                  className={cn("gap-2.5 border-l-[3px] p-3.5")}
-                  style={{
-                    borderLeftColor: `var(--color-${KIND_TONE[r.kind]})`,
-                  }}
+                  className={cn(
+                    "gap-2.5 border-l-[3px] p-3.5",
+                    TONE_BORDER_L[KIND_TONE[r.kind]],
+                  )}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
@@ -280,53 +273,42 @@ function GenerateReportSheet({
         </SheetHeader>
         <div className="flex flex-col gap-3.5 px-4">
           <Field label="Report">
-            <Select
+            <select
               value={kind}
-              onValueChange={(v) => v && setKind(v as ReportKind)}
+              onChange={(e) => setKind(e.target.value as ReportKind)}
+              className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(Object.keys(KIND_LABEL) as ReportKind[]).map((k) => (
-                  <SelectItem key={k} value={k}>
-                    {KIND_LABEL[k]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              {(Object.keys(KIND_LABEL) as ReportKind[]).map((k) => (
+                <option key={k} value={k}>
+                  {KIND_LABEL[k]}
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="Period">
-            <Select value={period} onValueChange={(v) => v && setPeriod(v)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="September 2026">September 2026</SelectItem>
-                <SelectItem value="01–08 Sep 2026">
-                  01–08 Sep 2026 (ad hoc)
-                </SelectItem>
-                <SelectItem value="Q3 2026">Q3 2026</SelectItem>
-              </SelectContent>
-            </Select>
+            <select
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+            >
+              <option value="September 2026">September 2026</option>
+              <option value="01–08 Sep 2026">01–08 Sep 2026 (ad hoc)</option>
+              <option value="Q3 2026">Q3 2026</option>
+            </select>
           </Field>
           <Field label="Scope">
-            <Select
+            <select
               value={buildingId}
-              onValueChange={(v) => setBuildingId(v ?? "all")}
+              onChange={(e) => setBuildingId(e.target.value)}
+              className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Whole estate</SelectItem>
-                {BUILDINGS.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <option value="all">Whole estate</option>
+              {BUILDINGS.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
         <div className="mt-2 flex gap-2 px-4">
@@ -430,12 +412,10 @@ function ReportDetailView({
         {detail.kpis.map((k) => (
           <Card
             key={k.label}
-            className="gap-1.5 border-t-[3px] p-3.5"
-            style={{
-              borderTopColor: kpiPasses(k)
-                ? "var(--color-success)"
-                : "var(--color-warning)",
-            }}
+            className={cn(
+              "gap-1.5 border-t-[3px] p-3.5",
+              kpiPasses(k) ? "border-t-success" : "border-t-warning",
+            )}
           >
             <div className="text-muted-foreground font-mono text-[10px] tracking-wider">
               {k.label}

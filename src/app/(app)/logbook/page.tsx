@@ -16,14 +16,14 @@ import {
 } from "@/components/ui/select";
 import { useLiveClock } from "@/hooks/use-live-clock";
 import { useAppState } from "@/lib/app-state";
-import { formatTime } from "@/lib/format";
+import { formatDayLabel, formatTime } from "@/lib/format";
 import { BUILDINGS, LOG_BOOK, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
 import {
   canAccessLogBook,
   isBuildingLocked,
   roleLabel,
 } from "@/lib/permissions";
-import type { LogBookEntry, LogBookSource } from "@/lib/types";
+import type { LogBookEntry, LogBookSource, UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const SOURCE_TONE: Record<LogBookSource, Tone> = {
@@ -101,8 +101,15 @@ export default function LogBookPage() {
     return Array.from(map.entries());
   }, [filtered]);
 
+  // The seed data is fixed, so "today" is the most recent day it holds
+  // rather than the wall-clock date — otherwise the panel reads 0 of 0 the
+  // day after the data was written.
+  const latestDay = LOG_BOOK.reduce(
+    (latest, e) => Math.max(latest, new Date(e.timestamp).setHours(0, 0, 0, 0)),
+    0,
+  );
   const todayEntries = LOG_BOOK.filter(
-    (e) => dayLabel(e.timestamp) === "Today",
+    (e) => new Date(e.timestamp).setHours(0, 0, 0, 0) === latestDay,
   );
   const alertCount = filtered.filter((e) => e.source === "alert").length;
   const sourceCounts = SOURCE_ORDER.map((s) => ({
@@ -113,10 +120,49 @@ export default function LogBookPage() {
         (effectiveBuilding === "all" || e.buildingId === effectiveBuilding),
     ).length,
   }));
-  const actors = Array.from(new Set(LOG_BOOK.map((e) => e.actorName))).slice(
-    0,
-    6,
-  );
+  // Who — or what — puts entries in this book. People carry their role;
+  // the automated writers carry the kind of entry they produce, since the
+  // point of the panel is that nothing here is written by hand.
+  const writers = Array.from(
+    LOG_BOOK.reduce(
+      (map, e) => {
+        const found = map.get(e.actorName);
+        if (found) {
+          found.count += 1;
+          found.sources.add(e.source);
+        } else {
+          map.set(e.actorName, {
+            name: e.actorName,
+            role: e.actorRole,
+            count: 1,
+            sources: new Set([e.source]),
+          });
+        }
+        return map;
+      },
+      new Map<
+        string,
+        {
+          name: string;
+          role?: UserRole;
+          count: number;
+          sources: Set<LogBookSource>;
+        }
+      >(),
+    ),
+  )
+    .map(([, w]) => ({
+      name: w.name,
+      detail: w.role
+        ? roleLabel[w.role]
+        : Array.from(w.sources)
+            .map((src) => LOG_BOOK_SOURCE_META[src].label.toLowerCase())
+            .join(", "),
+      tone: SOURCE_TONE[Array.from(w.sources)[0]],
+      count: w.count,
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
 
   if (!canAccessLogBook(role)) {
     return (
@@ -289,7 +335,7 @@ export default function LogBookPage() {
             </div>
           </div>
           <div className="border-border text-muted-foreground border-t pt-2 text-[10.5px]">
-            Since 00:00 today
+            Since 00:00 on {formatDayLabel(new Date(latestDay).toISOString())}
           </div>
         </Card>
 
@@ -340,12 +386,24 @@ export default function LogBookPage() {
           <div className="text-muted-foreground mb-1 font-mono text-[10px] tracking-wider">
             WHAT WRITES HERE
           </div>
-          {actors.map((a) => (
-            <div key={a} className="flex items-center gap-2 px-1.5 py-1">
-              <span className="bg-primary/60 size-1.5 rounded-full" />
-              <span className="text-[11.5px] font-[450]">{a}</span>
-            </div>
-          ))}
+          <div className="mt-2.75 flex flex-col gap-2.25">
+            {writers.map((w) => (
+              <div key={w.name} className="flex items-start gap-2.25">
+                <PulseDot tone={w.tone} className="mt-1.25" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11.5px] leading-snug font-[450]">
+                    {w.name}
+                  </div>
+                  <div className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug">
+                    {w.detail}
+                  </div>
+                </div>
+                <span className="text-muted-foreground shrink-0 font-mono text-[10px]">
+                  {w.count}
+                </span>
+              </div>
+            ))}
+          </div>
           <div className="border-border text-muted-foreground border-t pt-2 text-[10.5px] leading-relaxed">
             Entries are written by the system, never by hand. Historical Records
             holds the same events beyond today.

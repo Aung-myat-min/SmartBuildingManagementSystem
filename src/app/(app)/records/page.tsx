@@ -6,13 +6,6 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useAppState } from "@/lib/app-state";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import {
@@ -32,6 +25,27 @@ const TYPE_META: Record<HistoricalRecordType, { label: string; tone: Tone }> = {
   access: { label: "ACCESS", tone: "info" },
   system: { label: "SYSTEM", tone: "neutral" },
 };
+/**
+ * Tone -> a real utility class. Tailwind v4's `@theme inline` does not emit
+ * every --color-* as a usable custom property, so `var(--color-danger)` in an
+ * inline style resolved to nothing and those bars rendered transparent.
+ */
+const TONE_BG: Record<Tone, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
+  info: "bg-info",
+  neutral: "bg-neutral-foreground",
+};
+
+const TONE_BORDER_L: Record<Tone, string> = {
+  success: "border-l-success",
+  warning: "border-l-warning",
+  danger: "border-l-danger",
+  info: "border-l-info",
+  neutral: "border-l-neutral-foreground",
+};
+
 const TYPE_ORDER: HistoricalRecordType[] = [
   "alarm",
   "request",
@@ -98,8 +112,9 @@ export default function HistoricalRecordsPage() {
   ];
 
   const chartDays = Math.min(range, 14);
+  const midnightToday = new Date().setHours(0, 0, 0, 0);
   const bars = Array.from({ length: chartDays }, (_, i) => {
-    const dayStart = Date.now() - (chartDays - 1 - i) * DAY_MS;
+    const dayStart = midnightToday - (chartDays - 1 - i) * DAY_MS;
     const dayLabel = new Date(dayStart).toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
@@ -107,12 +122,11 @@ export default function HistoricalRecordsPage() {
     const counts = Object.fromEntries(
       TYPE_ORDER.map((t) => [
         t,
-        filtered.filter((r) => {
-          const diff = Math.floor(
-            (dayStart - new Date(r.timestamp).getTime()) / DAY_MS,
-          );
-          return r.type === t && diff === 0;
-        }).length,
+        filtered.filter(
+          (r) =>
+            r.type === t &&
+            new Date(r.timestamp).setHours(0, 0, 0, 0) === dayStart,
+        ).length,
       ]),
     ) as Record<HistoricalRecordType, number>;
     const total = TYPE_ORDER.reduce((a, t) => a + counts[t], 0);
@@ -133,14 +147,14 @@ export default function HistoricalRecordsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Card className="flex-row flex-wrap items-center gap-2 p-2.5">
-        <div className="border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
-          <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+        <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
+          <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search records, devices or people"
-            className="w-full bg-transparent py-1.5 pr-3 pl-8 text-[12px] outline-none"
+            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
         </div>
         <div className="bg-secondary flex items-center gap-1 rounded-md p-[3px]">
@@ -160,41 +174,36 @@ export default function HistoricalRecordsPage() {
             </button>
           ))}
         </div>
-        <Select
+        <select
           value={effectiveBuilding}
-          onValueChange={(v) => setBuildingFilter(v ?? "all")}
+          onChange={(e) => setBuildingFilter(e.target.value)}
           disabled={locked}
-        >
-          <SelectTrigger size="sm" className="text-[12px] font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All buildings</SelectItem>
-            {BUILDINGS.map((b) => (
-              <SelectItem key={b.id} value={b.id}>
-                {b.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={typeFilter}
-          onValueChange={(v) =>
-            setTypeFilter((v as typeof typeFilter) ?? "all")
+          title={
+            locked
+              ? "Office Staff are scoped to their own building."
+              : undefined
           }
+          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <SelectTrigger size="sm" className="text-[12px] font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All types</SelectItem>
-            {TYPE_ORDER.map((t) => (
-              <SelectItem key={t} value={t}>
-                {TYPE_META[t].label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <option value="all">All buildings</option>
+          {BUILDINGS.map((b) => (
+            <option key={b.id} value={b.id}>
+              {b.name}
+            </option>
+          ))}
+        </select>
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
+          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <option value="all">All types</option>
+          {TYPE_ORDER.map((t) => (
+            <option key={t} value={t}>
+              {TYPE_META[t].label}
+            </option>
+          ))}
+        </select>
         <div className="bg-border h-5.5 w-px" />
         <ToneBadge tone="info">{filtered.length} in range</ToneBadge>
         <div className="flex-1" />
@@ -209,7 +218,7 @@ export default function HistoricalRecordsPage() {
         >
           <Download className="size-3" /> Export CSV
         </button>
-      </Card>
+      </div>
 
       <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
@@ -241,10 +250,10 @@ export default function HistoricalRecordsPage() {
                 className="text-muted-foreground flex items-center gap-1.5 text-[10.5px]"
               >
                 <span
-                  className="size-2 rounded-sm"
-                  style={{
-                    background: `var(--color-${TYPE_META[t].tone === "neutral" ? "neutral-foreground" : TYPE_META[t].tone})`,
-                  }}
+                  className={cn(
+                    "size-2 rounded-sm",
+                    TONE_BG[TYPE_META[t].tone],
+                  )}
                 />
                 {TYPE_META[t].label}
               </span>
@@ -262,10 +271,12 @@ export default function HistoricalRecordsPage() {
               {TYPE_ORDER.filter((t) => b.counts[t] > 0).map((t) => (
                 <div
                   key={t}
-                  className="w-full rounded-[2px]"
+                  className={cn(
+                    "w-full rounded-[2px]",
+                    TONE_BG[TYPE_META[t].tone],
+                  )}
                   style={{
                     height: `${(b.counts[t] / maxTotal) * 100}%`,
-                    background: `var(--color-${TYPE_META[t].tone === "neutral" ? "neutral-foreground" : TYPE_META[t].tone})`,
                     minHeight: 2,
                   }}
                 />
@@ -306,10 +317,10 @@ export default function HistoricalRecordsPage() {
             {records.map((r) => (
               <div
                 key={r.id}
-                className="border-border flex items-center border-b border-l-[3px] px-4 py-2 text-[12px] last:border-b-0"
-                style={{
-                  borderLeftColor: `var(--color-${TYPE_META[r.type].tone === "neutral" ? "neutral-foreground" : TYPE_META[r.type].tone})`,
-                }}
+                className={cn(
+                  "border-rule flex items-center border-b border-l-[3px] px-4 py-2 text-[12px] last:border-b-0",
+                  TONE_BORDER_L[TYPE_META[r.type].tone],
+                )}
               >
                 <span className="text-muted-foreground w-16 font-mono text-[11px]">
                   {formatTime(r.timestamp)}

@@ -60,8 +60,6 @@ export default function DashboardPage() {
   const visibleBuildings = staff
     ? BUILDINGS.filter((b) => b.id === activeBuildingId)
     : BUILDINGS;
-  const building =
-    BUILDINGS.find((b) => b.id === activeBuildingId) ?? BUILDINGS[0];
   const rooms = roomsForBuilding(activeBuildingId);
 
   const eqForBuilding = EQUIPMENT.filter(
@@ -106,12 +104,12 @@ export default function DashboardPage() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="flex items-center gap-2.5">
-              <h2 className="text-[19px] font-semibold">{building.name}</h2>
+              {/*<h2 className="">{building.name}</h2>*/}
               {!staff && (
                 <select
                   value={activeBuildingId}
                   onChange={(e) => setActiveBuildingId(e.target.value)}
-                  className="border-border bg-card rounded-md border px-2 py-1 text-[11.5px] font-medium"
+                  className="border-border bg-card rounded-md border px-2 py-1 text-[19px] font-semibold"
                 >
                   {BUILDINGS.map((b) => (
                     <option key={b.id} value={b.id}>

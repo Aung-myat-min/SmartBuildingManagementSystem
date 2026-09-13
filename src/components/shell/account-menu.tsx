@@ -52,11 +52,13 @@ export function AccountMenu() {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        {/* Settings is reached from here rather than the sidebar, so these
+            have to actually go somewhere. */}
+        <DropdownMenuItem onClick={() => router.push("/settings")}>
           <UserRound className="size-3.5" /> My profile
         </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Settings className="size-3.5" /> Preferences
+        <DropdownMenuItem onClick={() => router.push("/settings")}>
+          <Settings className="size-3.5" /> Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem

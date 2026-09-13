@@ -469,7 +469,9 @@ function EquipmentDrawer({
   canDecommission: boolean;
 }) {
   const confirm = useConfirm();
-  const [form, setForm] = React.useState<"none" | "service" | "move">("none");
+  const [form, setForm] = React.useState<"none" | "service" | "move" | "edit">(
+    "none",
+  );
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: unit id is the reset trigger
   React.useEffect(() => setForm("none"), [unit?.id]);
@@ -490,6 +492,22 @@ function EquipmentDrawer({
   );
   const linkedSensor = sensorForEquipment(unit.tag);
   const days = daysUntilService(unit);
+
+  // Decommission retires a unit but keeps its history; Delete removes the
+  // record from the register outright, which is why it asks for a reason too.
+  const onDelete = async () => {
+    const result = await confirm({
+      title: `Delete ${unit.tag}?`,
+      body: `${equipmentUnitLabel(unit)} in ${roomLabel(unit.roomId)} is removed from the register.`,
+      note: "Its Log Book and Historical Records entries stay — only the asset record goes. Decommission instead if you want to retire it but keep it on the books.",
+      tone: "danger",
+      confirmLabel: "Delete unit",
+      requireReason: true,
+    });
+    if (!result.confirmed) return;
+    toast.success(`${unit.tag} deleted from the register`);
+    onClose();
+  };
 
   const setCondition = async (
     next: EquipmentCondition,
@@ -516,6 +534,36 @@ function EquipmentDrawer({
       <DetailDrawerHeader
         tag={unit.tag}
         chip={<ToneBadge tone={meta.tone}>{meta.label}</ToneBadge>}
+        action={
+          <>
+            <button
+              type="button"
+              title="Edit this unit's details"
+              onClick={() => setForm("edit")}
+              className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium"
+            >
+              Edit details
+            </button>
+            <button
+              type="button"
+              disabled={!canDecommission}
+              title={
+                canDecommission
+                  ? "Delete this unit from the register"
+                  : DECOMMISSION_LOCK_REASON
+              }
+              onClick={onDelete}
+              className={cn(
+                "bg-card shrink-0 cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
+                canDecommission
+                  ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
+                  : "border-border text-muted-foreground cursor-not-allowed opacity-45",
+              )}
+            >
+              Delete
+            </button>
+          </>
+        }
         onClose={onClose}
       >
         <div className="mt-3 flex gap-3">
@@ -653,6 +701,9 @@ function EquipmentDrawer({
         {form === "move" && (
           <MoveForm unit={unit} onDone={() => setForm("none")} />
         )}
+        {form === "edit" && (
+          <EditUnitForm unit={unit} onDone={() => setForm("none")} />
+        )}
       </DetailDrawerSection>
 
       <DetailDrawerSection label="History">
@@ -676,6 +727,84 @@ function EquipmentDrawer({
         </div>
       </DetailDrawerSection>
     </DetailDrawer>
+  );
+}
+
+/** The design's EDIT UNIT DETAILS: tag, type, install date and service interval. */
+function EditUnitForm({
+  unit,
+  onDone,
+}: {
+  unit: EquipmentUnit;
+  onDone: () => void;
+}) {
+  const [tag, setTag] = React.useState(unit.tag);
+  const [typeId, setTypeId] = React.useState(unit.typeId);
+  const [installed, setInstalled] = React.useState(
+    unit.installedAt.slice(0, 10),
+  );
+  const [interval, setInterval] = React.useState("180");
+  const [error, setError] = React.useState<string | null>(null);
+
+  return (
+    <FormDrawer
+      open
+      onOpenChange={(o) => !o && onDone()}
+      title="Edit unit details"
+      description="The tag follows the unit, so changing it renames every record that points at this asset."
+      submitLabel="Save details"
+      error={error}
+      onSubmit={() => {
+        if (tag.trim().length === 0) {
+          setError("A unit needs an asset tag.");
+          return;
+        }
+        toast.success(`${tag.trim()} updated`);
+        onDone();
+      }}
+    >
+      <FormField label="Asset tag">
+        <input
+          value={tag}
+          onChange={(e) => setTag(e.target.value)}
+          className="border-input focus:border-primary w-full rounded border px-2.25 py-2 font-mono text-[11.5px] outline-none"
+        />
+      </FormField>
+      <FormField label="Equipment type">
+        <select
+          value={typeId}
+          onChange={(e) => setTypeId(e.target.value)}
+          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+        >
+          {EQUIPMENT_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </FormField>
+      <div className="grid grid-cols-2 gap-2.75">
+        <FormField label="Installed">
+          <input
+            type="date"
+            value={installed}
+            onChange={(e) => setInstalled(e.target.value)}
+            className="border-input focus:border-primary w-full rounded border px-2.25 py-2 text-[12px] outline-none"
+          />
+        </FormField>
+        <FormField label="Service interval">
+          <select
+            value={interval}
+            onChange={(e) => setInterval(e.target.value)}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          >
+            <option value="90">Every 90 days</option>
+            <option value="180">Every 180 days</option>
+            <option value="365">Every year</option>
+          </select>
+        </FormField>
+      </div>
+    </FormDrawer>
   );
 }
 
