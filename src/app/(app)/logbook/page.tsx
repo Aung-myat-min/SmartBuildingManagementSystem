@@ -14,8 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useLiveClock } from "@/hooks/use-live-clock";
 import { useAppState } from "@/lib/app-state";
-import { formatClock, formatTime } from "@/lib/format";
+import { formatTime } from "@/lib/format";
 import { BUILDINGS, LOG_BOOK, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
 import {
   canAccessLogBook,
@@ -63,6 +64,7 @@ function dayLabel(iso: string) {
 
 export default function LogBookPage() {
   const { role, activeBuildingId, setRole } = useAppState();
+  const clock = useLiveClock();
   const [paused, setPaused] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState(
@@ -150,7 +152,7 @@ export default function LogBookPage() {
           </div>
           <div className="flex-1" />
           <span className="text-muted-foreground font-mono text-[11px]">
-            {formatClock()}
+            {clock ?? "—"}
           </span>
           <button
             type="button"

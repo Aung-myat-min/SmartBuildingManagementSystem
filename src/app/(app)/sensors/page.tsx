@@ -28,9 +28,10 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
+import { useLiveClock } from "@/hooks/use-live-clock";
 import { useAppState } from "@/lib/app-state";
 import { isAlarmStatus, isSensorOffline } from "@/lib/derive";
-import { formatClock, formatRelative } from "@/lib/format";
+import { formatRelative } from "@/lib/format";
 import {
   BUILDING_META,
   BUILDINGS,
@@ -104,9 +105,10 @@ export default function SensorsPage() {
 function SensorsView() {
   const router = useRouter();
   const params = useSearchParams();
-  const { role, activeBuildingId, sensorStatus, setSensorStatus, elapsed } =
+  const { role, activeBuildingId, sensorStatus, setSensorStatus } =
     useAppState();
   const confirm = useConfirm();
+  const clock = useLiveClock();
 
   const locked = isBuildingLocked(role);
   const mayAct = canActOnSensor(role);
@@ -229,8 +231,7 @@ function SensorsView() {
         <div className="flex-1" />
 
         <span className="text-muted-foreground shrink-0 text-[11px]">
-          {/* Held back until the first tick so the server and client agree. */}
-          Polled every 30s · {elapsed > 0 ? formatClock() : "—"}
+          Polled every 30s · {clock ?? "—"}
         </span>
 
         {canAct(role) && (

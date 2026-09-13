@@ -7,6 +7,7 @@ import { PulseDot } from "@/components/shared/pulse-dot";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useLiveClock } from "@/hooks/use-live-clock";
 import { useAppState } from "@/lib/app-state";
 import {
   countEscalated,
@@ -14,7 +15,7 @@ import {
   isEscalated,
   isRequestOpen,
 } from "@/lib/derive";
-import { formatAge, formatClock, formatTime } from "@/lib/format";
+import { formatAge, formatTime } from "@/lib/format";
 import {
   ATTENTION_ITEMS,
   BUILDINGS,
@@ -54,6 +55,7 @@ export default function DashboardPage() {
     scopedRequests,
     moveRequest,
   } = useAppState();
+  const clock = useLiveClock();
   const staff = !canAct(role);
   const visibleBuildings = staff
     ? BUILDINGS.filter((b) => b.id === activeBuildingId)
@@ -120,7 +122,7 @@ export default function DashboardPage() {
               )}
             </div>
             <div className="text-muted-foreground mt-1 text-[12px]">
-              {rooms.length} rooms monitored · last poll {formatClock()}
+              {rooms.length} rooms monitored · last poll {clock ?? "—"}
             </div>
           </div>
           <div
