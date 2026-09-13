@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -99,9 +100,12 @@ export default function LoginPage() {
               />
               Keep me signed in
             </label>
-            <span className="text-primary cursor-pointer text-[12px]">
+            <Link
+              href="/login/forgot-password"
+              className="text-primary text-[12px] hover:underline"
+            >
               Forgot password
-            </span>
+            </Link>
           </div>
           <Button
             type="submit"
@@ -149,6 +153,25 @@ export default function LoginPage() {
           <span className="font-medium">{roleLabel[role]}</span>. Picking an
           account changes which dashboard you land on.
         </p>
+
+        <div className="text-muted-foreground mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10.5px]">
+          <span className="font-mono tracking-wider uppercase">
+            Also preview
+          </span>
+          <Link
+            href="/login/first-sign-in"
+            className="hover:text-primary hover:underline"
+          >
+            First sign-in
+          </Link>
+          <span>·</span>
+          <Link
+            href="/login/session-expired"
+            className="hover:text-primary hover:underline"
+          >
+            Session expired
+          </Link>
+        </div>
       </div>
     </div>
   );
