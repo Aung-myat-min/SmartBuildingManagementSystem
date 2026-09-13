@@ -111,7 +111,10 @@
   --menu-acct-w: 236px;
 }
 
+/* Tells the browser which way to paint native controls — selects, date
+   pickers, scrollbars — so they follow the theme too. */
 :root {
+  color-scheme: light;
   --background: #f4f5f7;
   --foreground: #111318;
   --card: #ffffff;
@@ -169,6 +172,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: #0f1115;
   --foreground: #e9ebef;
   --card: #171a21;

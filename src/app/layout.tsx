@@ -25,8 +25,11 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    // next-themes sets the class on <html> before paint, which the server
+    // render cannot know about.
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

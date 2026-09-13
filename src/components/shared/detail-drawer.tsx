@@ -234,3 +234,87 @@ export function DrawerAction({
 export function DrawerActionGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid grid-cols-2 gap-1.75">{children}</div>;
 }
+
+/**
+ * A form that stays inside the drawer it was opened from. The design puts
+ * editing, recording a service and moving a unit in the record's own drawer —
+ * stacking a second drawer on top would bury the record you are editing.
+ */
+export function DrawerInlineForm({
+  title,
+  description,
+  submitLabel,
+  onSubmit,
+  onCancel,
+  error,
+  children,
+}: {
+  title: string;
+  description?: React.ReactNode;
+  submitLabel: string;
+  onSubmit: () => void;
+  onCancel: () => void;
+  error?: string | null;
+  children: React.ReactNode;
+}) {
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+      className="bg-surface-subtle border-divider -mx-4.5 -mb-3.5 flex flex-col gap-2.25 border-t px-4.5 py-3.5"
+    >
+      <div className="text-muted-foreground font-mono text-[10px] font-medium tracking-[0.07em] uppercase">
+        {title}
+      </div>
+      {description && (
+        <p className="text-muted-foreground text-[11px] leading-relaxed">
+          {description}
+        </p>
+      )}
+      {children}
+      {error && (
+        <p className="text-warning-foreground text-[11px] leading-relaxed">
+          {error}
+        </p>
+      )}
+      <div className="mt-0.5 flex gap-1.75">
+        <button
+          type="submit"
+          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 min-h-9 flex-1 cursor-pointer rounded border px-2 text-[11.5px] leading-none font-medium"
+        >
+          {submitLabel}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground min-h-9 cursor-pointer rounded border px-3 text-[11.5px] leading-none font-medium"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** Small-caps field label used by the inline forms. */
+export function DrawerField({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    // biome-ignore lint/a11y/noLabelWithoutControl: the control is the children, rendered inside this label
+    <label className={cn("flex flex-col gap-1.25", className)}>
+      <span className="text-muted-foreground font-mono text-[9.5px] font-medium tracking-[0.06em] uppercase">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}

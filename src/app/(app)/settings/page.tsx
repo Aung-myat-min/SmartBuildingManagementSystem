@@ -1,17 +1,10 @@
 "use client";
 
-import {
-  KeyRound,
-  Laptop,
-  Lock,
-  Palette,
-  Smartphone,
-  UserRound,
-} from "lucide-react";
+import { KeyRound, Lock, Palette, UserRound } from "lucide-react";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import * as React from "react";
 import { toast } from "sonner";
-import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -27,7 +20,7 @@ type SectionId = "profile" | "appearance" | "security";
 const SECTIONS: { id: SectionId; label: string; icon: typeof UserRound }[] = [
   { id: "profile", label: "Your account", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "security", label: "Password & sessions", icon: KeyRound },
+  { id: "security", label: "Password", icon: KeyRound },
 ];
 
 function initials(name: string) {
@@ -265,30 +258,17 @@ const THEMES = [
   },
 ] as const;
 
-const ACCENTS = [
-  { id: "blue", label: "Blue", swatch: "#4169e1" },
-  { id: "green", label: "Green", swatch: "#16a34a" },
-  { id: "amber", label: "Amber", swatch: "#d97706" },
-  { id: "violet", label: "Violet", swatch: "#7c3aed" },
-] as const;
-
-const DENSITIES = [
-  { id: "comfortable", label: "Comfortable", pad: 14 },
-  { id: "compact", label: "Compact", pad: 10 },
-  { id: "cozy", label: "Cozy", pad: 7 },
-] as const;
-
 function AppearanceSection() {
-  const [theme, setTheme] =
-    React.useState<(typeof THEMES)[number]["id"]>("light");
-  const [accent, setAccent] =
-    React.useState<(typeof ACCENTS)[number]["id"]>("blue");
-  const [density, setDensity] =
-    React.useState<(typeof DENSITIES)[number]["id"]>("comfortable");
+  // next-themes owns the value; `theme` may be "system", and resolvedTheme is
+  // what the page is actually painting.
+  const { theme, setTheme, resolvedTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
 
-  const activeTheme = THEMES.find((t) => t.id === theme) ?? THEMES[0];
-  const activeAccent = ACCENTS.find((a) => a.id === accent) ?? ACCENTS[0];
-  const activeDensity = DENSITIES.find((d) => d.id === density) ?? DENSITIES[0];
+  const current = mounted ? (theme ?? "system") : "system";
+  const preview =
+    THEMES.find((t) => t.id === (mounted ? resolvedTheme : "light")) ??
+    THEMES[0];
 
   return (
     <SectionCard
@@ -303,8 +283,8 @@ function AppearanceSection() {
             type="button"
             onClick={() => setTheme(t.id)}
             className={cn(
-              "overflow-hidden rounded-md border text-left",
-              theme === t.id ? "border-primary" : "border-border",
+              "cursor-pointer overflow-hidden rounded-md border text-left",
+              current === t.id ? "border-primary" : "border-border",
             )}
           >
             <div
@@ -328,7 +308,7 @@ function AppearanceSection() {
               <span
                 className={cn(
                   "size-3 shrink-0 rounded-full border",
-                  theme === t.id
+                  current === t.id
                     ? "border-primary bg-primary"
                     : "border-input bg-transparent",
                 )}
@@ -339,71 +319,14 @@ function AppearanceSection() {
         ))}
       </div>
 
-      <div className="mt-5">
-        <FieldLabel>Accent</FieldLabel>
-        <div className="mt-2.5 flex flex-wrap gap-2">
-          {ACCENTS.map((a) => (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => setAccent(a.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-md border px-2.75 py-2",
-                accent === a.id
-                  ? "border-primary bg-accent/40"
-                  : "border-border",
-              )}
-            >
-              <span
-                className="size-3.5 shrink-0 rounded-[3px]"
-                style={{ background: a.swatch }}
-              />
-              <span className="text-[11.5px] font-[450]">{a.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-5">
-        <FieldLabel>Density</FieldLabel>
-        <div className="bg-secondary border-border mt-2.5 flex w-fit items-center gap-1 rounded-md border p-[3px]">
-          {DENSITIES.map((d) => (
-            <button
-              key={d.id}
-              type="button"
-              onClick={() => setDensity(d.id)}
-              className={cn(
-                "cursor-pointer rounded px-3 py-1.5 text-[11.5px] font-medium whitespace-nowrap",
-                density === d.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-foreground/70",
-              )}
-            >
-              {d.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="border-border mt-5 overflow-hidden rounded-md border">
         <div className="bg-surface-subtle border-border text-muted-foreground border-b px-3 py-2 font-mono text-[10px] tracking-wider uppercase">
           Preview
         </div>
-        <div style={{ padding: activeDensity.pad, background: "#f4f5f7" }}>
-          <div
-            className="rounded-md border border-l-[3px]"
-            style={{
-              borderColor: "#d8dbe1",
-              borderLeftColor: activeAccent.swatch,
-              background: activeTheme.bg,
-              padding: activeDensity.pad,
-            }}
-          >
+        <div className="bg-background p-3.5">
+          <div className="border-border border-l-primary bg-card rounded-md border border-l-[3px] p-3.5">
             <div className="flex items-center gap-2">
-              <span
-                className="font-mono text-[10.5px]"
-                style={{ color: activeAccent.swatch }}
-              >
+              <span className="text-accent-foreground font-mono text-[10.5px]">
                 REQ-4192
               </span>
               <span className="bg-warning-muted text-warning-foreground rounded-[3px] px-1.5 py-0.75 font-mono text-[9px] tracking-wider uppercase">
@@ -414,10 +337,7 @@ function AppearanceSection() {
                 31h
               </span>
             </div>
-            <div
-              className="mt-2 text-[12.5px] font-[450]"
-              style={{ color: activeTheme.ink }}
-            >
+            <div className="text-foreground mt-2 text-[12.5px] font-[450]">
               Projector will not power on; lamp indicator flashing red
             </div>
             <div className="text-muted-foreground mt-1.25 font-mono text-[10.5px]">
@@ -427,22 +347,15 @@ function AppearanceSection() {
         </div>
       </div>
 
-      <div className="mt-4.5 flex items-center gap-3">
+      <div className="mt-4.5 flex flex-wrap items-center gap-3">
         <Button onClick={() => toast.success("Appearance saved.")}>
           Save appearance
         </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setTheme("light");
-            setAccent("blue");
-            setDensity("comfortable");
-          }}
-        >
+        <Button variant="outline" onClick={() => setTheme("system")}>
           Reset to default
         </Button>
         <span className="text-muted-foreground text-[11px]">
-          Dark and System stay in preview for this build.
+          Currently painting {preview.label.toLowerCase()}.
         </span>
       </div>
     </SectionCard>
@@ -451,43 +364,11 @@ function AppearanceSection() {
 
 // ---- Security --------------------------------------------------------------
 
-interface Session {
-  id: string;
-  device: string;
-  meta: string;
-  icon: typeof Laptop;
-  current?: boolean;
-}
-
-const INITIAL_SESSIONS: Session[] = [
-  {
-    id: "this",
-    device: "Chrome on Windows",
-    meta: "Yangon · active now",
-    icon: Laptop,
-    current: true,
-  },
-  {
-    id: "s2494",
-    device: "Safari on iPhone",
-    meta: "Yangon · 2 days ago",
-    icon: Smartphone,
-  },
-  {
-    id: "s2410",
-    device: "Chrome on Windows",
-    meta: "Junction Square kiosk · 6 days ago",
-    icon: Laptop,
-  },
-];
-
 function SecuritySection() {
-  const confirm = useConfirm();
   const [current, setCurrent] = React.useState("");
   const [next, setNext] = React.useState("");
   const [confirmPass, setConfirmPass] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
-  const [sessions, setSessions] = React.useState(INITIAL_SESSIONS);
 
   const handleChangePassword = () => {
     if (next.length < 10) {
@@ -505,28 +386,11 @@ function SecuritySection() {
     toast.success("Password changed. You've been kept signed in here.");
   };
 
-  const endSession = (id: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== id));
-    toast.success("Session ended.");
-  };
-
-  const endAll = async () => {
-    const result = await confirm({
-      title: "Sign out of all other sessions?",
-      body: "Every other device currently signed in to this account will be signed out immediately.",
-      tone: "warning",
-      confirmLabel: "Sign out everywhere else",
-    });
-    if (!result.confirmed) return;
-    setSessions((prev) => prev.filter((s) => s.current));
-    toast.success("Signed out of all other sessions.");
-  };
-
   return (
     <div className="flex flex-col gap-3.5">
       <SectionCard
         title="Password"
-        detail="Changing your password signs you out everywhere else. Last changed 62 days ago."
+        detail="Changing your password signs you out on every other device. Last changed 62 days ago."
       >
         <div className="grid grid-cols-3 gap-3 max-sm:grid-cols-1">
           <div className="flex flex-col gap-1.5">
@@ -569,55 +433,6 @@ function SecuritySection() {
           </Link>
         </div>
       </SectionCard>
-
-      <Card className="gap-0 overflow-hidden p-0">
-        <div className="px-4.5 pt-4.5 pb-4 lg:px-5 lg:pt-5">
-          <div className="text-[13.5px] font-semibold">Sessions</div>
-          <p className="text-muted-foreground mt-1.5 text-[11.5px] leading-relaxed">
-            Where your account is signed in. Sessions end after 30 minutes
-            without activity.
-          </p>
-        </div>
-        {sessions.map((s) => (
-          <div
-            key={s.id}
-            className="border-border/60 flex items-center gap-3 border-t px-4.5 py-3 lg:px-5"
-          >
-            <s.icon className="text-muted-foreground size-4 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <div className="text-[12.5px] font-[450]">{s.device}</div>
-              <div className="text-muted-foreground mt-0.5 font-mono text-[10.5px]">
-                {s.meta}
-              </div>
-            </div>
-            {s.current ? (
-              <span className="bg-success-muted text-success-foreground shrink-0 rounded-[3px] px-1.5 py-0.75 font-mono text-[9px] tracking-wider uppercase">
-                This device
-              </span>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-danger/40 text-danger-foreground hover:bg-danger-muted shrink-0"
-                onClick={() => endSession(s.id)}
-              >
-                End session
-              </Button>
-            )}
-          </div>
-        ))}
-        <div className="bg-surface-subtle border-border border-t px-4.5 py-3.5 lg:px-5">
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-danger/40 text-danger-foreground hover:bg-danger-muted"
-            onClick={endAll}
-            disabled={sessions.length <= 1}
-          >
-            Sign out of all other sessions
-          </Button>
-        </div>
-      </Card>
     </div>
   );
 }

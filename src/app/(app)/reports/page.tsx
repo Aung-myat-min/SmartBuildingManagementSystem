@@ -33,6 +33,16 @@ const KIND_LABEL: Record<ReportKind, string> = {
   "equipment-reliability": "Equipment reliability",
   "cost-of-maintenance": "Cost of maintenance",
 };
+/** What each report actually measures — the title alone does not say. */
+const KIND_BLURB: Record<ReportKind, string> = {
+  "maintenance-performance":
+    "How quickly maintenance requests were answered and closed over the period: the share resolved inside the escalation window, the average response time, how often a request escalated, and what the work cost against budget. Weekly figures separate work finished in the period from work carried over into the next one.",
+  "equipment-reliability":
+    "Which assets failed and how often, over the period: faults grouped by equipment type, the units that failed most, and the downtime each one accounted for. Use it to decide what to replace rather than keep repairing.",
+  "cost-of-maintenance":
+    "What the period's maintenance actually cost, split across parts, labour and contractors, and measured against the budget set for the scope. Per-unit costs show where spend concentrates.",
+};
+
 const STATUS_META: Record<ReportStatus, { label: string; tone: Tone }> = {
   ready: { label: "READY", tone: "success" },
   scheduled: { label: "SCHEDULED", tone: "warning" },
@@ -47,6 +57,16 @@ const TONE_BORDER_L: Record<Tone, string> = {
   info: "border-l-info",
   neutral: "border-l-neutral-foreground",
 };
+
+// The design gives each equipment type its own bar colour rather than one
+// flat blue, so the five rows read apart at a glance.
+const FAULT_BARS = [
+  "bg-chart-1",
+  "bg-chart-4",
+  "bg-chart-3",
+  "bg-chart-2",
+  "bg-chart-5",
+];
 
 const KIND_TONE: Record<ReportKind, Tone> = {
   "maintenance-performance": "info",
@@ -147,7 +167,7 @@ export default function ReportsPage() {
         </select>
         <div className="bg-border h-5.5 w-px" />
         <ToneBadge tone="info">{filtered.length} reports</ToneBadge>
-        <div className="flex-1" />
+        {/*<div className="flex-1" />*/}
         <Button size="sm" onClick={() => setGenOpen(true)}>
           + Generate report
         </Button>
@@ -384,12 +404,16 @@ function ReportDetailView({
           <div className="text-[13px] font-semibold">
             {KIND_LABEL[report.kind]}
           </div>
-          <div className="text-muted-foreground font-mono text-[10.5px]">
+          <div className="text-muted-foreground mt-1 font-mono text-[10.5px] leading-snug">
             {report.buildingId
               ? buildingName(report.buildingId)
               : "Whole estate"}{" "}
-            · {report.period}
+            · {report.period} · Generated {formatDate(report.generatedAt)} by{" "}
+            {report.generatedBy} · {STATUS_META[report.status].label}
           </div>
+          <p className="text-foreground/80 mt-2 max-w-[92ch] text-[11.5px] leading-relaxed text-pretty">
+            {KIND_BLURB[report.kind]}
+          </p>
         </div>
         <div className="flex-1" />
         <Button
@@ -498,17 +522,22 @@ function ReportDetailView({
             FAULTS BY EQUIPMENT TYPE
           </span>
           <div className="flex flex-col gap-2.5">
-            {detail.faultTypes.map((f) => {
+            {detail.faultTypes.map((f, i) => {
               const max = Math.max(...detail.faultTypes.map((x) => x.count));
               return (
                 <div key={f.typeLabel}>
-                  <div className="flex justify-between text-[11.5px]">
-                    <span>{f.typeLabel}</span>
-                    <span className="font-mono font-medium">{f.count}</span>
+                  <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
+                    <span className="font-[450]">{f.typeLabel}</span>
+                    <span className="text-neutral-foreground font-mono font-medium">
+                      {f.count}
+                    </span>
                   </div>
-                  <div className="bg-muted mt-1 h-1.5 overflow-hidden rounded-full">
+                  <div className="bg-rule mt-1.5 h-1.75 overflow-hidden rounded-[2px]">
                     <div
-                      className="bg-primary h-full rounded-full"
+                      className={cn(
+                        "h-full rounded-[2px]",
+                        FAULT_BARS[i % FAULT_BARS.length],
+                      )}
                       style={{ width: `${(f.count / max) * 100}%` }}
                     />
                   </div>

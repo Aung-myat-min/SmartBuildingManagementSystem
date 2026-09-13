@@ -206,7 +206,7 @@ export default function HistoricalRecordsPage() {
         </select>
         <div className="bg-border h-5.5 w-px" />
         <ToneBadge tone="info">{filtered.length} in range</ToneBadge>
-        <div className="flex-1" />
+        {/*<div className="flex-1" />*/}
         <button
           type="button"
           onClick={() =>

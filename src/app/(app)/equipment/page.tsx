@@ -22,10 +22,11 @@ import {
   DetailMetaGrid,
   DrawerAction,
   DrawerActionGrid,
+  DrawerField,
+  DrawerInlineForm,
   SameDevicePanel,
 } from "@/components/shared/detail-drawer";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { useAppState } from "@/lib/app-state";
 import {
@@ -472,9 +473,13 @@ function EquipmentDrawer({
   const [form, setForm] = React.useState<"none" | "service" | "move" | "edit">(
     "none",
   );
+  const [photo, setPhoto] = React.useState<string | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: unit id is the reset trigger
-  React.useEffect(() => setForm("none"), [unit?.id]);
+  React.useEffect(() => {
+    setForm("none");
+    setPhoto(null);
+  }, [unit?.id]);
 
   // Rendered closed rather than unmounted, so the drawer animates out.
   if (!unit) {
@@ -567,9 +572,32 @@ function EquipmentDrawer({
         onClose={onClose}
       >
         <div className="mt-3 flex gap-3">
-          <div className="border-divider bg-background flex h-21 w-28 shrink-0 items-center justify-center overflow-hidden rounded border">
-            <Camera className="text-muted-foreground size-5" />
-          </div>
+          <label
+            title="Choose a photo of this unit"
+            className="border-divider bg-background hover:border-primary relative flex h-21 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded border"
+          >
+            {photo ? (
+              // biome-ignore lint/performance/noImgElement: a local object URL, not a remote asset
+              <img
+                src={photo}
+                alt={`${unit.tag} — ${equipmentUnitLabel(unit)}`}
+                className="size-full object-cover"
+              />
+            ) : (
+              <Camera className="text-muted-foreground size-5" />
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setPhoto(URL.createObjectURL(file));
+                toast.success(`Photo added to ${unit.tag}`);
+              }}
+            />
+          </label>
           <div className="min-w-0 flex-1">
             <div className="text-[15px] leading-tight font-semibold">
               {equipmentUnitLabel(unit)}
@@ -577,8 +605,19 @@ function EquipmentDrawer({
             <div className="text-muted-foreground mt-1 text-[11.5px] leading-snug">
               {roomLabel(unit.roomId)} · {buildingName(unit.buildingId)}
             </div>
-            <div className="text-muted-foreground mt-2 font-mono text-[10.5px]">
-              Drop a photo of this unit
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-muted-foreground font-mono text-[10.5px]">
+                {photo ? "Photo attached" : "Drop a photo of this unit"}
+              </span>
+              {photo && (
+                <button
+                  type="button"
+                  onClick={() => setPhoto(null)}
+                  className="text-danger-foreground cursor-pointer text-[10.5px] font-medium hover:underline"
+                >
+                  Remove
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -730,7 +769,6 @@ function EquipmentDrawer({
   );
 }
 
-/** The design's EDIT UNIT DETAILS: tag, type, install date and service interval. */
 function EditUnitForm({
   unit,
   onDone,
@@ -743,17 +781,16 @@ function EditUnitForm({
   const [installed, setInstalled] = React.useState(
     unit.installedAt.slice(0, 10),
   );
-  const [interval, setInterval] = React.useState("180");
+  const [serviceInterval, setServiceInterval] = React.useState("180");
   const [error, setError] = React.useState<string | null>(null);
 
   return (
-    <FormDrawer
-      open
-      onOpenChange={(o) => !o && onDone()}
+    <DrawerInlineForm
       title="Edit unit details"
       description="The tag follows the unit, so changing it renames every record that points at this asset."
       submitLabel="Save details"
       error={error}
+      onCancel={onDone}
       onSubmit={() => {
         if (tag.trim().length === 0) {
           setError("A unit needs an asset tag.");
@@ -763,18 +800,18 @@ function EditUnitForm({
         onDone();
       }}
     >
-      <FormField label="Asset tag">
+      <DrawerField label="Asset tag">
         <input
           value={tag}
           onChange={(e) => setTag(e.target.value)}
-          className="border-input focus:border-primary w-full rounded border px-2.25 py-2 font-mono text-[11.5px] outline-none"
+          className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 font-mono text-[11.5px] outline-none"
         />
-      </FormField>
-      <FormField label="Equipment type">
+      </DrawerField>
+      <DrawerField label="Equipment type">
         <select
           value={typeId}
           onChange={(e) => setTypeId(e.target.value)}
-          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium"
         >
           {EQUIPMENT_TYPES.map((t) => (
             <option key={t.id} value={t.id}>
@@ -782,29 +819,29 @@ function EditUnitForm({
             </option>
           ))}
         </select>
-      </FormField>
-      <div className="grid grid-cols-2 gap-2.75">
-        <FormField label="Installed">
+      </DrawerField>
+      <div className="grid grid-cols-2 gap-2.25">
+        <DrawerField label="Installed">
           <input
             type="date"
             value={installed}
             onChange={(e) => setInstalled(e.target.value)}
-            className="border-input focus:border-primary w-full rounded border px-2.25 py-2 text-[12px] outline-none"
+            className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
           />
-        </FormField>
-        <FormField label="Service interval">
+        </DrawerField>
+        <DrawerField label="Service interval">
           <select
-            value={interval}
-            onChange={(e) => setInterval(e.target.value)}
-            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+            value={serviceInterval}
+            onChange={(e) => setServiceInterval(e.target.value)}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium"
           >
             <option value="90">Every 90 days</option>
             <option value="180">Every 180 days</option>
             <option value="365">Every year</option>
           </select>
-        </FormField>
+        </DrawerField>
       </div>
-    </FormDrawer>
+    </DrawerInlineForm>
   );
 }
 
@@ -819,34 +856,33 @@ function ServiceForm({
   const [parts, setParts] = React.useState("");
 
   return (
-    <FormDrawer
-      open
-      onOpenChange={(o) => !o && onDone()}
+    <DrawerInlineForm
       title="Record a service"
-      description={`${unit.tag} — ${equipmentUnitLabel(unit)}. The next service date moves on by ${DUE_SERVICE_DAYS * 6} days.`}
+      description={`The next service date moves on by ${DUE_SERVICE_DAYS * 6} days.`}
       submitLabel="Save service"
+      onCancel={onDone}
       onSubmit={() => {
         toast.success(`Service recorded for ${unit.tag}`);
         onDone();
       }}
     >
-      <FormField label="Parts used">
+      <DrawerField label="Parts used">
         <input
           value={parts}
           onChange={(e) => setParts(e.target.value)}
           placeholder="Lamp module, filter"
-          className="border-input focus:border-primary w-full rounded border px-2.25 py-2 text-[12px] outline-none"
+          className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
         />
-      </FormField>
-      <FormField label="Cost">
+      </DrawerField>
+      <DrawerField label="Cost">
         <input
           value={cost}
           onChange={(e) => setCost(e.target.value)}
           placeholder="145,000 MMK"
-          className="border-input focus:border-primary w-full rounded border px-2.25 py-2 text-[12px] outline-none"
+          className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
         />
-      </FormField>
-    </FormDrawer>
+      </DrawerField>
+    </DrawerInlineForm>
   );
 }
 
@@ -862,46 +898,47 @@ function MoveForm({
   const rooms = roomsForBuilding(buildingId);
 
   return (
-    <FormDrawer
-      open
-      onOpenChange={(o) => !o && onDone()}
+    <DrawerInlineForm
       title="Move unit"
       description={`${unit.tag} keeps its tag and its history; only its location changes.`}
       submitLabel="Move unit"
+      onCancel={onDone}
       onSubmit={() => {
         toast.success(`${unit.tag} moved to ${roomLabel(roomId)}`);
         onDone();
       }}
     >
-      <FormField label="Building">
-        <select
-          value={buildingId}
-          onChange={(e) => {
-            setBuildingId(e.target.value);
-            setRoomId(roomsForBuilding(e.target.value)[0]?.id ?? "");
-          }}
-          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-        >
-          {BUILDINGS.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-      </FormField>
-      <FormField label="Room">
-        <select
-          value={roomId}
-          onChange={(e) => setRoomId(e.target.value)}
-          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-        >
-          {rooms.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.roomNumber}
-            </option>
-          ))}
-        </select>
-      </FormField>
-    </FormDrawer>
+      <div className="grid grid-cols-2 gap-2.25">
+        <DrawerField label="Building">
+          <select
+            value={buildingId}
+            onChange={(e) => {
+              setBuildingId(e.target.value);
+              setRoomId(roomsForBuilding(e.target.value)[0]?.id ?? "");
+            }}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium"
+          >
+            {BUILDINGS.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </DrawerField>
+        <DrawerField label="Room">
+          <select
+            value={roomId}
+            onChange={(e) => setRoomId(e.target.value)}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium"
+          >
+            {rooms.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.roomNumber}
+              </option>
+            ))}
+          </select>
+        </DrawerField>
+      </div>
+    </DrawerInlineForm>
   );
 }
