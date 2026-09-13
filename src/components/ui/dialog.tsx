@@ -30,7 +30,9 @@ function DialogOverlay({
     <DialogPrimitive.Backdrop
       data-slot="dialog-overlay"
       className={cn(
-        "fixed inset-0 isolate z-50 bg-black/10 duration-100 supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
+        // Dimmed to the design's rgba(17,19,24,.34), and not blurred: the
+        // numbers behind a confirm are often what you are deciding against.
+        "fixed inset-0 isolate z-50 bg-[#111318]/34 duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0",
         className,
       )}
       {...props}

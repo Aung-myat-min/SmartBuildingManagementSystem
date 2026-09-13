@@ -66,7 +66,9 @@
   --color-surface: var(--surface);
   --color-surface-subtle: var(--surface-subtle);
   --color-surface-hover: var(--surface-hover);
-  /* Row rules inside a card are lighter than the card's own border. */
+  /* Two rules below the border weight: --divider separates sections inside a
+     card or drawer, --rule separates rows within a list. */
+  --color-divider: var(--divider);
   --color-rule: var(--rule);
   /* The signed-out screens sit on a slightly deeper ground than the app. */
   --color-auth: var(--auth);
@@ -161,6 +163,7 @@
   --surface: #f4f5f7;
   --surface-subtle: #fafbfc;
   --surface-hover: #f7f8fa;
+  --divider: #e6e8ec;
   --rule: #f1f2f5;
   --auth: #eef0f3;
 }
@@ -216,6 +219,7 @@
   --surface: #14161c;
   --surface-subtle: #191c24;
   --surface-hover: #1c1f28;
+  --divider: #262b35;
   --rule: #232832;
   --auth: #0b0d11;
 }
