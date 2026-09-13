@@ -37,12 +37,21 @@ export function FormDrawer({
   submitDisabled?: boolean;
   children: React.ReactNode;
 }) {
+  // On a phone the drawer is re-drawn as a bottom sheet — same fields,
+  // reachable with a thumb.
+  const isMobile = useIsMobile();
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="right"
+        side={isMobile ? "bottom" : "right"}
         showCloseButton={false}
-        className="border-border max-w-none data-[side=right]:w-(--drawer-form-w) gap-0 border-l p-0 shadow-[-8px_0_24px_rgba(17,19,24,0.12)] data-[side=right]:sm:max-w-none"
+        className={cn(
+          "border-border max-w-none gap-0 p-0 data-[side=right]:sm:max-w-none",
+          "data-[side=bottom]:max-h-[86vh] data-[side=bottom]:rounded-t-xl",
+          "data-[side=right]:border-l data-[side=right]:shadow-[-8px_0_24px_rgba(17,19,24,0.12)]",
+          "data-[side=right]:w-(--drawer-form-w)",
+        )}
       >
         <form
           onSubmit={(e) => {
