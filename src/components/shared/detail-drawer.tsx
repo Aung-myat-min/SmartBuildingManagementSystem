@@ -3,6 +3,7 @@
 import { Link2, Lock } from "lucide-react";
 import type * as React from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,18 +22,29 @@ export function DetailDrawer({
   size?: "wide" | "narrow";
   children: React.ReactNode;
 }) {
+  // On a phone the drawer is re-drawn as a bottom sheet — the same content,
+  // reachable with a thumb.
+  const isMobile = useIsMobile();
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="right"
+        side={isMobile ? "bottom" : "right"}
         showCloseButton={false}
         className={cn(
-          "border-border max-w-none gap-0 overflow-y-auto border-l p-0 shadow-[-8px_0_24px_rgba(17,19,24,0.12)] data-[side=right]:sm:max-w-none",
+          "border-border max-w-none gap-0 overflow-y-auto p-0 data-[side=right]:sm:max-w-none",
+          "data-[side=bottom]:max-h-[86vh] data-[side=bottom]:rounded-t-xl",
+          "data-[side=right]:border-l data-[side=right]:shadow-[-8px_0_24px_rgba(17,19,24,0.12)]",
           size === "wide"
             ? "data-[side=right]:w-(--drawer-detail-w)"
             : "data-[side=right]:w-(--drawer-form-w)",
         )}
       >
+        {isMobile && (
+          <div className="flex justify-center pt-2.5 pb-1">
+            <span className="bg-input h-1 w-9 rounded-full" />
+          </div>
+        )}
         {children}
       </SheetContent>
     </Sheet>
@@ -198,7 +210,7 @@ export function DrawerAction({
       onClick={onClick}
       title={lockedReason ?? caption}
       className={cn(
-        "flex cursor-pointer flex-col items-start gap-1.25 rounded border px-2.5 py-2.25 text-left transition-colors",
+        "flex min-h-11 cursor-pointer flex-col items-start justify-center gap-1.25 rounded border px-2.5 py-2.25 text-left transition-colors md:min-h-0",
         locked
           ? "border-border cursor-not-allowed opacity-45"
           : tone === "danger"

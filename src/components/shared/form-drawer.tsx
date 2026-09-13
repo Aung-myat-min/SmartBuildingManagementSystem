@@ -2,6 +2,7 @@
 
 import type * as React from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 /**
@@ -82,14 +83,14 @@ export function FormDrawer({
             <button
               type="submit"
               disabled={submitDisabled}
-              className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 flex-1 cursor-pointer rounded border px-2 py-2 text-[11.5px] leading-none font-medium disabled:cursor-not-allowed disabled:opacity-45"
+              className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 min-h-11 flex-1 cursor-pointer rounded border px-2 py-2 text-[11.5px] leading-none font-medium disabled:cursor-not-allowed disabled:opacity-45 md:min-h-0"
             >
               {submitLabel}
             </button>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+              className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground min-h-11 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium md:min-h-0"
             >
               {cancelLabel}
             </button>

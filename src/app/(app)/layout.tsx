@@ -4,23 +4,21 @@ import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/shell/account-menu";
 import { AppSidebar } from "@/components/shell/app-sidebar";
 import { DemoBanner } from "@/components/shell/demo-banner";
+import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
 import { NotificationsMenu } from "@/components/shell/notifications-menu";
 import { RoleSwitcher } from "@/components/shell/role-switcher";
 import { Separator } from "@/components/ui/separator";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
 import { useAppState } from "@/lib/app-state";
 import { BUILDINGS } from "@/lib/mock-data";
-import { NAV_ITEMS } from "@/lib/nav";
+import { MOBILE_TABS, MORE_ITEMS, NAV_ITEMS } from "@/lib/nav";
+
+const TITLES = [...NAV_ITEMS, ...MORE_ITEMS, ...MOBILE_TABS];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { role, activeBuildingId } = useAppState();
 
-  const current = NAV_ITEMS.find(
+  const current = TITLES.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
   const buildingName =
@@ -31,29 +29,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       : "All buildings in scope";
 
   return (
-    <SidebarProvider>
+    <div className="flex min-h-screen">
       <AppSidebar />
-      <SidebarInset className="bg-background">
-        <header className="border-border bg-card sticky top-0 z-40 flex h-[54px] shrink-0 items-center gap-3.5 border-b px-4 lg:px-5">
-          <SidebarTrigger className="-ml-1.5" />
-          <Separator orientation="vertical" className="h-5!" />
-          <h1 className="text-[13px] font-semibold whitespace-nowrap">
-            {current?.label ?? "Smart Building Monitoring"}
-          </h1>
-          <span className="text-muted-foreground hidden text-[11.5px] sm:inline">
-            {scopeNote}
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="border-border bg-card sticky top-0 z-40 flex h-(--header-h) shrink-0 items-center gap-3 border-b px-4 lg:px-5">
+          {/* The phone has no sidebar, so the mark rides in the header. */}
+          <span className="border-primary relative size-5.5 shrink-0 rounded-[3px] border-2 md:hidden">
+            <span className="bg-primary absolute inset-0.75 opacity-55" />
           </span>
+
+          <div className="flex min-w-0 flex-col md:flex-row md:items-center md:gap-3">
+            <h1 className="truncate text-[12.5px] font-semibold md:text-[13px]">
+              {current?.label ?? "Smart Building Monitoring"}
+            </h1>
+            <span className="text-muted-foreground truncate font-mono text-[10px] md:font-sans md:text-[11.5px]">
+              {scopeNote}
+            </span>
+          </div>
+
           <div className="flex-1" />
-          <RoleSwitcher />
-          <Separator orientation="vertical" className="h-5!" />
+          <div className="hidden lg:block">
+            <RoleSwitcher />
+          </div>
+          <Separator orientation="vertical" className="hidden h-5! lg:block" />
           <NotificationsMenu />
           <AccountMenu />
         </header>
+
         <DemoBanner />
-        <main className="flex flex-1 flex-col gap-4 p-4 lg:p-5">
+
+        {/* Bottom padding clears the tab bar, which floats over the page. */}
+        <main className="flex flex-1 flex-col gap-4 p-4 pb-24 md:pb-4 lg:p-5 lg:pb-5">
           {children}
         </main>
-      </SidebarInset>
-    </SidebarProvider>
+      </div>
+
+      <MobileTabBar />
+    </div>
   );
 }

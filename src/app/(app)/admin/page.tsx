@@ -124,7 +124,7 @@ export default function AdministrationPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="border-border bg-card flex items-center gap-2 rounded-[5px] border px-3 py-2.25">
+      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <div className="bg-secondary border-border flex items-center gap-1 rounded-[5px] border p-[3px]">
           <TabButton
             icon={mayEstate ? Building2 : Lock}
@@ -414,84 +414,88 @@ function BuildingsTab({
             </div>
           </div>
 
-          <div className="bg-surface-subtle border-divider text-muted-foreground flex border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
-            <span className="flex-1">Room</span>
-            <span className="w-30">Type</span>
-            <span className="w-17.5">Floor</span>
-            <span className="w-22 text-right">Devices</span>
-            <span className="w-30 text-right">Actions</span>
-          </div>
-          {buildingRooms.map((r) => (
-            <div
-              key={r.id}
-              className="border-rule flex items-center border-b px-4 py-2.5"
-            >
-              <span className="flex-1 truncate text-[12.5px] leading-snug font-[450]">
-                {r.roomNumber}
-              </span>
-              <span className="text-neutral-foreground w-30 text-[11.5px]">
-                {ROOM_TYPE_LABEL[r.type]}
-              </span>
-              <span className="text-muted-foreground w-17.5 font-mono text-[11px]">
-                {r.floor}
-              </span>
-              <span className="text-neutral-foreground w-22 text-right font-mono text-[11px] font-medium">
-                {EQUIPMENT_UNITS.filter((u) => u.roomId === r.id).length}
-              </span>
-              <span className="flex w-30 justify-end gap-1.5">
-                <RowButton
-                  onClick={() => setEditingRoom(r)}
-                  title="Edit this room"
-                >
-                  Edit
-                </RowButton>
-                <RowButton
-                  danger
-                  onClick={() => removeRoom(r)}
-                  title="Remove room"
-                >
-                  Remove
-                </RowButton>
-              </span>
+          {/* Below a tablet the room table keeps its column widths and
+              scrolls inside the card, rather than pushing the page sideways. */}
+          <div className="overflow-x-auto">
+            <div className="bg-surface-subtle border-divider text-muted-foreground flex min-w-140 border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
+              <span className="flex-1">Room</span>
+              <span className="w-30">Type</span>
+              <span className="w-17.5">Floor</span>
+              <span className="w-22 text-right">Devices</span>
+              <span className="w-30 text-right">Actions</span>
             </div>
-          ))}
+            {buildingRooms.map((r) => (
+              <div
+                key={r.id}
+                className="border-rule flex min-w-140 items-center border-b px-4 py-2.5"
+              >
+                <span className="flex-1 truncate text-[12.5px] leading-snug font-[450]">
+                  {r.roomNumber}
+                </span>
+                <span className="text-neutral-foreground w-30 text-[11.5px]">
+                  {ROOM_TYPE_LABEL[r.type]}
+                </span>
+                <span className="text-muted-foreground w-17.5 font-mono text-[11px]">
+                  {r.floor}
+                </span>
+                <span className="text-neutral-foreground w-22 text-right font-mono text-[11px] font-medium">
+                  {EQUIPMENT_UNITS.filter((u) => u.roomId === r.id).length}
+                </span>
+                <span className="flex w-30 justify-end gap-1.5">
+                  <RowButton
+                    onClick={() => setEditingRoom(r)}
+                    title="Edit this room"
+                  >
+                    Edit
+                  </RowButton>
+                  <RowButton
+                    danger
+                    onClick={() => removeRoom(r)}
+                    title="Remove room"
+                  >
+                    Remove
+                  </RowButton>
+                </span>
+              </div>
+            ))}
 
-          <div className="bg-surface-subtle flex items-center gap-2 px-4 py-3">
-            <input
-              value={newRoomName}
-              onChange={(e) => setNewRoomName(e.target.value)}
-              placeholder="Room name or number"
-              className="border-input focus:border-primary min-w-0 flex-1 rounded border px-2.25 py-2 text-[12px] outline-none"
-            />
-            <select
-              value={newRoomType}
-              onChange={(e) => setNewRoomType(e.target.value as RoomType)}
-              className="border-input bg-card text-neutral-foreground w-32.5 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-            >
-              {ROOM_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {ROOM_TYPE_LABEL[t]}
-                </option>
-              ))}
-            </select>
-            <select
-              value={newRoomFloor}
-              onChange={(e) => setNewRoomFloor(e.target.value)}
-              className="border-input bg-card text-neutral-foreground w-24 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-            >
-              {FLOORS.map((f) => (
-                <option key={f} value={f}>
-                  Floor {f}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={addRoom}
-              className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer rounded border px-3.25 py-2 text-[11.5px] leading-none font-medium"
-            >
-              Add room
-            </button>
+            <div className="bg-surface-subtle flex items-center gap-2 px-4 py-3">
+              <input
+                value={newRoomName}
+                onChange={(e) => setNewRoomName(e.target.value)}
+                placeholder="Room name or number"
+                className="border-input focus:border-primary min-w-0 flex-1 rounded border px-2.25 py-2 text-[12px] outline-none"
+              />
+              <select
+                value={newRoomType}
+                onChange={(e) => setNewRoomType(e.target.value as RoomType)}
+                className="border-input bg-card text-neutral-foreground w-32.5 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+              >
+                {ROOM_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {ROOM_TYPE_LABEL[t]}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={newRoomFloor}
+                onChange={(e) => setNewRoomFloor(e.target.value)}
+                className="border-input bg-card text-neutral-foreground w-24 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+              >
+                {FLOORS.map((f) => (
+                  <option key={f} value={f}>
+                    Floor {f}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={addRoom}
+                className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer rounded border px-3.25 py-2 text-[11.5px] leading-none font-medium"
+              >
+                Add room
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -820,7 +824,7 @@ function UsersTab({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="border-border bg-card flex items-center gap-2 rounded-[5px] border px-3 py-2.25">
+      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <div className="border-input focus-within:border-primary bg-card flex min-w-35 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
@@ -856,8 +860,8 @@ function UsersTab({
         </button>
       </div>
 
-      <div className="border-border bg-card overflow-hidden rounded-[5px] border">
-        <div className="bg-surface-subtle border-divider text-muted-foreground flex border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
+      <div className="border-border bg-card overflow-x-auto rounded-[5px] border">
+        <div className="bg-surface-subtle border-divider text-muted-foreground flex min-w-260 border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
           <span className="w-47.5">Name</span>
           <span className="flex-1">Email</span>
           <span className="w-37.5">Role</span>
@@ -876,7 +880,7 @@ function UsersTab({
             <div
               key={u.uid}
               className={cn(
-                "border-rule flex items-center border-b px-4 py-2.5",
+                "border-rule flex min-w-260 items-center border-b px-4 py-2.5",
                 u.status === "suspended" && "bg-surface-subtle",
               )}
             >
