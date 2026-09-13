@@ -1,12 +1,10 @@
 "use client";
 
 import {
-  Bell,
   KeyRound,
   Laptop,
   Lock,
   Palette,
-  SlidersHorizontal,
   Smartphone,
   UserRound,
 } from "lucide-react";
@@ -17,7 +15,6 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { useAppState } from "@/lib/app-state";
 import { formatRelative } from "@/lib/format";
 import { BUILDINGS } from "@/lib/mock-data";
@@ -25,28 +22,11 @@ import { roleLabel } from "@/lib/permissions";
 import type { UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type SectionId =
-  | "profile"
-  | "appearance"
-  | "notifications"
-  | "monitoring"
-  | "security";
+type SectionId = "profile" | "appearance" | "security";
 
-const SECTIONS: {
-  id: SectionId;
-  label: string;
-  icon: typeof UserRound;
-  ceoOnly?: boolean;
-}[] = [
+const SECTIONS: { id: SectionId; label: string; icon: typeof UserRound }[] = [
   { id: "profile", label: "Your account", icon: UserRound },
   { id: "appearance", label: "Appearance", icon: Palette },
-  { id: "notifications", label: "Notifications", icon: Bell },
-  {
-    id: "monitoring",
-    label: "Monitoring",
-    icon: SlidersHorizontal,
-    ceoOnly: true,
-  },
   { id: "security", label: "Password & sessions", icon: KeyRound },
 ];
 
@@ -60,7 +40,7 @@ function initials(name: string) {
 }
 
 export default function SettingsPage() {
-  const { currentUser, role, setRole, activeBuildingId } = useAppState();
+  const { currentUser, role, activeBuildingId } = useAppState();
   const [section, setSection] = React.useState<SectionId>("profile");
 
   const scopeValue =
@@ -73,7 +53,6 @@ export default function SettingsPage() {
       <Card className="gap-0 overflow-hidden p-0 max-lg:hidden">
         {SECTIONS.map((s) => {
           const active = s.id === section;
-          const locked = s.ceoOnly && role !== "ceo-super-admin";
           return (
             <button
               key={s.id}
@@ -100,9 +79,6 @@ export default function SettingsPage() {
               >
                 {s.label}
               </span>
-              {locked && (
-                <Lock className="text-muted-foreground size-3 shrink-0" />
-              )}
             </button>
           );
         })}
@@ -137,16 +113,6 @@ export default function SettingsPage() {
           />
         )}
         {section === "appearance" && <AppearanceSection />}
-        {section === "notifications" && <NotificationsSection />}
-        {section === "monitoring" &&
-          (role === "ceo-super-admin" ? (
-            <MonitoringSection />
-          ) : (
-            <MonitoringLocked
-              currentRoleLabel={roleLabel[role]}
-              onSwitch={() => setRole("ceo-super-admin")}
-            />
-          ))}
         {section === "security" && <SecuritySection />}
       </div>
     </div>
@@ -480,309 +446,6 @@ function AppearanceSection() {
         </span>
       </div>
     </SectionCard>
-  );
-}
-
-// ---- Notifications ---------------------------------------------------------
-
-interface NotifRow {
-  id: string;
-  label: string;
-  detail: string;
-  forced?: boolean;
-}
-
-const NOTIF_ROWS: NotifRow[] = [
-  {
-    id: "fire",
-    label: "Fire alarm & life-safety alerts",
-    detail: "Triggered or offline fire/life-safety sensors.",
-    forced: true,
-  },
-  {
-    id: "priority",
-    label: "High-priority request opened",
-    detail: "A new request is submitted with High priority.",
-  },
-  {
-    id: "aging",
-    label: "Request aging past 24h",
-    detail: "A high-priority request has been open past the escalation window.",
-  },
-  {
-    id: "faulty",
-    label: "Equipment marked faulty",
-    detail: "Any unit in your scope changes to Faulty.",
-  },
-  {
-    id: "report",
-    label: "Weekly report ready",
-    detail: "A new performance or reliability report is generated.",
-  },
-  {
-    id: "building",
-    label: "Building added to the estate",
-    detail: "Administration adds a new building or room.",
-  },
-];
-
-type NotifChannels = { inApp: boolean; email: boolean; sms: boolean };
-
-const NOTIF_DEFAULTS: Record<string, NotifChannels> = {
-  fire: { inApp: true, email: true, sms: true },
-  priority: { inApp: true, email: true, sms: false },
-  aging: { inApp: true, email: true, sms: false },
-  faulty: { inApp: true, email: false, sms: false },
-  report: { inApp: true, email: true, sms: false },
-  building: { inApp: true, email: false, sms: false },
-};
-
-function NotificationsSection() {
-  const [prefs, setPrefs] =
-    React.useState<Record<string, NotifChannels>>(NOTIF_DEFAULTS);
-
-  const toggle = (rowId: string, channel: keyof NotifChannels) => {
-    setPrefs((prev) => ({
-      ...prev,
-      [rowId]: { ...prev[rowId], [channel]: !prev[rowId][channel] },
-    }));
-  };
-
-  return (
-    <Card className="gap-0 overflow-hidden p-0">
-      <div className="px-4.5 pt-4.5 pb-4 lg:px-5 lg:pt-5">
-        <div className="text-[13.5px] font-semibold">Notifications</div>
-        <p className="text-muted-foreground mt-1.5 text-[11.5px] leading-relaxed">
-          Choose what reaches you and how. Fire alarms always notify every
-          channel — that one cannot be turned off.
-        </p>
-      </div>
-      <div className="bg-surface-subtle border-border text-muted-foreground flex border-y px-4.5 py-2 font-mono text-[9.5px] tracking-wider uppercase lg:px-5">
-        <span className="flex-1">Event</span>
-        <span className="w-15 text-center max-sm:hidden">In app</span>
-        <span className="w-15 text-center max-sm:hidden">Email</span>
-        <span className="w-15 text-center max-sm:hidden">SMS</span>
-      </div>
-      {NOTIF_ROWS.map((row) => {
-        const channels = prefs[row.id];
-        return (
-          <div
-            key={row.id}
-            className="border-border/60 flex items-center border-b px-4.5 py-3 last:border-b-0 lg:px-5"
-          >
-            <div className="min-w-0 flex-1 pr-3">
-              <div className="flex items-center gap-2">
-                <span className="text-[12.5px] font-[450]">{row.label}</span>
-                {row.forced && (
-                  <span className="bg-danger-muted text-danger-foreground rounded-[3px] px-1.5 py-0.75 font-mono text-[9px] tracking-wider uppercase">
-                    Always on
-                  </span>
-                )}
-              </div>
-              <div className="text-muted-foreground mt-1 text-[10.5px] leading-relaxed">
-                {row.detail}
-              </div>
-            </div>
-            {(["inApp", "email", "sms"] as const).map((c) => (
-              <div key={c} className="flex w-15 shrink-0 justify-center">
-                <Switch
-                  size="sm"
-                  checked={channels[c]}
-                  disabled={row.forced}
-                  onCheckedChange={() => toggle(row.id, c)}
-                />
-              </div>
-            ))}
-          </div>
-        );
-      })}
-      <div className="bg-surface-subtle flex items-center gap-3 px-4.5 py-3.5 lg:px-5">
-        <Button
-          size="sm"
-          onClick={() => toast.success("Notification preferences saved.")}
-        >
-          Save preferences
-        </Button>
-        <span className="text-muted-foreground text-[11px]">
-          Quiet hours aren&apos;t configured for this account.
-        </span>
-      </div>
-    </Card>
-  );
-}
-
-// ---- Monitoring (CEO only) --------------------------------------------
-
-function MonitoringLocked({
-  currentRoleLabel,
-  onSwitch,
-}: {
-  currentRoleLabel: string;
-  onSwitch: () => void;
-}) {
-  return (
-    <Card className="gap-3 p-9 text-center">
-      <Lock className="text-muted-foreground mx-auto size-7" />
-      <div className="text-[13.5px] font-semibold">
-        Monitoring thresholds are CEO-only
-      </div>
-      <p className="text-muted-foreground mx-auto max-w-[56ch] text-[12px] leading-relaxed">
-        Polling, escalation and alarm behaviour apply to the whole estate, so
-        they sit with the CEO / Super Admin. Your role is{" "}
-        <span className="font-mono">{currentRoleLabel}</span>.
-      </p>
-      <Button
-        variant="outline"
-        size="sm"
-        className="mx-auto mt-1"
-        onClick={onSwitch}
-      >
-        Switch to CEO for this demo
-      </Button>
-    </Card>
-  );
-}
-
-interface SliderSpec {
-  id: string;
-  label: string;
-  detail: string;
-  options: string[];
-  defaultValue: string;
-}
-
-const SLIDERS: SliderSpec[] = [
-  {
-    id: "escalation",
-    label: "Escalation window",
-    detail:
-      "How long a high-priority request can sit before it's flagged as aging on the Requests page.",
-    options: ["12h", "24h", "48h"],
-    defaultValue: "24h",
-  },
-  {
-    id: "polling",
-    label: "Sensor polling interval",
-    detail: "How often the sensor network is expected to report in.",
-    options: ["15s", "30s", "1m", "5m"],
-    defaultValue: "30s",
-  },
-  {
-    id: "offline",
-    label: "Offline sensor timeout",
-    detail:
-      "How long a sensor can miss its check-in before it shows as Offline.",
-    options: ["2m", "5m", "10m"],
-    defaultValue: "5m",
-  },
-];
-
-function MonitoringSection() {
-  const [values, setValues] = React.useState<Record<string, string>>(
-    Object.fromEntries(SLIDERS.map((s) => [s.id, s.defaultValue])),
-  );
-  const [autoEscalate, setAutoEscalate] = React.useState(true);
-  const [notifyOffline, setNotifyOffline] = React.useState(true);
-  const [nightlyReports, setNightlyReports] = React.useState(false);
-
-  return (
-    <SectionCard
-      title="Monitoring"
-      detail="Estate-wide thresholds. Changing these changes what the other pages count as late, offline or in alarm."
-    >
-      <div className="flex flex-col gap-5">
-        {SLIDERS.map((s) => (
-          <div key={s.id}>
-            <div className="flex items-baseline gap-2.5">
-              <span className="flex-1 text-[12.5px] font-[450]">{s.label}</span>
-              <span className="text-accent-foreground font-mono text-[13px] font-semibold">
-                {values[s.id]}
-              </span>
-            </div>
-            <p className="text-muted-foreground mt-1 max-w-[68ch] text-[10.5px] leading-relaxed">
-              {s.detail}
-            </p>
-            <div className="mt-2.25 flex flex-wrap gap-1.75">
-              {s.options.map((opt) => (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() =>
-                    setValues((prev) => ({ ...prev, [s.id]: opt }))
-                  }
-                  className={cn(
-                    "rounded-md border px-3 py-1.75 font-mono text-[11px] font-medium",
-                    values[s.id] === opt
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border bg-card text-foreground/70",
-                  )}
-                >
-                  {opt}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="border-border mt-5 flex flex-col gap-3.5 border-t pt-4.5">
-        <MonToggle
-          label="Auto-escalate high-priority requests"
-          detail="Mark a high-priority request as aging the moment it passes the escalation window, without waiting for a refresh."
-          checked={autoEscalate}
-          onCheckedChange={setAutoEscalate}
-        />
-        <MonToggle
-          label="Notify on sensor offline"
-          detail="Send a notification the moment a sensor misses its check-in window."
-          checked={notifyOffline}
-          onCheckedChange={setNotifyOffline}
-        />
-        <MonToggle
-          label="Nightly report generation"
-          detail="Automatically generate the next scheduled report overnight instead of on request."
-          checked={nightlyReports}
-          onCheckedChange={setNightlyReports}
-        />
-      </div>
-
-      <div className="mt-5 flex items-center gap-3">
-        <Button onClick={() => toast.success("Monitoring thresholds saved.")}>
-          Save thresholds
-        </Button>
-        <span className="text-muted-foreground text-[11px]">
-          Applies across every building in the estate.
-        </span>
-      </div>
-    </SectionCard>
-  );
-}
-
-function MonToggle({
-  label,
-  detail,
-  checked,
-  onCheckedChange,
-}: {
-  label: string;
-  detail: string;
-  checked: boolean;
-  onCheckedChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-start gap-3">
-      <Switch
-        className="mt-0.5"
-        checked={checked}
-        onCheckedChange={onCheckedChange}
-      />
-      <div className="min-w-0 flex-1">
-        <div className="text-[12.5px] font-[450]">{label}</div>
-        <div className="text-muted-foreground mt-1 max-w-[70ch] text-[10.5px] leading-relaxed">
-          {detail}
-        </div>
-      </div>
-    </div>
   );
 }
 
