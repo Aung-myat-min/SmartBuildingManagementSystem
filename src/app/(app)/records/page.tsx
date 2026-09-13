@@ -285,10 +285,10 @@ export default function HistoricalRecordsPage() {
       <Card className="gap-0 overflow-hidden p-0">
         <div className="bg-surface-subtle border-border text-muted-foreground flex border-b px-4 py-2 font-mono text-[10px] tracking-wider">
           <span className="w-16">TIME</span>
-          <span className="w-24">TYPE</span>
-          <span className="w-52">SOURCE</span>
+          <span className="w-29.5">TYPE</span>
+          <span className="w-57.5">SOURCE</span>
           <span className="flex-1">RECORD</span>
-          <span className="w-28 text-right">BY</span>
+          <span className="w-32">BY</span>
         </div>
         {grouped.length === 0 && (
           <EmptyState className="m-4">
@@ -314,19 +314,22 @@ export default function HistoricalRecordsPage() {
                 <span className="text-muted-foreground w-16 font-mono text-[11px]">
                   {formatTime(r.timestamp)}
                 </span>
-                <span className="w-24">
+                <span className="w-29.5">
                   <ToneBadge tone={TYPE_META[r.type].tone}>
                     {TYPE_META[r.type].label}
                   </ToneBadge>
                 </span>
-                <span className="text-foreground/70 w-52 truncate">
+                <span className="text-neutral-foreground w-57.5 truncate pr-2.5 text-[11.5px]">
                   {r.buildingId ? buildingName(r.buildingId) : "Estate-wide"}
                   {r.roomId ? ` / ${roomLabel(r.roomId)}` : ""}
                 </span>
-                <span className="flex-1 truncate pr-3" title={r.text}>
+                <span
+                  className="min-w-0 flex-1 truncate pr-2.5 text-[12px] font-[450]"
+                  title={r.text}
+                >
                   {r.text}
                 </span>
-                <span className="text-muted-foreground w-28 truncate text-right text-[11.5px]">
+                <span className="text-muted-foreground w-32 truncate text-[11.5px]">
                   {r.actorName}
                 </span>
               </div>
