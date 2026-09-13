@@ -80,8 +80,7 @@ function equipmentLabel(equipmentId: string) {
 }
 
 export default function RequestsPage() {
-  const { role, activeBuildingId, requestStatus, advanceRequest } =
-    useAppState();
+  const { role, activeBuildingId, requestStatus, moveRequest } = useAppState();
   const staff = !canAdvanceRequest(role);
   const locked = isBuildingLocked(role);
 
@@ -125,7 +124,7 @@ export default function RequestsPage() {
   ).length;
 
   const handleAdvance = (r: MaintenanceRequest) => {
-    advanceRequest(r.id);
+    moveRequest(r.id, "next");
     toast.success(`${r.id} → ${REQUEST_NEXT_ACTION[requestStatus(r)]}`, {
       description: r.issue,
     });

@@ -126,6 +126,7 @@ export interface EquipmentHistoryEvent {
 export interface SensorAction {
   id: string; // e.g. "reset", "lock", "unlock"
   label: string; // e.g. "Reset"
+  caption: string; // what the action does, shown under the label in the drawer
   resultStatus: string; // status this action transitions the sensor to
   requiresNote?: boolean; // e.g. fire alarm reset requires a reason
   allowedRoles: UserRole[];
@@ -277,12 +278,15 @@ export interface Report {
   status: ReportStatus;
 }
 
+// Pass/fail is computed from value against target (see derive.kpiPasses), not
+// stored — so a target can move without rewriting every generated report.
 export interface ReportKpi {
   label: string;
   value: number;
   unit: string;
-  target: string;
-  onTarget: boolean;
+  target: number;
+  compare: "gte" | "lte" | "lt";
+  targetLabel: string; // e.g. "Target ≥ 90%"
 }
 
 export interface ReportWeek {

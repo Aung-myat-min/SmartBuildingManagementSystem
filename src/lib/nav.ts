@@ -1,11 +1,9 @@
 import {
   BarChart3,
   Box,
-  Building2,
   ClipboardList,
   History,
   LayoutGrid,
-  Settings as SettingsIcon,
   ShieldCheck,
   Waves,
   Wrench,
@@ -20,6 +18,8 @@ export interface NavItem {
   badgeKey?: "openRequests";
 }
 
+// Eight items. The estate lives inside Administration rather than in its own
+// entry, and Settings is reached from the account menu, not the sidebar.
 export const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutGrid, minRank: 3 },
   { label: "Equipment", href: "/equipment", icon: Box, minRank: 3 },
@@ -34,7 +34,5 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Historical Records", href: "/records", icon: History, minRank: 3 },
   { label: "Log Book", href: "/logbook", icon: ClipboardList, minRank: 2 },
   { label: "Reports", href: "/reports", icon: BarChart3, minRank: 2 },
-  { label: "Buildings", href: "/buildings", icon: Building2, minRank: 3 },
   { label: "Administration", href: "/admin", icon: ShieldCheck, minRank: 2 },
-  { label: "Settings", href: "/settings", icon: SettingsIcon, minRank: 3 },
 ];

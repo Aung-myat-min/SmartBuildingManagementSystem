@@ -5,6 +5,11 @@
 // layered on top by src/lib/app-state.tsx, not stored here.
 // ============================================================================
 
+import {
+  countEscalated,
+  countOpenRequests,
+  ESCALATION_WINDOW_HOURS,
+} from "./derive";
 import type {
   AppUser,
   Building,
@@ -207,18 +212,10 @@ export function buildingStats(buildingId: string) {
   const maint = EQUIPMENT_UNITS.filter(
     (u) => u.buildingId === buildingId && u.condition === "under-maintenance",
   ).length;
-  const openReq = MAINTENANCE_REQUESTS.filter(
-    (r) =>
-      r.buildingId === buildingId &&
-      (r.status === "pending" || r.status === "in-progress"),
-  ).length;
-  const escalated = MAINTENANCE_REQUESTS.filter(
-    (r) =>
-      r.buildingId === buildingId &&
-      r.priority === "high" &&
-      (r.status === "pending" || r.status === "in-progress") &&
-      Date.now() - new Date(r.submittedAt).getTime() > 24 * 3600 * 1000,
-  ).length;
+  // Seed figures only. Anything on screen counts through useAppState so it
+  // reflects moves made this session — see derive.countOpenRequests.
+  const openReq = countOpenRequests(MAINTENANCE_REQUESTS, buildingId);
+  const escalated = countEscalated(MAINTENANCE_REQUESTS, buildingId);
   const roomCount = roomsForBuilding(buildingId).length;
   return {
     faulty,
@@ -564,6 +561,27 @@ export const EQUIPMENT_UNITS: EquipmentUnit[] = [
   },
 ];
 
+// ---- The two-record join ---------------------------------------------------
+//
+// A fire detector is one physical device with a row in each table: the
+// EquipmentUnit is the asset (tag, condition, service history), the
+// EnvironmentalSensor is the live state (status, last report). They are
+// joined by linkedEquipmentId and never merged — both drawers cross to the
+// other record rather than duplicating its fields.
+
+export function sensorForEquipment(
+  equipmentTag: string,
+): EnvironmentalSensor | undefined {
+  return SENSORS.find((s) => s.linkedEquipmentId === equipmentTag);
+}
+
+export function equipmentForSensor(
+  sensor: EnvironmentalSensor,
+): EquipmentUnit | undefined {
+  if (!sensor.linkedEquipmentId) return undefined;
+  return EQUIPMENT_UNITS.find((u) => u.tag === sensor.linkedEquipmentId);
+}
+
 export function equipmentUnitLabel(u: EquipmentUnit): string {
   return typeLabel(u.typeId);
 }
@@ -622,6 +640,7 @@ export const SENSOR_TYPES: SensorTypeDef[] = [
       {
         id: "reset",
         label: "Reset",
+        caption: "Clears the alarm and returns the detector to normal",
         resultStatus: "normal",
         requiresNote: true,
         allowedRoles: ["admin-manager", "ceo-super-admin"],
@@ -636,12 +655,14 @@ export const SENSOR_TYPES: SensorTypeDef[] = [
       {
         id: "lock",
         label: "Lock",
+        caption: "Engages the lock on the next door cycle",
         resultStatus: "locked",
         allowedRoles: ["admin-manager", "ceo-super-admin"],
       },
       {
         id: "unlock",
         label: "Unlock",
+        caption: "Releases the lock until it is locked again",
         resultStatus: "unlocked",
         allowedRoles: ["admin-manager", "ceo-super-admin"],
       },
@@ -979,23 +1000,48 @@ export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [
   },
 ];
 
+// Requests move forward one step, and back one step at a time behind a
+// confirm — work gets marked done too early. Completed is the end of the
+// line forward; pending is the end of the line back. The age never resets.
 export const REQUEST_NEXT_STATUS: Record<
   MaintenanceRequest["status"],
-  MaintenanceRequest["status"]
+  MaintenanceRequest["status"] | null
 > = {
   pending: "in-progress",
   "in-progress": "resolved",
   resolved: "completed",
-  completed: "pending",
+  completed: null,
 };
 
-export const REQUEST_NEXT_ACTION: Record<MaintenanceRequest["status"], string> =
-  {
-    pending: "Start work",
-    "in-progress": "Mark resolved",
-    resolved: "Close out",
-    completed: "Reopen",
-  };
+export const REQUEST_PREV_STATUS: Record<
+  MaintenanceRequest["status"],
+  MaintenanceRequest["status"] | null
+> = {
+  pending: null,
+  "in-progress": "pending",
+  resolved: "in-progress",
+  completed: "resolved",
+};
+
+export const REQUEST_NEXT_ACTION: Record<
+  MaintenanceRequest["status"],
+  string | null
+> = {
+  pending: "Start work",
+  "in-progress": "Mark resolved",
+  resolved: "Close out",
+  completed: null,
+};
+
+export const REQUEST_PREV_ACTION: Record<
+  MaintenanceRequest["status"],
+  string | null
+> = {
+  pending: null,
+  "in-progress": "Back to pending",
+  resolved: "Reopen work",
+  completed: "Reopen",
+};
 
 // ---- Users -------------------------------------------------------------------
 
@@ -1709,32 +1755,36 @@ export function reportDetail(report: Report): ReportDetail {
     ...report,
     kpis: [
       {
-        label: "RESOLUTION RATE",
+        label: "RESOLVED WITHIN 24H",
         value: resolutionRate,
         unit: "%",
-        target: "Target ≥ 90%",
-        onTarget: resolutionRate >= 90,
+        target: 90,
+        compare: "gte",
+        targetLabel: "Target ≥ 90%",
       },
       {
         label: "AVG. RESPONSE TIME",
-        value: Math.round(4 + rnd() * 20) / 10,
+        value: Math.round(40 + rnd() * 200) / 10,
         unit: "hrs",
-        target: "Target ≤ 6h",
-        onTarget: true,
+        target: ESCALATION_WINDOW_HOURS,
+        compare: "lte",
+        targetLabel: `Target ≤ ${ESCALATION_WINDOW_HOURS}h`,
       },
       {
-        label: "OPEN AT PERIOD END",
-        value: Math.floor(rnd() * 6),
-        unit: "requests",
-        target: "Target ≤ 5",
-        onTarget: true,
+        label: "ESCALATION RATE",
+        value: Math.round(rnd() * 180) / 10,
+        unit: "%",
+        target: 10,
+        compare: "lt",
+        targetLabel: "Target < 10%",
       },
       {
-        label: "REPEAT FAULTS",
-        value: Math.floor(rnd() * 4),
-        unit: "units",
-        target: "Target = 0",
-        onTarget: rnd() > 0.5,
+        label: "SPEND AGAINST BUDGET",
+        value: Math.round((total / budgetMmk) * 1000) / 10,
+        unit: "%",
+        target: 100,
+        compare: "lte",
+        targetLabel: "Target ≤ 100%",
       },
     ],
     weeks,

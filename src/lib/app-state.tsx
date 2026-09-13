@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
+import { countOpenRequests } from "@/lib/derive";
 import {
   CURRENT_USERS,
   LIVE_ALARM_SENSOR_ID,
   MAINTENANCE_REQUESTS,
   REQUEST_NEXT_STATUS,
+  REQUEST_PREV_STATUS,
 } from "@/lib/mock-data";
 import type {
   AppUser,
@@ -70,8 +72,20 @@ export interface AppState {
   // In-memory demo mutations — reset on reload/restart, shared across pages
   // so an action taken on one screen (e.g. Requests) is reflected wherever
   // else that record shows up (e.g. the Dashboard's mini list).
+
+  /** Every request with this session's moves applied. The one list to read. */
+  requests: MaintenanceRequest[];
+  /** The same list narrowed to what the signed-in role may see. */
+  scopedRequests: MaintenanceRequest[];
+  /**
+   * The open-request count. The sidebar badge, the toolbar chip, the building
+   * cards and the dashboard tiles all read this, so they cannot disagree.
+   */
+  openRequestCount: number;
+  addRequest: (request: MaintenanceRequest) => void;
   requestStatus: (req: MaintenanceRequest) => MaintenanceRequest["status"];
-  advanceRequest: (id: string) => void;
+  /** Forward one step, or back one step — never more, and the age never resets. */
+  moveRequest: (id: string, direction: "next" | "prev") => void;
   sensorStatus: (sensorId: string, fallback: string) => string;
   setSensorStatus: (sensorId: string, status: string) => void;
   equipmentCondition: (
@@ -95,6 +109,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [requestOverrides, setRequestOverrides] = React.useState<
     Record<string, MaintenanceRequest["status"]>
   >({});
+  const [createdRequests, setCreatedRequests] = React.useState<
+    MaintenanceRequest[]
+  >([]);
   const [sensorOverrides, setSensorOverrides] = React.useState<
     Record<string, string>
   >({});
@@ -153,6 +170,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     alarmNotifAdded.current = false;
     setNotifications(BASE_NOTIFICATIONS);
     setRequestOverrides({});
+    setCreatedRequests([]);
     setSensorOverrides({});
     setEquipmentOverrides({});
   }, []);
@@ -172,13 +190,48 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [requestOverrides],
   );
 
-  const advanceRequest = React.useCallback((id: string) => {
-    setRequestOverrides((prev) => {
-      const base = MAINTENANCE_REQUESTS.find((r) => r.id === id);
-      const current = prev[id] ?? base?.status ?? "pending";
-      return { ...prev, [id]: REQUEST_NEXT_STATUS[current] };
-    });
+  const requests = React.useMemo(
+    () =>
+      [...createdRequests, ...MAINTENANCE_REQUESTS].map((r) => ({
+        ...r,
+        status: requestOverrides[r.id] ?? r.status,
+      })),
+    [createdRequests, requestOverrides],
+  );
+
+  const scopedRequests = React.useMemo(
+    () =>
+      role === "office-staff"
+        ? requests.filter((r) => r.buildingId === activeBuildingId)
+        : requests,
+    [requests, role, activeBuildingId],
+  );
+
+  const openRequestCount = React.useMemo(
+    () => countOpenRequests(scopedRequests),
+    [scopedRequests],
+  );
+
+  const addRequest = React.useCallback((request: MaintenanceRequest) => {
+    setCreatedRequests((prev) => [request, ...prev]);
   }, []);
+
+  const moveRequest = React.useCallback(
+    (id: string, direction: "next" | "prev") => {
+      setRequestOverrides((prev) => {
+        const base = [...createdRequests, ...MAINTENANCE_REQUESTS].find(
+          (r) => r.id === id,
+        );
+        const current = prev[id] ?? base?.status ?? "pending";
+        const table =
+          direction === "next" ? REQUEST_NEXT_STATUS : REQUEST_PREV_STATUS;
+        const target = table[current];
+        if (!target) return prev;
+        return { ...prev, [id]: target };
+      });
+    },
+    [createdRequests],
+  );
 
   const sensorStatus = React.useCallback(
     (sensorId: string, fallback: string) =>
@@ -225,8 +278,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       unreadCount: notifications.filter((n) => !n.read).length,
       markNotificationRead,
       markAllNotificationsRead,
+      requests,
+      scopedRequests,
+      openRequestCount,
+      addRequest,
       requestStatus,
-      advanceRequest,
+      moveRequest,
       sensorStatus,
       setSensorStatus,
       equipmentCondition,
@@ -243,8 +300,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       notifications,
       markNotificationRead,
       markAllNotificationsRead,
+      requests,
+      scopedRequests,
+      openRequestCount,
+      addRequest,
       requestStatus,
-      advanceRequest,
+      moveRequest,
       sensorStatus,
       setSensorStatus,
       equipmentCondition,

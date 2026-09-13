@@ -47,7 +47,7 @@ export default function DashboardPage() {
     alarmActive,
     alarmSeconds,
     requestStatus,
-    advanceRequest,
+    moveRequest,
   } = useAppState();
   const staff = !canAct(role);
   const visibleBuildings = staff
@@ -375,7 +375,7 @@ export default function DashboardPage() {
                   size="sm"
                   variant="outline"
                   disabled={staff}
-                  onClick={() => advanceRequest(r.id)}
+                  onClick={() => moveRequest(r.id, "next")}
                   className="w-28 shrink-0 text-[11px]"
                 >
                   {staff && <Lock className="size-2.5" />}

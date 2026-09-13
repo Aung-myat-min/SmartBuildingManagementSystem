@@ -23,6 +23,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useAppState } from "@/lib/app-state";
+import { kpiPasses } from "@/lib/derive";
 import { formatDate, formatMmk } from "@/lib/format";
 import {
   BUILDINGS,
@@ -431,7 +432,7 @@ function ReportDetailView({
             key={k.label}
             className="gap-1.5 border-t-[3px] p-3.5"
             style={{
-              borderTopColor: k.onTarget
+              borderTopColor: kpiPasses(k)
                 ? "var(--color-success)"
                 : "var(--color-warning)",
             }}
@@ -448,11 +449,11 @@ function ReportDetailView({
               </span>
             </div>
             <div className="border-border flex items-center gap-1.5 border-t pt-2">
-              <ToneBadge tone={k.onTarget ? "success" : "warning"}>
-                {k.onTarget ? "ON TARGET" : "WATCH"}
+              <ToneBadge tone={kpiPasses(k) ? "success" : "warning"}>
+                {kpiPasses(k) ? "ON TARGET" : "WATCH"}
               </ToneBadge>
               <span className="text-muted-foreground text-[10.5px]">
-                {k.target}
+                {k.targetLabel}
               </span>
             </div>
           </Card>
