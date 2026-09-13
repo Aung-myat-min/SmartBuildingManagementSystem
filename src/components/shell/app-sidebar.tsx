@@ -52,12 +52,15 @@ export function AppSidebar() {
                     "text-[12.5px] font-[450]",
                     // The badge is positioned over the button, so the label
                     // has to stop short of it rather than run underneath.
-                    item.badgeKey && "pr-7",
+                    item.badgeKey && "pr-6",
                   )}
                 >
                   <item.icon className="size-4 shrink-0" />
-                  {/* The longest label only just fits 196px beside its badge. */}
-                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  {/* "Maintenance Requests" is ~10px longer than 196px leaves
+                      beside a badge, so it truncates and keeps its tooltip. */}
+                  <span className="min-w-0 flex-1 truncate" title={item.label}>
+                    {item.label}
+                  </span>
                 </SidebarMenuButton>
                 {item.badgeKey === "openRequests" && openRequestCount > 0 && (
                   <SidebarMenuBadge className="text-warning-foreground font-mono">

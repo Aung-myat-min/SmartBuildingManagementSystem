@@ -41,7 +41,7 @@ export function FormDrawer({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="border-border w-(--drawer-form-w) max-w-none gap-0 border-l p-0 shadow-[-8px_0_24px_rgba(17,19,24,0.12)] data-[side=right]:sm:max-w-none"
+        className="border-border max-w-none data-[side=right]:w-(--drawer-form-w) gap-0 border-l p-0 shadow-[-8px_0_24px_rgba(17,19,24,0.12)] data-[side=right]:sm:max-w-none"
       >
         <form
           onSubmit={(e) => {
