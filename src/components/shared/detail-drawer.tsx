@@ -6,17 +6,19 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
 /**
- * The 412px right drawer — wider than the form drawer because it carries a
- * record's history and actions rather than a handful of fields. Equipment
- * units and sensors both open here.
+ * The right drawer for a record with its history and actions. Equipment
+ * carries a photo and six actions and takes the wider 412px; a sensor is
+ * narrower at 392px, the same width as a form drawer.
  */
 export function DetailDrawer({
   open,
   onOpenChange,
+  size = "wide",
   children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  size?: "wide" | "narrow";
   children: React.ReactNode;
 }) {
   return (
@@ -24,7 +26,12 @@ export function DetailDrawer({
       <SheetContent
         side="right"
         showCloseButton={false}
-        className="border-border max-w-none data-[side=right]:w-(--drawer-detail-w) gap-0 overflow-y-auto border-l p-0 shadow-[-8px_0_24px_rgba(17,19,24,0.12)] data-[side=right]:sm:max-w-none"
+        className={cn(
+          "border-border max-w-none gap-0 overflow-y-auto border-l p-0 shadow-[-8px_0_24px_rgba(17,19,24,0.12)] data-[side=right]:sm:max-w-none",
+          size === "wide"
+            ? "data-[side=right]:w-(--drawer-detail-w)"
+            : "data-[side=right]:w-(--drawer-form-w)",
+        )}
       >
         {children}
       </SheetContent>
