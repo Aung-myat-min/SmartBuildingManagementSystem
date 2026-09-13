@@ -92,19 +92,21 @@ the account menu and `/more`, not the sidebar.
 `app/globals.css` holds the whole token sheet. Everything is a CSS variable surfaced
 as a Tailwind utility — **never hardcode a hex**.
 
-- Ground `#e9ebef` · card `#fff` · border `#d8dbe1` · muted text `#6b7280`
+- Ground `#f4f5f7` · card `#fff` · border `#d8dbe1` · rules `#e6e8ec` (section) and
+  `#f1f2f5` (row) · muted text `#6b7280`
 - Primary `#4169e1`, `#2f4fb8` as on-white text
 - Status tones as fill/text pairs: `success` `warning` `danger` `info` `neutral`,
   each with `-muted` (light fill) and `-foreground` (dark text). Use
   `bg-*-muted text-*-foreground` together; never the mid tone on the light fill.
 - Surfaces: `surface`, `surface-subtle`, `surface-hover`
-- Fonts: `--font-plex-sans` (body) / `--font-plex-mono` (ids, counts, timestamps,
-  small uppercase labels). `font-tabular` utility for figure columns.
+- Fonts: `--font-plex-sans` (body, loaded as the **variable** font so `font-[450]`
+  resolves) / `--font-plex-mono` (ids, counts, timestamps, small uppercase labels).
 - Animations: `animate-sb-pulse` (live dot), `animate-sb-slide` (popover entry).
 - A `.dark` block exists but no theme provider is mounted — the app is light-only.
 
-Metrics: sidebar 196px · header 54px · page padding 20px · card gap 14–16px ·
-radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
+Metrics are tokens, not literals: `--sidebar-w` 196 · `--header-h` 54 ·
+`--page-pad` 20 · `--drawer-form-w` 392 · `--drawer-detail-w` 412 · `--modal-w` 452.
+Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 
 ## Shared components
 
@@ -115,7 +117,6 @@ radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 | `shared/confirm-dialog.tsx` | `useConfirm()` → promise. Decisions only, plus the one optional `requireReason` textarea. |
 | `shared/access-denied.tsx` | Role-locked page: states the role, offers a switch. |
 | `shared/empty-state.tsx` | Empty list/filter result. |
-
 | `shared/form-drawer.tsx` | `FormDrawer` — the 392px right drawer for anything with fields, plus `FormField` / `FormFieldLocked`. |
 | `shared/detail-drawer.tsx` | `DetailDrawer` — a record with history and actions (412px wide, 392px `size="narrow"`), plus `SameDevicePanel` and `DrawerAction`. |
 
