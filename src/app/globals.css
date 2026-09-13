@@ -66,6 +66,10 @@
   --color-surface: var(--surface);
   --color-surface-subtle: var(--surface-subtle);
   --color-surface-hover: var(--surface-hover);
+  /* Row rules inside a card are lighter than the card's own border. */
+  --color-rule: var(--rule);
+  /* The signed-out screens sit on a slightly deeper ground than the app. */
+  --color-auth: var(--auth);
 
   --animate-sb-pulse: sb-pulse 1.4s infinite;
   --animate-sb-slide: sb-slide 0.16s ease-out;
@@ -92,8 +96,21 @@
   }
 }
 
+/* Layout constants the design repeats on every screen. Kept as tokens so the
+   shell, the drawers and the modal agree rather than each carrying a number. */
 :root {
-  --background: #e9ebef;
+  --sidebar-w: 196px;
+  --header-h: 54px;
+  --page-pad: 20px;
+  --drawer-form-w: 392px; /* create/edit: buildings, rooms, users, sensors, reports */
+  --drawer-detail-w: 412px; /* a record with its history and actions */
+  --modal-w: 452px; /* decisions only */
+  --menu-notif-w: 392px;
+  --menu-acct-w: 236px;
+}
+
+:root {
+  --background: #f4f5f7;
   --foreground: #111318;
   --card: #ffffff;
   --card-foreground: #111318;
@@ -144,6 +161,8 @@
   --surface: #f4f5f7;
   --surface-subtle: #fafbfc;
   --surface-hover: #f7f8fa;
+  --rule: #f1f2f5;
+  --auth: #eef0f3;
 }
 
 .dark {
@@ -197,6 +216,8 @@
   --surface: #14161c;
   --surface-subtle: #191c24;
   --surface-hover: #1c1f28;
+  --rule: #232832;
+  --auth: #0b0d11;
 }
 
 @layer base {

@@ -5,10 +5,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
+// Loaded as the variable font, not a fixed set: the design sets most interface
+// body copy at 450, a half-step above regular, which no static cut provides.
 const plexSans = IBM_Plex_Sans({
   variable: "--font-plex-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
 });
 
 const plexMono = IBM_Plex_Mono({

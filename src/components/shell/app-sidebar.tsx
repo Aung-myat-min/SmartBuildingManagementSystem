@@ -12,20 +12,14 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { useAppState } from "@/lib/app-state";
-import { MAINTENANCE_REQUESTS } from "@/lib/mock-data";
 import { NAV_ITEMS } from "@/lib/nav";
 import { roleRank } from "@/lib/permissions";
+import { cn } from "@/lib/utils";
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { role, activeBuildingId } = useAppState();
+  const { role, openRequestCount } = useAppState();
   const rank = roleRank(role);
-
-  const openRequests = MAINTENANCE_REQUESTS.filter(
-    (r) =>
-      (r.status === "pending" || r.status === "in-progress") &&
-      (role !== "office-staff" || r.buildingId === activeBuildingId),
-  ).length;
 
   return (
     <Sidebar collapsible="offcanvas">
@@ -54,14 +48,20 @@ export function AppSidebar() {
                 <SidebarMenuButton
                   render={<Link href={item.href} />}
                   isActive={active}
-                  className="text-[12.5px] font-[450]"
+                  className={cn(
+                    "text-[12.5px] font-[450]",
+                    // The badge is positioned over the button, so the label
+                    // has to stop short of it rather than run underneath.
+                    item.badgeKey && "pr-7",
+                  )}
                 >
-                  <item.icon className="size-4" />
-                  <span>{item.label}</span>
+                  <item.icon className="size-4 shrink-0" />
+                  {/* The longest label only just fits 196px beside its badge. */}
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
                 </SidebarMenuButton>
-                {item.badgeKey === "openRequests" && openRequests > 0 && (
+                {item.badgeKey === "openRequests" && openRequestCount > 0 && (
                   <SidebarMenuBadge className="text-warning-foreground font-mono">
-                    {openRequests}
+                    {openRequestCount}
                   </SidebarMenuBadge>
                 )}
               </SidebarMenuItem>
