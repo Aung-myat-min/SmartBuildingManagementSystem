@@ -8,14 +8,19 @@ import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAppState } from "@/lib/app-state";
-import { formatAge, formatClock, formatTime, isAging } from "@/lib/format";
+import {
+  countEscalated,
+  countOpenRequests,
+  isEscalated,
+  isRequestOpen,
+} from "@/lib/derive";
+import { formatAge, formatClock, formatTime } from "@/lib/format";
 import {
   ATTENTION_ITEMS,
   BUILDINGS,
   buildingStats,
   EQUIPMENT,
   LOG_BOOK,
-  MAINTENANCE_REQUESTS,
   powerSeries,
   roomsForBuilding,
 } from "@/lib/mock-data";
@@ -46,7 +51,7 @@ export default function DashboardPage() {
     setActiveBuildingId,
     alarmActive,
     alarmSeconds,
-    requestStatus,
+    scopedRequests,
     moveRequest,
   } = useAppState();
   const staff = !canAct(role);
@@ -73,26 +78,17 @@ export default function DashboardPage() {
 
   const buildingAlarm = activeBuildingId === "b216" && alarmActive;
 
-  const scopedRequests = MAINTENANCE_REQUESTS.filter(
-    (r) => !staff || r.buildingId === activeBuildingId,
-  ).filter((r) => {
-    const s = requestStatus(r);
-    return s === "pending" || s === "in-progress";
-  });
-  const decisionQueue = [...scopedRequests]
+  const openRequests = scopedRequests.filter((r) => isRequestOpen(r.status));
+  const decisionQueue = [...openRequests]
     .sort((a, b) => {
-      const aging =
-        Number(isAging(b.submittedAt, b.priority)) -
-        Number(isAging(a.submittedAt, a.priority));
+      const aging = Number(isEscalated(b)) - Number(isEscalated(a));
       if (aging !== 0) return aging;
       return (
         new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
       );
     })
     .slice(0, 4);
-  const escalatedCount = scopedRequests.filter((r) =>
-    isAging(r.submittedAt, r.priority),
-  ).length;
+  const escalatedCount = countEscalated(scopedRequests);
 
   const attentionItems = ATTENTION_ITEMS.filter(
     (a) => !staff || a.buildingId === activeBuildingId,
@@ -298,7 +294,7 @@ export default function DashboardPage() {
                   {stats.maint}
                 </span>
                 <span className="text-foreground/70 w-19 text-right font-mono text-[12px] font-medium">
-                  {stats.openReq}
+                  {countOpenRequests(scopedRequests, b.id)}
                 </span>
                 <span className="text-foreground/70 w-18 text-right font-mono text-[12px] font-medium">
                   {stats.kw} kW
@@ -325,8 +321,8 @@ export default function DashboardPage() {
             </EmptyState>
           )}
           {decisionQueue.map((r) => {
-            const status = requestStatus(r);
-            const aging = isAging(r.submittedAt, r.priority);
+            const status = r.status;
+            const aging = isEscalated(r);
             return (
               <div
                 key={r.id}
