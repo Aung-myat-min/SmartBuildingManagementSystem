@@ -22,10 +22,12 @@ import {
   DetailMetaGrid,
   DrawerAction,
   DrawerActionGrid,
+  DrawerField,
+  DrawerInlineForm,
   SameDevicePanel,
 } from "@/components/shared/detail-drawer";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FormDrawer, FormField } from "@/components/shared/form-drawer";
+import { FormDrawer } from "@/components/shared/form-drawer";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { useLiveClock } from "@/hooks/use-live-clock";
@@ -117,9 +119,6 @@ function SensorsView() {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<EnvironmentalSensor | null>(
-    null,
-  );
 
   // Arriving from an equipment unit's SAME PHYSICAL DEVICE panel.
   const deviceParam = params.get("device");
@@ -238,10 +237,7 @@ function SensorsView() {
           <button
             type="button"
             title="Register a new sensor on the network"
-            onClick={() => {
-              setEditing(null);
-              setFormOpen(true);
-            }}
+            onClick={() => setFormOpen(true)}
             className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
           >
             + New sensor
@@ -428,25 +424,13 @@ function SensorsView() {
           if (deviceParam) router.replace("/sensors");
         }}
         onRunAction={runAction}
-        onEdit={(s) => {
-          setEditing(s);
-          setFormOpen(true);
-          setOpenId(null);
-        }}
         onGoToEquipment={() => {
           setOpenId(null);
           router.push("/equipment");
         }}
       />
 
-      <SensorFormDrawer
-        open={formOpen}
-        editing={editing}
-        onOpenChange={(o) => {
-          setFormOpen(o);
-          if (!o) setEditing(null);
-        }}
-      />
+      <NewSensorDrawer open={formOpen} onOpenChange={setFormOpen} />
     </div>
   );
 }
@@ -458,7 +442,6 @@ function SensorDrawer({
   mayAct,
   onClose,
   onRunAction,
-  onEdit,
   onGoToEquipment,
 }: {
   sensor: EnvironmentalSensor | null;
@@ -467,9 +450,15 @@ function SensorDrawer({
   mayAct: boolean;
   onClose: () => void;
   onRunAction: (s: EnvironmentalSensor, a: SensorAction) => void;
-  onEdit: (s: EnvironmentalSensor) => void;
   onGoToEquipment: () => void;
 }) {
+  // Editing stays in this drawer rather than stacking a second one on top of
+  // the record being edited.
+  const [editing, setEditing] = React.useState(false);
+  const fields = useSensorFields(sensor, editing);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: sensor id is the reset trigger
+  React.useEffect(() => setEditing(false), [sensor?.id]);
   if (!sensor) {
     return (
       <DetailDrawer open={false} size="narrow" onOpenChange={onClose}>
@@ -523,74 +512,91 @@ function SensorDrawer({
         />
       )}
 
-      <DetailDrawerSection label={`${type?.label ?? "Device"} actions`}>
-        <DrawerActionGrid>
-          {(type?.actions ?? []).map((a) => {
-            const allowed = mayAct && a.allowedRoles.includes(role);
-            return (
-              <DrawerAction
-                key={a.id}
-                icon={ACTION_ICON[a.id] ?? RotateCcw}
-                label={a.label}
-                caption={a.caption}
-                lockedReason={allowed ? undefined : SENSOR_LOCK_REASON}
-                onClick={() => onRunAction(sensor, a)}
-              />
-            );
-          })}
-        </DrawerActionGrid>
-        <p className="text-muted-foreground mt-2.25 text-[11px] leading-relaxed">
-          {offline
-            ? "This device is not reporting, so it raises no alarms until it comes back."
-            : "Every action here writes an entry to the Log Book."}
-        </p>
-      </DetailDrawerSection>
+      {editing ? (
+        <DetailDrawerSection label="Edit device details">
+          <DrawerInlineForm
+            title="Registration"
+            description="The device keeps its reporting history; only its registration changes."
+            submitLabel="Save changes"
+            error={fields.error}
+            onCancel={() => setEditing(false)}
+            onSubmit={() => {
+              if (fields.name.trim().length === 0) {
+                fields.setError("A device needs a name.");
+                return;
+              }
+              toast.success(`${fields.name} updated`);
+              setEditing(false);
+            }}
+          >
+            <SensorFields f={fields} isEdit />
+          </DrawerInlineForm>
+        </DetailDrawerSection>
+      ) : (
+        <>
+          <DetailDrawerSection label={`${type?.label ?? "Device"} actions`}>
+            <DrawerActionGrid>
+              {(type?.actions ?? []).map((a) => {
+                const allowed = mayAct && a.allowedRoles.includes(role);
+                return (
+                  <DrawerAction
+                    key={a.id}
+                    icon={ACTION_ICON[a.id] ?? RotateCcw}
+                    label={a.label}
+                    caption={a.caption}
+                    lockedReason={allowed ? undefined : SENSOR_LOCK_REASON}
+                    onClick={() => onRunAction(sensor, a)}
+                  />
+                );
+              })}
+            </DrawerActionGrid>
+            <p className="text-muted-foreground mt-2.25 text-[11px] leading-relaxed">
+              {offline
+                ? "This device is not reporting, so it raises no alarms until it comes back."
+                : "Every action here writes an entry to the Log Book."}
+            </p>
+          </DetailDrawerSection>
 
-      <DetailDrawerSection className="flex gap-1.75">
-        <button
-          type="button"
-          disabled={!mayAct}
-          title={mayAct ? "Edit this sensor's details" : SENSOR_LOCK_REASON}
-          onClick={() => onEdit(sensor)}
-          className={cn(
-            "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
-            mayAct
-              ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
-              : "border-border cursor-not-allowed opacity-45",
-          )}
-        >
-          {!mayAct && <Lock className="size-2.5" />}
-          Edit details
-        </button>
-        <button
-          type="button"
-          disabled={!mayAct}
-          title={mayAct ? "Remove this sensor" : SENSOR_LOCK_REASON}
-          onClick={() => toast.info("Removing a sensor is demo-only here.")}
-          className={cn(
-            "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
-            mayAct
-              ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
-              : "border-border cursor-not-allowed opacity-45",
-          )}
-        >
-          <Trash2 className="size-2.5" />
-          Remove
-        </button>
-      </DetailDrawerSection>
+          <DetailDrawerSection className="flex gap-1.75">
+            <button
+              type="button"
+              disabled={!mayAct}
+              title={mayAct ? "Edit this sensor's details" : SENSOR_LOCK_REASON}
+              onClick={() => setEditing(true)}
+              className={cn(
+                "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
+                mayAct
+                  ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
+                  : "border-border cursor-not-allowed opacity-45",
+              )}
+            >
+              {!mayAct && <Lock className="size-2.5" />}
+              Edit details
+            </button>
+            <button
+              type="button"
+              disabled={!mayAct}
+              title={mayAct ? "Remove this sensor" : SENSOR_LOCK_REASON}
+              onClick={() => toast.info("Removing a sensor is demo-only here.")}
+              className={cn(
+                "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
+                mayAct
+                  ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
+                  : "border-border cursor-not-allowed opacity-45",
+              )}
+            >
+              <Trash2 className="size-2.5" />
+              Remove
+            </button>
+          </DetailDrawerSection>
+        </>
+      )}
     </DetailDrawer>
   );
 }
 
-function SensorFormDrawer({
-  open,
-  editing,
-  onOpenChange,
-}: {
-  open: boolean;
-  editing: EnvironmentalSensor | null;
-  onOpenChange: (open: boolean) => void;
-}) {
+/** The registration fields, shared by the inline edit and the new-sensor drawer. */
+function useSensorFields(seed: EnvironmentalSensor | null, active: boolean) {
   const [name, setName] = React.useState("");
   const [typeId, setTypeId] = React.useState(SENSOR_TYPES[0]?.id ?? "");
   const [buildingId, setBuildingId] = React.useState(BUILDINGS[0]?.id ?? "");
@@ -599,70 +605,74 @@ function SensorFormDrawer({
   const [linkTag, setLinkTag] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reseed when the form opens
   React.useEffect(() => {
-    if (!open) return;
-    setName(editing?.id ?? "");
-    setTypeId(editing?.typeId ?? SENSOR_TYPES[0]?.id ?? "");
-    setBuildingId(editing?.buildingId ?? BUILDINGS[0]?.id ?? "");
-    setRoomId(editing?.roomId ?? "");
-    setStatus(editing?.status ?? SENSOR_TYPES[0]?.statuses[0] ?? "");
-    setLinkTag(editing?.linkedEquipmentId ?? "");
+    if (!active) return;
+    setName(seed?.id ?? "");
+    setTypeId(seed?.typeId ?? SENSOR_TYPES[0]?.id ?? "");
+    setBuildingId(seed?.buildingId ?? BUILDINGS[0]?.id ?? "");
+    setRoomId(seed?.roomId ?? "");
+    setStatus(seed?.status ?? SENSOR_TYPES[0]?.statuses[0] ?? "");
+    setLinkTag(seed?.linkedEquipmentId ?? "");
     setError(null);
-  }, [open, editing]);
+  }, [active, seed?.id]);
 
-  const type = SENSOR_TYPES.find((t) => t.id === typeId);
-  const rooms = roomsForBuilding(buildingId);
-  const linkable = EQUIPMENT_UNITS.filter((u) => u.buildingId === buildingId);
+  return {
+    name,
+    setName,
+    typeId,
+    setTypeId,
+    buildingId,
+    setBuildingId,
+    roomId,
+    setRoomId,
+    status,
+    setStatus,
+    linkTag,
+    setLinkTag,
+    error,
+    setError,
+  };
+}
+
+type SensorFieldState = ReturnType<typeof useSensorFields>;
+
+const FIELD_INPUT =
+  "border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none";
+const FIELD_SELECT =
+  "border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60";
+
+function SensorFields({ f, isEdit }: { f: SensorFieldState; isEdit: boolean }) {
+  const type = SENSOR_TYPES.find((t) => t.id === f.typeId);
+  const rooms = roomsForBuilding(f.buildingId);
+  const linkable = EQUIPMENT_UNITS.filter((u) => u.buildingId === f.buildingId);
 
   return (
-    <FormDrawer
-      open={open}
-      onOpenChange={onOpenChange}
-      title={editing ? "Edit sensor" : "New sensor"}
-      description={
-        editing
-          ? "The device keeps its reporting history; only its registration changes."
-          : "Register a device already on the network. It starts reporting at the next poll."
-      }
-      submitLabel={editing ? "Save changes" : "Register sensor"}
-      error={error}
-      onSubmit={() => {
-        if (name.trim().length === 0) {
-          setError("A device needs a name.");
-          return;
-        }
-        toast.success(
-          editing ? `${name} updated` : `${name} registered on the network`,
-        );
-        onOpenChange(false);
-      }}
-    >
-      <FormField label="Device name">
+    <>
+      <DrawerField label="Device name">
         <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
+          value={f.name}
+          onChange={(e) => f.setName(e.target.value)}
           placeholder="e.g. Room 305 detector"
-          className="border-input focus:border-primary w-full rounded border px-2.5 py-2.25 text-[12px] outline-none"
+          className={FIELD_INPUT}
         />
-      </FormField>
+      </DrawerField>
 
-      <FormField
-        label="Sensor type"
-        hint={
-          editing
-            ? "A registered device cannot change type — remove it and register the replacement."
-            : "Each type brings its own statuses and actions."
-        }
-      >
+      <DrawerField label="Sensor type">
         <select
-          value={typeId}
-          disabled={Boolean(editing)}
+          value={f.typeId}
+          disabled={isEdit}
+          title={
+            isEdit
+              ? "A registered device cannot change type — remove it and register the replacement."
+              : undefined
+          }
           onChange={(e) => {
-            setTypeId(e.target.value);
+            f.setTypeId(e.target.value);
             const next = SENSOR_TYPES.find((t) => t.id === e.target.value);
-            setStatus(next?.statuses[0] ?? "");
+            f.setStatus(next?.statuses[0] ?? "");
           }}
-          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
+          className={FIELD_SELECT}
         >
           {SENSOR_TYPES.map((t) => (
             <option key={t.id} value={t.id}>
@@ -670,17 +680,17 @@ function SensorFormDrawer({
             </option>
           ))}
         </select>
-      </FormField>
+      </DrawerField>
 
-      <div className="grid grid-cols-2 gap-2.75">
-        <FormField label="Building">
+      <div className="grid grid-cols-2 gap-2.25">
+        <DrawerField label="Building">
           <select
-            value={buildingId}
+            value={f.buildingId}
             onChange={(e) => {
-              setBuildingId(e.target.value);
-              setRoomId(roomsForBuilding(e.target.value)[0]?.id ?? "");
+              f.setBuildingId(e.target.value);
+              f.setRoomId(roomsForBuilding(e.target.value)[0]?.id ?? "");
             }}
-            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+            className={FIELD_SELECT}
           >
             {BUILDINGS.map((b) => (
               <option key={b.id} value={b.id}>
@@ -688,12 +698,12 @@ function SensorFormDrawer({
               </option>
             ))}
           </select>
-        </FormField>
-        <FormField label="Room">
+        </DrawerField>
+        <DrawerField label="Room">
           <select
-            value={roomId}
-            onChange={(e) => setRoomId(e.target.value)}
-            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+            value={f.roomId}
+            onChange={(e) => f.setRoomId(e.target.value)}
+            className={FIELD_SELECT}
           >
             {rooms.map((r) => (
               <option key={r.id} value={r.id}>
@@ -701,31 +711,28 @@ function SensorFormDrawer({
               </option>
             ))}
           </select>
-        </FormField>
+        </DrawerField>
       </div>
 
-      <FormField label="Status">
+      <DrawerField label="Status">
         <select
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          value={f.status}
+          onChange={(e) => f.setStatus(e.target.value)}
+          className={FIELD_SELECT}
         >
-          {(type?.statuses ?? []).map((s) => (
-            <option key={s} value={s}>
-              {statusLabel(s)}
+          {(type?.statuses ?? []).map((st) => (
+            <option key={st} value={st}>
+              {statusLabel(st)}
             </option>
           ))}
         </select>
-      </FormField>
+      </DrawerField>
 
-      <FormField
-        label="Linked equipment unit · optional"
-        hint="A fire detector is one physical device with two records — the equipment unit that gets serviced, and the sensor that reports its state. Linking them keeps both in step."
-      >
+      <DrawerField label="Linked equipment unit · optional">
         <select
-          value={linkTag}
-          onChange={(e) => setLinkTag(e.target.value)}
-          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          value={f.linkTag}
+          onChange={(e) => f.setLinkTag(e.target.value)}
+          className={FIELD_SELECT}
         >
           <option value="">Not linked</option>
           {linkable.map((u) => (
@@ -734,7 +741,44 @@ function SensorFormDrawer({
             </option>
           ))}
         </select>
-      </FormField>
+      </DrawerField>
+      <p className="text-muted-foreground text-[10.5px] leading-relaxed">
+        A fire detector is one physical device with two records — the equipment
+        unit that gets serviced, and the sensor that reports its state. Linking
+        them keeps both in step.
+      </p>
+    </>
+  );
+}
+
+/** Registering a device has no record open yet, so it gets its own drawer. */
+function NewSensorDrawer({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const f = useSensorFields(null, open);
+
+  return (
+    <FormDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="New sensor"
+      description="Register a device already on the network. It starts reporting at the next poll."
+      submitLabel="Register sensor"
+      error={f.error}
+      onSubmit={() => {
+        if (f.name.trim().length === 0) {
+          f.setError("A device needs a name.");
+          return;
+        }
+        toast.success(`${f.name} registered on the network`);
+        onOpenChange(false);
+      }}
+    >
+      <SensorFields f={f} isEdit={false} />
     </FormDrawer>
   );
 }

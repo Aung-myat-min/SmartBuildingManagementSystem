@@ -342,7 +342,7 @@ export default function EquipmentPage() {
                         key={u.id}
                         onClick={() => setSelectedId(u.id)}
                         className={cn(
-                          "border-divider hover:border-primary cursor-pointer rounded border border-l-[3px] bg-white px-2.75 py-2.5 text-left",
+                          "border-divider hover:border-primary bg-card cursor-pointer rounded border border-l-[3px] px-2.75 py-2.5 text-left",
                           col === "faulty"
                             ? "border-l-danger"
                             : col === "due-service"

@@ -345,7 +345,7 @@ function BuildingsTab({
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          className="bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded-[5px] border border-dashed border-[#b9bec8] py-2.75 text-[11.5px] leading-none font-medium"
+          className="bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground border-input cursor-pointer rounded-[5px] border border-dashed py-2.75 text-[11.5px] leading-none font-medium"
         >
           + Add building
         </button>

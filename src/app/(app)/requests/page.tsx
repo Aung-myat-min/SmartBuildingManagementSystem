@@ -293,14 +293,14 @@ export default function RequestsPage() {
                   title="Expand completed requests"
                   onClick={() => setDoneCollapsed(false)}
                   className={cn(
-                    "bg-neutral-muted hover:bg-neutral-muted/70 flex min-h-85 cursor-pointer flex-col items-center gap-2.75 rounded-[5px] border border-t-2 border-[#dcdfe5] px-0 pt-2.75 pb-3.5",
+                    "bg-neutral-muted hover:bg-neutral-muted/70 border-border flex min-h-85 cursor-pointer flex-col items-center gap-2.75 rounded-[5px] border border-t-2 px-0 pt-2.75 pb-3.5",
                     TONE_BORDER[col.tone],
                   )}
                 >
-                  <span className="border-input text-neutral-foreground flex size-5.5 items-center justify-center rounded-[3px] border bg-white font-mono text-[13px] leading-none font-medium">
+                  <span className="border-input text-neutral-foreground bg-card flex size-5.5 items-center justify-center rounded-[3px] border font-mono text-[13px] leading-none font-medium">
                     ‹
                   </span>
-                  <span className="text-neutral-foreground rounded-[3px] border border-[#dcdfe5] bg-white px-1.5 py-1 font-mono text-[10.5px] leading-none font-semibold">
+                  <span className="text-neutral-foreground border-border bg-card rounded-[3px] border px-1.5 py-1 font-mono text-[10.5px] leading-none font-semibold">
                     {cards.length}
                   </span>
                   <span
@@ -534,7 +534,7 @@ function RequestCard({
   return (
     <div
       className={cn(
-        "border-divider rounded border border-l-[3px] bg-white px-2.75 py-2.5",
+        "border-divider bg-card rounded border border-l-[3px] px-2.75 py-2.5",
         aging
           ? "border-l-danger"
           : request.priority === "high"
