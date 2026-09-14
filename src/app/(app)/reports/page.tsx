@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Download, Search } from "lucide-react";
+import { ArrowLeft, Download, Info, Search } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { AccessDenied } from "@/components/shared/access-denied";
@@ -15,6 +15,11 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useAppState } from "@/lib/app-state";
 import { kpiPasses } from "@/lib/derive";
 import { formatDate, formatMmk } from "@/lib/format";
@@ -400,10 +405,29 @@ function ReportDetailView({
           <ArrowLeft className="size-3.5" /> Library
         </button>
         <div className="bg-border h-5.5 w-px" />
-        <div>
-          <div className="text-[13px] font-semibold">
-            {KIND_LABEL[report.kind]}
-          </div>
+        <div className="min-w-0">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <button
+                  type="button"
+                  className="flex cursor-help items-center gap-1.5 text-left"
+                />
+              }
+            >
+              <span className="text-[13px] font-semibold">
+                {KIND_LABEL[report.kind]}
+              </span>
+              <Info className="text-muted-foreground size-3.25 shrink-0" />
+            </TooltipTrigger>
+            <TooltipContent
+              side="bottom"
+              align="start"
+              className="max-w-100 text-[11.5px] leading-relaxed"
+            >
+              {KIND_BLURB[report.kind]}
+            </TooltipContent>
+          </Tooltip>
           <div className="text-muted-foreground mt-1 font-mono text-[10.5px] leading-snug">
             {report.buildingId
               ? buildingName(report.buildingId)
@@ -411,9 +435,6 @@ function ReportDetailView({
             · {report.period} · Generated {formatDate(report.generatedAt)} by{" "}
             {report.generatedBy} · {STATUS_META[report.status].label}
           </div>
-          <p className="text-foreground/80 mt-2 max-w-[92ch] text-[11.5px] leading-relaxed text-pretty">
-            {KIND_BLURB[report.kind]}
-          </p>
         </div>
         <div className="flex-1" />
         <Button
