@@ -27,7 +27,9 @@ import {
   SameDevicePanel,
 } from "@/components/shared/detail-drawer";
 import { EmptyState } from "@/components/shared/empty-state";
+import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import {
   boardColumnFor,
@@ -96,14 +98,21 @@ export default function EquipmentPage() {
     useAppState();
   const locked = isBuildingLocked(role);
 
-  const [view, setView] = React.useState<"register" | "board">("register");
+  const [view, setView] = usePersistedState<"register" | "board">(
+    "equipment.view",
+    "register",
+  );
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState(
     locked ? activeBuildingId : "all",
   );
   const [typeFilter, setTypeFilter] = React.useState("all");
-  const [showDecommissioned, setShowDecommissioned] = React.useState(false);
+  const [showDecommissioned, setShowDecommissioned] = usePersistedState(
+    "equipment.showDecommissioned",
+    false,
+  );
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
+  const [newOpen, setNewOpen] = React.useState(false);
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
 
@@ -227,6 +236,15 @@ export default function EquipmentPage() {
             onClick={() => setView("board")}
           />
         </div>
+
+        <button
+          type="button"
+          title="Add a unit to the register"
+          onClick={() => setNewOpen(true)}
+          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+        >
+          + New unit
+        </button>
       </div>
 
       {view === "register" ? (
@@ -398,7 +416,151 @@ export default function EquipmentPage() {
         }}
         canDecommission={canDecommissionEquipment(role)}
       />
+
+      <NewUnitDrawer
+        open={newOpen}
+        onOpenChange={setNewOpen}
+        defaultBuildingId={locked ? activeBuildingId : BUILDINGS[0].id}
+      />
     </div>
+  );
+}
+
+/**
+ * Adding a unit has no record open yet, so it takes its own form drawer —
+ * the same 392px shape as registering a sensor.
+ */
+function NewUnitDrawer({
+  open,
+  onOpenChange,
+  defaultBuildingId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  defaultBuildingId: string;
+}) {
+  const [tag, setTag] = React.useState("");
+  const [typeId, setTypeId] = React.useState(EQUIPMENT_TYPES[0]?.id ?? "");
+  const [buildingId, setBuildingId] = React.useState(defaultBuildingId);
+  const [roomId, setRoomId] = React.useState("");
+  const [installed, setInstalled] = React.useState("");
+  const [serviceInterval, setServiceInterval] = React.useState("180");
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    setTag("");
+    setTypeId(EQUIPMENT_TYPES[0]?.id ?? "");
+    setBuildingId(defaultBuildingId);
+    setRoomId(roomsForBuilding(defaultBuildingId)[0]?.id ?? "");
+    setInstalled(new Date().toISOString().slice(0, 10));
+    setServiceInterval("180");
+    setError(null);
+  }, [open, defaultBuildingId]);
+
+  const rooms = roomsForBuilding(buildingId);
+
+  return (
+    <FormDrawer
+      open={open}
+      onOpenChange={onOpenChange}
+      title="New unit"
+      description="A unit joins the register as healthy. Its first service is scheduled from the install date."
+      submitLabel="Add to register"
+      error={error}
+      onSubmit={() => {
+        if (tag.trim().length === 0) {
+          setError("A unit needs an asset tag.");
+          return;
+        }
+        if (EQUIPMENT_UNITS.some((u) => u.tag === tag.trim())) {
+          setError(`${tag.trim()} is already on the register.`);
+          return;
+        }
+        toast.success(`${tag.trim()} added to the register`);
+        onOpenChange(false);
+      }}
+    >
+      <FormField
+        label="Asset tag"
+        hint="Follows the unit for the rest of its life."
+      >
+        <input
+          value={tag}
+          onChange={(e) => setTag(e.target.value)}
+          placeholder="e.g. EQ-216-09"
+          className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-2 font-mono text-[11.5px] outline-none"
+        />
+      </FormField>
+
+      <FormField label="Equipment type">
+        <select
+          value={typeId}
+          onChange={(e) => setTypeId(e.target.value)}
+          className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+        >
+          {EQUIPMENT_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
+            </option>
+          ))}
+        </select>
+      </FormField>
+
+      <div className="grid grid-cols-2 gap-2.75">
+        <FormField label="Building">
+          <select
+            value={buildingId}
+            onChange={(e) => {
+              setBuildingId(e.target.value);
+              setRoomId(roomsForBuilding(e.target.value)[0]?.id ?? "");
+            }}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          >
+            {BUILDINGS.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="Room">
+          <select
+            value={roomId}
+            onChange={(e) => setRoomId(e.target.value)}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          >
+            {rooms.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.roomNumber}
+              </option>
+            ))}
+          </select>
+        </FormField>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.75">
+        <FormField label="Installed">
+          <input
+            type="date"
+            value={installed}
+            onChange={(e) => setInstalled(e.target.value)}
+            className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-2 text-[12px] outline-none"
+          />
+        </FormField>
+        <FormField label="Service interval">
+          <select
+            value={serviceInterval}
+            onChange={(e) => setServiceInterval(e.target.value)}
+            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          >
+            <option value="90">Every 90 days</option>
+            <option value="180">Every 180 days</option>
+            <option value="365">Every year</option>
+          </select>
+        </FormField>
+      </div>
+    </FormDrawer>
   );
 }
 

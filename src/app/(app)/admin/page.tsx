@@ -17,6 +17,7 @@ import {
   FormFieldLocked,
 } from "@/components/shared/form-drawer";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { countOpenRequests } from "@/lib/derive";
 import { formatRelative } from "@/lib/format";
@@ -77,12 +78,14 @@ export default function AdministrationPage() {
   const mayAccounts = canManageAccounts(role);
 
   // An Admin Manager lands on User Accounts with Buildings padlocked.
-  const [tab, setTab] = React.useState<"buildings" | "users">(
+  const [tab, setTab] = usePersistedState<"buildings" | "users">(
+    "admin.tab",
     mayEstate ? "buildings" : "users",
   );
+  // A stored preference must not put an Admin Manager on a tab they cannot open.
   React.useEffect(() => {
     if (!mayEstate) setTab("users");
-  }, [mayEstate]);
+  }, [mayEstate, setTab]);
 
   const [buildings, setBuildings] = React.useState<LocalBuilding[]>(() =>
     BUILDINGS.map((b) => ({

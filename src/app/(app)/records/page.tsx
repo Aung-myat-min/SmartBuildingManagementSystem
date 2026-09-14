@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import {
@@ -65,7 +66,7 @@ export default function HistoricalRecordsPage() {
   const { role, activeBuildingId } = useAppState();
   const locked = isBuildingLocked(role);
 
-  const [range, setRange] = React.useState(30);
+  const [range, setRange] = usePersistedState("records.range", 30);
   const [buildingFilter, setBuildingFilter] = React.useState(
     locked ? activeBuildingId : "all",
   );

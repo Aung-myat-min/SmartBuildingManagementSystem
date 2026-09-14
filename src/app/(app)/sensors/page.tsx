@@ -31,6 +31,7 @@ import { FormDrawer } from "@/components/shared/form-drawer";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { useLiveClock } from "@/hooks/use-live-clock";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { isAlarmStatus, isSensorOffline } from "@/lib/derive";
 import { formatRelative } from "@/lib/format";
@@ -115,7 +116,7 @@ function SensorsView() {
   const locked = isBuildingLocked(role);
   const mayAct = canActOnSensor(role);
 
-  const [filter, setFilter] = React.useState<Filter>("all");
+  const [filter, setFilter] = usePersistedState<Filter>("sensors.show", "all");
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);

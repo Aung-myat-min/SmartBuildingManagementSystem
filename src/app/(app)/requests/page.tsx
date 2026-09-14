@@ -16,6 +16,7 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { ESCALATION_WINDOW_HOURS, isEscalated } from "@/lib/derive";
 import { formatAge } from "@/lib/format";
@@ -95,11 +96,20 @@ export default function RequestsPage() {
   const locked = isBuildingLocked(role);
   const mayAdvance = canAdvanceRequest(role);
 
-  const [view, setView] = React.useState<"board" | "table">("board");
+  const [view, setView] = usePersistedState<"board" | "table">(
+    "requests.view",
+    "board",
+  );
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState("all");
-  const [sort, setSort] = React.useState<"time" | "priority">("time");
-  const [doneCollapsed, setDoneCollapsed] = React.useState(false);
+  const [sort, setSort] = usePersistedState<"time" | "priority">(
+    "requests.sort",
+    "time",
+  );
+  const [doneCollapsed, setDoneCollapsed] = usePersistedState(
+    "requests.doneCollapsed",
+    false,
+  );
   const [newOpen, setNewOpen] = React.useState(false);
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;

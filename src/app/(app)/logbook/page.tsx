@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useLiveClock } from "@/hooks/use-live-clock";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import { BUILDINGS, LOG_BOOK, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
@@ -70,9 +71,9 @@ export default function LogBookPage() {
   const [buildingFilter, setBuildingFilter] = React.useState(
     isBuildingLocked(role) ? activeBuildingId : "all",
   );
-  const [sourceFilter, setSourceFilter] = React.useState<LogBookSource | "all">(
-    "all",
-  );
+  const [sourceFilter, setSourceFilter] = usePersistedState<
+    LogBookSource | "all"
+  >("logbook.source", "all");
 
   const locked = isBuildingLocked(role);
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;

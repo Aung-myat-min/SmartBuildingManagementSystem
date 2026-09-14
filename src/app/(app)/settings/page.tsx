@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { formatRelative } from "@/lib/format";
 import { BUILDINGS } from "@/lib/mock-data";
@@ -34,7 +35,10 @@ function initials(name: string) {
 
 export default function SettingsPage() {
   const { currentUser, role, activeBuildingId } = useAppState();
-  const [section, setSection] = React.useState<SectionId>("profile");
+  const [section, setSection] = usePersistedState<SectionId>(
+    "settings.section",
+    "profile",
+  );
 
   const scopeValue =
     role === "office-staff"
