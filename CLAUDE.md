@@ -3,6 +3,9 @@
 Facilities-operations dashboard for a 3-building estate (CET333). Frontend only;
 all data is in-memory mock data. Firebase is planned as the backend later.
 
+Full reference — build status, every exported function, page-by-page behaviour
+and the known gaps — lives in [`docs/PROJECT-STATE.md`](docs/PROJECT-STATE.md).
+
 ## Stack
 
 Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 ·
@@ -102,7 +105,8 @@ as a Tailwind utility — **never hardcode a hex**.
 - Fonts: `--font-plex-sans` (body, loaded as the **variable** font so `font-[450]`
   resolves) / `--font-plex-mono` (ids, counts, timestamps, small uppercase labels).
 - Animations: `animate-sb-pulse` (live dot), `animate-sb-slide` (popover entry).
-- A `.dark` block exists but no theme provider is mounted — the app is light-only.
+- A `.dark` block carries the dark palette; `next-themes` is mounted in
+  `providers.tsx` (`attribute="class"`) and `/settings` switches light/dark/system.
 
 Metrics are tokens, not literals: `--sidebar-w` 196 · `--header-h` 54 ·
 `--page-pad` 20 · `--drawer-form-w` 392 · `--drawer-detail-w` 412 · `--modal-w` 452.
