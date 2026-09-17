@@ -82,6 +82,14 @@ function validateType(type: SensorTypeDef): RegistryResult {
   return OK;
 }
 
+/** What an in-session action can change about a request. */
+interface RequestPatch {
+  status?: MaintenanceRequest["status"];
+  declineNote?: string;
+  verificationRequested?: boolean;
+  withdrawn?: boolean;
+}
+
 export interface Notification {
   id: string;
   tone: "danger" | "warning" | "info" | "neutral";
@@ -150,6 +158,12 @@ export interface AppState {
   openRequestCount: number;
   addRequest: (request: MaintenanceRequest) => void;
   requestStatus: (req: MaintenanceRequest) => MaintenanceRequest["status"];
+  /** Attaches the reason an approver sent a request back. The status holds. */
+  declineRequest: (id: string, reason: string) => void;
+  /** Its submitter pulls it back before approval; it leaves every list. */
+  withdrawRequest: (id: string) => void;
+  /** Its submitter says the resolved work looks done. A flag, not a status. */
+  requestVerification: (id: string) => void;
   /** Forward one step, or back one step — never more, and the age never resets. */
   moveRequest: (id: string, direction: "next" | "prev") => void;
   sensorStatus: (sensorId: string, fallback: string) => string;
@@ -210,8 +224,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [elapsed, setElapsed] = React.useState(0);
   const [notifications, setNotifications] =
     React.useState<Notification[]>(BASE_NOTIFICATIONS);
-  const [requestOverrides, setRequestOverrides] = React.useState<
-    Record<string, MaintenanceRequest["status"]>
+  // A request now carries more in-session change than a status: the reason an
+  // approver sent it back, its submitter's "this looks done", and whether it
+  // was withdrawn before approval. One patch per request keeps them together.
+  const [requestPatches, setRequestPatches] = React.useState<
+    Record<string, RequestPatch>
   >({});
   const [createdRequests, setCreatedRequests] = React.useState<
     MaintenanceRequest[]
@@ -282,7 +299,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setElapsed(0);
     alarmNotifAdded.current = false;
     setNotifications(BASE_NOTIFICATIONS);
-    setRequestOverrides({});
+    setRequestPatches({});
     setCreatedRequests([]);
     setSensorOverrides({});
     setEquipmentOverrides({});
@@ -300,17 +317,18 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const requestStatus = React.useCallback(
-    (req: MaintenanceRequest) => requestOverrides[req.id] ?? req.status,
-    [requestOverrides],
+    (req: MaintenanceRequest) => requestPatches[req.id]?.status ?? req.status,
+    [requestPatches],
   );
 
+  // The one resolved list. A withdrawn request drops out here rather than
+  // being filtered again on every screen, so no count can disagree.
   const requests = React.useMemo(
     () =>
-      [...createdRequests, ...MAINTENANCE_REQUESTS].map((r) => ({
-        ...r,
-        status: requestOverrides[r.id] ?? r.status,
-      })),
-    [createdRequests, requestOverrides],
+      [...createdRequests, ...MAINTENANCE_REQUESTS]
+        .map((r) => ({ ...r, ...requestPatches[r.id] }))
+        .filter((r) => !r.withdrawn),
+    [createdRequests, requestPatches],
   );
 
   const scopedRequests = React.useMemo(
@@ -330,21 +348,54 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setCreatedRequests((prev) => [request, ...prev]);
   }, []);
 
+  const patchRequest = React.useCallback((id: string, patch: RequestPatch) => {
+    setRequestPatches((prev) => ({
+      ...prev,
+      [id]: { ...prev[id], ...patch },
+    }));
+  }, []);
+
   const moveRequest = React.useCallback(
     (id: string, direction: "next" | "prev") => {
-      setRequestOverrides((prev) => {
+      setRequestPatches((prev) => {
         const base = [...createdRequests, ...MAINTENANCE_REQUESTS].find(
           (r) => r.id === id,
         );
-        const current = prev[id] ?? base?.status ?? "pending";
+        const current = prev[id]?.status ?? base?.status ?? "requested";
         const table =
           direction === "next" ? REQUEST_NEXT_STATUS : REQUEST_PREV_STATUS;
         const target = table[current];
         if (!target) return prev;
-        return { ...prev, [id]: target };
+        return {
+          ...prev,
+          [id]: {
+            ...prev[id],
+            status: target,
+            // Approving answers the note that sent it back, so the note goes.
+            ...(current === "requested" ? { declineNote: undefined } : {}),
+          },
+        };
       });
     },
     [createdRequests],
+  );
+
+  /** Sends a request back without moving it: the status holds, the reason lands. */
+  const declineRequest = React.useCallback(
+    (id: string, reason: string) => patchRequest(id, { declineNote: reason }),
+    [patchRequest],
+  );
+
+  /** Pulled back by its submitter before approval — it leaves every list. */
+  const withdrawRequest = React.useCallback(
+    (id: string) => patchRequest(id, { withdrawn: true }),
+    [patchRequest],
+  );
+
+  /** The submitter asks for a close-out; an approver still presses it. */
+  const requestVerification = React.useCallback(
+    (id: string) => patchRequest(id, { verificationRequested: true }),
+    [patchRequest],
   );
 
   const sensorStatus = React.useCallback(
@@ -581,6 +632,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       openRequestCount,
       addRequest,
       requestStatus,
+      declineRequest,
+      withdrawRequest,
+      requestVerification,
       moveRequest,
       sensorStatus,
       sensorChangedAt,
@@ -615,6 +669,9 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       openRequestCount,
       addRequest,
       requestStatus,
+      declineRequest,
+      withdrawRequest,
+      requestVerification,
       moveRequest,
       sensorStatus,
       sensorChangedAt,

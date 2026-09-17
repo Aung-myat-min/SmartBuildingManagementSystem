@@ -217,10 +217,18 @@ export interface EnvironmentalSensor {
 
 export type RequestPriority = "normal" | "high";
 
-// Confirmed workflow: Office Staff submits -> Admin Manager/CEO notified ->
-// action the request -> Office Staff sees status (read-only).
+// Confirmed workflow: Office Staff submits -> an approver lets it in or sends
+// it back with a reason -> the work runs -> Office Staff sees status
+// (read-only throughout). Approval is the gate that keeps unreviewed work off
+// the board; staff never move a request themselves.
+//
+//   requested -> approved -> in-progress -> resolved -> completed
+//
+// "requested" is not yet work: it is a thing asked for. Everything from
+// "approved" onward is committed work with someone accountable for it.
 export type RequestStatus =
-  | "pending"
+  | "requested"
+  | "approved"
   | "in-progress"
   | "resolved"
   | "completed";
@@ -238,6 +246,23 @@ export interface MaintenanceRequest {
   submittedAt: string; // ISO timestamp
   updatedAt: string;
   notes?: string; // resolution notes from Admin Manager/CEO
+  /**
+   * Why an approver sent this back. The status does not move — the request
+   * stays "requested" and the note tells its submitter what to fix, so they
+   * can withdraw it and raise a corrected one. Cleared once it is approved.
+   */
+  declineNote?: string;
+  /**
+   * The submitter has looked at the resolved work and says it is done. It is
+   * a flag, not a status: an approver still presses Close out. Requests with
+   * no Office Staff behind them never carry it.
+   */
+  verificationRequested?: boolean;
+  /**
+   * Pulled back by its own submitter before approval. Withdrawn requests drop
+   * out of every list and count rather than sitting on the board.
+   */
+  withdrawn?: boolean;
   // NOTE: "escalated" (high-priority + aging past threshold) is computed
   // client-side from submittedAt/priority/status — not stored, so the
   // threshold can change without a data migration.

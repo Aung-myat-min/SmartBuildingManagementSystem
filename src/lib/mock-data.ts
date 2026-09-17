@@ -891,7 +891,7 @@ export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [
     equipmentId: "EQ-216-01",
     issue: "Projector will not power on; lamp indicator flashing red",
     priority: "high",
-    status: "pending",
+    status: "requested",
     submittedBy: "u-hnin",
     submittedByName: "Hnin Nwe",
     submittedAt: "2026-09-08T13:00:00Z",
@@ -917,7 +917,7 @@ export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [
     equipmentId: "EQ-216-06",
     issue: "Three of eight fluorescent tubes not lighting",
     priority: "normal",
-    status: "pending",
+    status: "requested",
     submittedBy: "u-hnin",
     submittedByName: "Hnin Nwe",
     submittedAt: "2026-09-09T06:00:00Z",
@@ -930,7 +930,7 @@ export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [
     equipmentId: "EQ-JSQ-01",
     issue: "Card reader intermittently rejects valid staff cards",
     priority: "high",
-    status: "pending",
+    status: "approved",
     submittedBy: "u-zaw",
     submittedByName: "Zaw Lin",
     submittedAt: "2026-09-08T15:00:00Z",
@@ -956,7 +956,7 @@ export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [
     equipmentId: "EQ-216-09",
     issue: "Touch layer unresponsive on left third of panel",
     priority: "normal",
-    status: "pending",
+    status: "approved",
     submittedBy: "u-hnin",
     submittedByName: "Hnin Nwe",
     submittedAt: "2026-09-09T12:00:00Z",
@@ -1070,12 +1070,17 @@ export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [
 
 // Requests move forward one step, and back one step at a time behind a
 // confirm — work gets marked done too early. Completed is the end of the
-// line forward; pending is the end of the line back. The age never resets.
+// line forward; requested is the end of the line back. The age never resets.
+//
+// The first step is the approval gate. Stepping back across it un-approves a
+// request rather than deleting it, which is a different thing from declining
+// one (declining leaves the status alone and attaches a reason).
 export const REQUEST_NEXT_STATUS: Record<
   MaintenanceRequest["status"],
   MaintenanceRequest["status"] | null
 > = {
-  pending: "in-progress",
+  requested: "approved",
+  approved: "in-progress",
   "in-progress": "resolved",
   resolved: "completed",
   completed: null,
@@ -1085,8 +1090,9 @@ export const REQUEST_PREV_STATUS: Record<
   MaintenanceRequest["status"],
   MaintenanceRequest["status"] | null
 > = {
-  pending: null,
-  "in-progress": "pending",
+  requested: null,
+  approved: "requested",
+  "in-progress": "approved",
   resolved: "in-progress",
   completed: "resolved",
 };
@@ -1095,7 +1101,8 @@ export const REQUEST_NEXT_ACTION: Record<
   MaintenanceRequest["status"],
   string | null
 > = {
-  pending: "Start work",
+  requested: "Approve",
+  approved: "Start work",
   "in-progress": "Mark resolved",
   resolved: "Close out",
   completed: null,
@@ -1105,8 +1112,9 @@ export const REQUEST_PREV_ACTION: Record<
   MaintenanceRequest["status"],
   string | null
 > = {
-  pending: null,
-  "in-progress": "Back to pending",
+  requested: null,
+  approved: "Withdraw approval",
+  "in-progress": "Back to approved",
   resolved: "Reopen work",
   completed: "Reopen",
 };

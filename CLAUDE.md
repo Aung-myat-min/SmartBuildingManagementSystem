@@ -42,7 +42,7 @@ src/
 | Estate | `Building`, `Room`, `RoomType` |
 | Equipment | `EquipmentTypeDef`, `Equipment` (room-level count breakdown), `EquipmentUnit` (one taggable asset), `EquipmentCondition`, `EquipmentHistoryEvent` |
 | Sensors | `SensorTypeDef` (own `statuses[]` + `actions[]` + `icon` key), `SensorStatusDef`, `SensorAction`, `EnvironmentalSensor` |
-| Requests | `MaintenanceRequest`, `RequestStatus`, `RequestPriority` |
+| Requests | `MaintenanceRequest` (+ `declineNote`, `verificationRequested`, `withdrawn`), `RequestStatus` (5 steps, approval first), `RequestPriority` |
 | Ledgers | `HistoricalRecord` (long-range, all roles), `LogBookEntry` (short-range, admin+CEO) |
 | Reports | `Report`, `ReportDetail`, `ReportKpi`, `ReportWeek`, `ReportOffender`, `ReportCostLine` |
 
@@ -84,7 +84,12 @@ with sensors cannot be archived, a status with sensors in it cannot be removed.
 `requests` / `scopedRequests` / `openRequestCount` are the one resolved list and
 the one count — the sidebar badge, toolbar chips, building cards and dashboard
 tiles all read them, so they cannot disagree. `moveRequest(id, "next" | "prev")`
-walks a request one step; `resetDemo()` clears everything.
+walks a request one step through
+`requested → approved → in-progress → resolved → completed`; `declineRequest`
+attaches a reason **without** moving it, `withdrawRequest` drops a staff
+member's own unapproved request out of every list, and `requestVerification`
+flags that its submitter thinks resolved work is done. `resetDemo()` clears
+everything.
 
 **`lib/permissions.ts`** — `roleRank()` (ceo=1, admin=2, staff=3), `roleLabel`, and
 `can*` predicates. Gate on **rank**, never on role equality. Administration is
@@ -154,7 +159,7 @@ tooltip — it is never hidden.
 | `/dashboard` | Estate overview | KPI tiles, power series, estate table, requests needing a decision, live alerts, log feed |
 | `/equipment` | Asset register | Register/Board toggle, filters, detail drawer with history + 6 actions |
 | `/sensors` | Live device state | grouped by building, one column per registry type, alarm rows break the rhythm |
-| `/requests` | Maintenance requests | Kanban/Table toggle, new-request sheet, status advance |
+| `/requests` | Maintenance requests | Kanban/Table toggle, new-request sheet, five-column approval workflow; staff raise, withdraw and verify, approvers move |
 | `/records` | Historical Records | range/building/type filters, daily grouping, CSV export |
 | `/logbook` | Log Book | live feed, source filters, pause |
 | `/reports` | Reports | library + full report view, generate sheet, PDF/CSV |

@@ -36,13 +36,17 @@ export const DUE_SERVICE_DAYS = 30;
 
 // ---- Requests --------------------------------------------------------------
 
+// Open means still owed to somebody. An unapproved request counts: nobody
+// has looked at it yet, which is the worst kind of outstanding, and a
+// high-priority one left unapproved escalates like any other.
 export const OPEN_REQUEST_STATUSES: RequestStatus[] = [
-  "pending",
+  "requested",
+  "approved",
   "in-progress",
 ];
 
 export function isRequestOpen(status: RequestStatus): boolean {
-  return status === "pending" || status === "in-progress";
+  return OPEN_REQUEST_STATUSES.includes(status);
 }
 
 /**

@@ -33,13 +33,15 @@ const PRIORITY_TONE: Record<string, Tone> = {
   normal: "neutral",
 };
 const STATUS_LABEL: Record<string, string> = {
-  pending: "PENDING",
+  requested: "REQUESTED",
+  approved: "APPROVED",
   "in-progress": "IN PROGRESS",
   resolved: "RESOLVED",
   completed: "COMPLETED",
 };
 const STATUS_TONE: Record<string, Tone> = {
-  pending: "warning",
+  requested: "warning",
+  approved: "info",
   "in-progress": "info",
   resolved: "success",
   completed: "neutral",

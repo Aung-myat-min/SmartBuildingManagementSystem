@@ -1,4 +1,4 @@
-import type { UserRole } from "./types";
+import type { MaintenanceRequest, RequestStatus, UserRole } from "./types";
 
 // Lower rank = more privileged. Gate on rank, never on role equality, so a
 // new role slots into the ladder without rewriting every check:
@@ -23,6 +23,44 @@ export function canAct(role: UserRole): boolean {
 export function canAdvanceRequest(role: UserRole): boolean {
   return canAct(role);
 }
+
+// Approving is the same gate as advancing: whoever moves a request along the
+// board is who decides it belongs there in the first place.
+export function canApproveRequest(role: UserRole): boolean {
+  return canAdvanceRequest(role);
+}
+
+/**
+ * A request is its submitter's only up to the moment it is approved. After
+ * that it is committed work and they can no longer pull it back.
+ */
+export function canWithdrawRequest(
+  request: Pick<MaintenanceRequest, "submittedBy">,
+  status: RequestStatus,
+  actorUid: string,
+): boolean {
+  return status === "requested" && request.submittedBy === actorUid;
+}
+
+/**
+ * The submitter is the one who can say resolved work actually looks done.
+ * It asks for a close-out; it does not perform one. Requests raised by an
+ * admin have no Office Staff behind them, so nobody is asked.
+ */
+export function canRequestVerification(
+  request: Pick<MaintenanceRequest, "submittedBy" | "verificationRequested">,
+  status: RequestStatus,
+  actorUid: string,
+): boolean {
+  return (
+    status === "resolved" &&
+    request.submittedBy === actorUid &&
+    !request.verificationRequested
+  );
+}
+
+export const REQUEST_ADVANCE_LOCK_REASON =
+  "Office Staff raise requests and follow them — moving one along is the Admin Manager's or CEO's.";
 
 // Sensors are read-only for Office Staff: they see every state, but every
 // action carries a padlock and the reason sits in its tooltip.

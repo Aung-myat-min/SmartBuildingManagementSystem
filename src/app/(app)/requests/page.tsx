@@ -3,7 +3,9 @@
 import {
   Box,
   CalendarClock,
+  CheckCheck,
   Clock,
+  CornerUpLeft,
   LayoutGrid,
   Lock,
   MapPin,
@@ -33,7 +35,13 @@ import {
   roomLabel,
   roomsForBuilding,
 } from "@/lib/mock-data";
-import { canAdvanceRequest, isBuildingLocked } from "@/lib/permissions";
+import {
+  canAdvanceRequest,
+  canRequestVerification,
+  canWithdrawRequest,
+  isBuildingLocked,
+  REQUEST_ADVANCE_LOCK_REASON,
+} from "@/lib/permissions";
 import type {
   MaintenanceRequest,
   RequestPriority,
@@ -41,26 +49,41 @@ import type {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
+// Five columns. "Requested" is the approval queue — things asked for that
+// nobody has let in yet — and everything to its right is committed work.
 const COLUMNS: { status: RequestStatus; label: string; tone: Tone }[] = [
-  { status: "pending", label: "Pending", tone: "warning" },
+  { status: "requested", label: "Requested", tone: "warning" },
+  { status: "approved", label: "Approved", tone: "info" },
   { status: "in-progress", label: "In progress", tone: "info" },
   { status: "resolved", label: "Resolved", tone: "success" },
   { status: "completed", label: "Completed", tone: "neutral" },
 ];
 
 const STATUS_TONE: Record<RequestStatus, Tone> = {
-  pending: "warning",
+  requested: "warning",
+  approved: "info",
   "in-progress": "info",
   resolved: "success",
   completed: "neutral",
 };
 
 const STATUS_LABEL: Record<RequestStatus, string> = {
-  pending: "Pending",
+  requested: "Requested",
+  approved: "Approved",
   "in-progress": "In progress",
   resolved: "Resolved",
   completed: "Completed",
 };
+
+/** What either view can do to a request, gathered once and passed down. */
+interface RequestActions {
+  mayAdvance: boolean;
+  uid: string;
+  onMove: (r: MaintenanceRequest, d: "next" | "prev") => void;
+  onDecline: (r: MaintenanceRequest) => void;
+  onWithdraw: (r: MaintenanceRequest) => void;
+  onVerify: (r: MaintenanceRequest) => void;
+}
 
 const TONE_DOT: Record<Tone, string> = {
   success: "bg-success",
@@ -89,6 +112,9 @@ export default function RequestsPage() {
     activeBuildingId,
     scopedRequests,
     moveRequest,
+    declineRequest,
+    withdrawRequest,
+    requestVerification,
     addRequest,
     currentUser,
   } = useAppState();
@@ -162,6 +188,50 @@ export default function RequestsPage() {
 
     moveRequest(r.id, direction);
     toast.success(`${r.id} → ${STATUS_LABEL[target]}`);
+  };
+
+  // Declining is not a move. The request holds its place in the queue and
+  // picks up a reason, so its submitter can see what was wrong with it.
+  const decline = async (r: MaintenanceRequest) => {
+    const result = await confirm({
+      title: `Send ${r.id} back?`,
+      body: r.issue,
+      note: `It stays in Requested and starts no work. ${r.submittedByName} sees your reason and can withdraw it and raise a corrected one.`,
+      tone: "warning",
+      confirmLabel: "Send back",
+      requireReason: true,
+      reasonPlaceholder: "What needs to change before this can be approved?",
+    });
+    if (!result.confirmed || !result.reason) return;
+    declineRequest(r.id, result.reason);
+    toast.success(`${r.id} sent back to ${r.submittedByName}`);
+  };
+
+  const withdraw = async (r: MaintenanceRequest) => {
+    const result = await confirm({
+      title: `Withdraw ${r.id}?`,
+      body: r.issue,
+      note: "It was never approved, so no work was scheduled against it. It leaves the board and every count.",
+      tone: "danger",
+      confirmLabel: "Withdraw request",
+    });
+    if (!result.confirmed) return;
+    withdrawRequest(r.id);
+    toast.success(`${r.id} withdrawn`);
+  };
+
+  const verify = (r: MaintenanceRequest) => {
+    requestVerification(r.id);
+    toast.success(`${r.id} — close-out requested`);
+  };
+
+  const actions: RequestActions = {
+    mayAdvance,
+    uid: currentUser.uid,
+    onMove: move,
+    onDecline: decline,
+    onWithdraw: withdraw,
+    onVerify: verify,
   };
 
   return (
@@ -288,8 +358,8 @@ export default function RequestsPage() {
             // Completed collapses sideways to a rail rather than disappearing,
             // so the board keeps its width for active work.
             gridTemplateColumns: doneCollapsed
-              ? "repeat(3, minmax(0,1fr)) 46px"
-              : "repeat(4, minmax(0,1fr))",
+              ? "repeat(4, minmax(0,1fr)) 46px"
+              : "repeat(5, minmax(0,1fr))",
           }}
         >
           {COLUMNS.map((col) => {
@@ -360,12 +430,7 @@ export default function RequestsPage() {
 
                 <div className="flex min-h-30 flex-col gap-2 p-2.5">
                   {cards.map((r) => (
-                    <RequestCard
-                      key={r.id}
-                      request={r}
-                      mayAdvance={mayAdvance}
-                      onMove={move}
-                    />
+                    <RequestCard key={r.id} request={r} actions={actions} />
                   ))}
                   {cards.length === 0 && (
                     <div className="text-muted-foreground px-0.5 py-2 text-[11px]">
@@ -415,11 +480,25 @@ export default function RequestsPage() {
                 <span className="text-muted-foreground w-36 truncate text-[11.5px]">
                   {equipmentLabel(r.equipmentId)}
                 </span>
-                <span
-                  title={r.issue}
-                  className="min-w-0 flex-1 truncate pr-3 text-[12px] font-[450]"
-                >
-                  {r.issue}
+                <span className="flex min-w-0 flex-1 items-center gap-1.5 pr-3">
+                  <span
+                    title={r.issue}
+                    className="min-w-0 truncate text-[12px] font-[450]"
+                  >
+                    {r.issue}
+                  </span>
+                  {r.verificationRequested && (
+                    <CheckCheck
+                      className="text-success size-3 shrink-0"
+                      aria-label={`${r.submittedByName} says this looks done`}
+                    />
+                  )}
+                  {r.declineNote && (
+                    <CornerUpLeft
+                      className="text-warning size-3 shrink-0"
+                      aria-label={`Sent back — ${r.declineNote}`}
+                    />
+                  )}
                 </span>
                 <span className="w-22">
                   <ToneBadge
@@ -455,11 +534,7 @@ export default function RequestsPage() {
                   {r.submittedByName}
                 </span>
                 <span className="flex w-40 justify-end gap-1.5">
-                  <MoveButtons
-                    request={r}
-                    mayAdvance={mayAdvance}
-                    onMove={move}
-                  />
+                  <MoveButtons request={r} actions={actions} />
                 </span>
               </div>
             );
@@ -489,19 +564,51 @@ export default function RequestsPage() {
 
 function MoveButtons({
   request,
-  mayAdvance,
-  onMove,
+  actions,
 }: {
   request: MaintenanceRequest;
-  mayAdvance: boolean;
-  onMove: (r: MaintenanceRequest, d: "next" | "prev") => void;
+  actions: RequestActions;
 }) {
+  const { mayAdvance, uid, onMove, onDecline, onWithdraw, onVerify } = actions;
   const nextLabel = REQUEST_NEXT_ACTION[request.status];
   const backLabel = REQUEST_PREV_ACTION[request.status];
   const canBack = Boolean(REQUEST_PREV_STATUS[request.status]) && mayAdvance;
+  const mayWithdraw = canWithdrawRequest(request, request.status, uid);
+  const mayVerify = canRequestVerification(request, request.status, uid);
 
   return (
     <>
+      {mayWithdraw && (
+        <button
+          type="button"
+          title="Withdraw this request — it has not been approved yet"
+          onClick={() => onWithdraw(request)}
+          className="border-input bg-card text-neutral-foreground hover:border-danger/40 hover:text-danger-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2 text-[11px] leading-none font-medium"
+        >
+          Withdraw
+        </button>
+      )}
+      {mayVerify && (
+        <button
+          type="button"
+          title="Tell the approver this looks done, so they can close it out"
+          onClick={() => onVerify(request)}
+          className="border-primary bg-card text-accent-foreground hover:bg-accent/40 flex flex-1 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium"
+        >
+          <CheckCheck className="size-3" />
+          Looks done
+        </button>
+      )}
+      {request.status === "requested" && mayAdvance && (
+        <button
+          type="button"
+          title="Send this back with a reason — it stays in the queue"
+          onClick={() => onDecline(request)}
+          className="border-input bg-card text-neutral-foreground hover:border-warning hover:text-warning-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2 text-[11px] leading-none font-medium"
+        >
+          Send back
+        </button>
+      )}
       {canBack && (
         <button
           type="button"
@@ -516,11 +623,7 @@ function MoveButtons({
         <button
           type="button"
           disabled={!mayAdvance}
-          title={
-            mayAdvance
-              ? nextLabel
-              : "Office Staff submit and watch requests; Admin Managers action them."
-          }
+          title={mayAdvance ? nextLabel : REQUEST_ADVANCE_LOCK_REASON}
           onClick={() => onMove(request, "next")}
           className={cn(
             "bg-card flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium",
@@ -539,12 +642,10 @@ function MoveButtons({
 
 function RequestCard({
   request,
-  mayAdvance,
-  onMove,
+  actions,
 }: {
   request: MaintenanceRequest;
-  mayAdvance: boolean;
-  onMove: (r: MaintenanceRequest, d: "next" | "prev") => void;
+  actions: RequestActions;
 }) {
   const aging = isEscalated(request);
   return (
@@ -586,6 +687,23 @@ function RequestCard({
         {request.issue}
       </div>
 
+      {request.verificationRequested && (
+        <div className="bg-success-muted text-success-foreground mt-2 flex items-center gap-1.5 rounded-[3px] px-2 py-1.5 text-[10.5px] leading-snug">
+          <CheckCheck className="size-2.75 shrink-0" />
+          {request.submittedByName} says this looks done
+        </div>
+      )}
+
+      {request.declineNote && (
+        <div className="bg-warning-muted text-warning-foreground mt-2 flex items-start gap-1.5 rounded-[3px] px-2 py-1.5 text-[10.5px] leading-snug">
+          <CornerUpLeft className="mt-0.25 size-2.75 shrink-0" />
+          <span>
+            <span className="font-medium">Sent back —</span>{" "}
+            {request.declineNote}
+          </span>
+        </div>
+      )}
+
       <div className="text-muted-foreground mt-2 flex flex-col gap-1 text-[10.5px]">
         <span className="flex items-center gap-1.5">
           <MapPin className="size-2.75 shrink-0" />
@@ -610,12 +728,8 @@ function RequestCard({
         </span>
       </div>
 
-      <div className="mt-2.5 flex gap-1.5">
-        <MoveButtons
-          request={request}
-          mayAdvance={mayAdvance}
-          onMove={onMove}
-        />
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <MoveButtons request={request} actions={actions} />
       </div>
     </div>
   );
@@ -675,7 +789,7 @@ function NewRequestDrawer({
           equipmentId: equipmentId || units[0]?.tag || "—",
           issue: issue.trim(),
           priority,
-          status: "pending",
+          status: "requested",
           submittedBy: submittedBy.uid,
           submittedByName: submittedBy.name,
           submittedAt: now,
