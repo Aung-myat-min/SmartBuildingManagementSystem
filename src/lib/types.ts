@@ -10,6 +10,13 @@
 //     linked via equipmentId, not merged into a single record
 // ============================================================================
 
+// ---- Display tones ---------------------------------------------------------
+
+// The five status colours the whole UI is painted from. Defined here rather
+// than in the badge component so data modules (registries, mock data) can
+// carry a tone without importing React.
+export type Tone = "success" | "warning" | "danger" | "info" | "neutral";
+
 // ---- Users & Roles --------------------------------------------------------
 
 export type UserRole = "office-staff" | "admin-manager" | "ceo-super-admin";
@@ -123,35 +130,80 @@ export interface EquipmentHistoryEvent {
 // since a fire alarm and a door lock don't behave alike. The UI renders
 // whatever a given type's definition says — it doesn't need to know in
 // advance what any specific type looks like.
+
+/**
+ * One state a sensor type can sit in. `id` is the stable key stored on
+ * EnvironmentalSensor.status and never changes once created; `label` is the
+ * display string and is always editable. `isAlarm` is what raises the alarm
+ * count and breaks the row rhythm on the sensors page — it is a property of
+ * the status, not a hardcoded list of status ids. `pulse` adds the live dot.
+ */
+export interface SensorStatusDef {
+  id: string; // e.g. "triggered" — referenced by EnvironmentalSensor.status
+  label: string; // e.g. "Triggered"
+  tone: Tone;
+  isAlarm: boolean;
+  pulse?: boolean;
+  /**
+   * A state that is fine briefly and a problem if it persists — a door held
+   * unlocked, say. After this many minutes in the status the row switches to
+   * `escalateTone`. Set both or neither; without them the tone never moves.
+   * The threshold lives on the status rather than in derive.ts so it stays
+   * editable from Administration.
+   */
+  escalateAfterMinutes?: number;
+  escalateTone?: Tone;
+}
+
 export interface SensorAction {
   id: string; // e.g. "reset", "lock", "unlock"
   label: string; // e.g. "Reset"
   caption: string; // what the action does, shown under the label in the drawer
-  resultStatus: string; // status this action transitions the sensor to
+  resultStatus: string; // SensorStatusDef.id this action transitions the sensor to
   requiresNote?: boolean; // e.g. fire alarm reset requires a reason
+  /** Which roles may run this action. Enforced per action, not per page. */
   allowedRoles: UserRole[];
 }
 
 export interface SensorTypeDef {
-  id: string; // e.g. "fire-alarm", "door-lock"
+  id: string; // slug, generated from the label at creation and immutable after
   label: string;
-  statuses: string[]; // this type's own valid states
+  /** Key into the fixed icon allowlist — a string, never a component. */
+  icon: SensorIconKey;
+  statuses: SensorStatusDef[]; // this type's own valid states, never empty
   actions: SensorAction[];
+  /** Retired types stay in the registry so existing records still resolve. */
+  archived?: boolean;
 }
 
-// Confirmed registry entries so far (more may be added later without
-// changing this shape):
-//   fire-alarm  -> statuses: Normal / Triggered / Offline
+/**
+ * The icons a sensor type may choose from. A fixed allowlist rather than a
+ * free string, so a registry entry stays plain data — the key-to-component
+ * map lives in lib/icons.ts.
+ */
+export type SensorIconKey =
+  | "flame"
+  | "lock"
+  | "door"
+  | "thermometer"
+  | "droplet"
+  | "wind"
+  | "zap"
+  | "activity";
+
+// Seeded registry entries (more can be added at runtime from Administration
+// without changing this shape):
+//   fire-alarm  -> Normal / Triggered (alarm) / Offline
 //                  actions: Reset (requiresNote, admin-manager + ceo-super-admin)
-//   door-lock   -> statuses: Locked / Unlocked / Forced Open / Offline
-//                  actions: Lock, Unlock (roles TBC)
+//   door-lock   -> Locked / Unlocked (amber after 30m) / Forced open (alarm) / Offline
+//                  actions: Lock, Unlock (admin-manager + ceo-super-admin)
 
 export interface EnvironmentalSensor {
   id: string;
   buildingId: string;
   roomId: string;
   typeId: string; // references SensorTypeDef.id
-  status: string; // must be one of typeId's SensorTypeDef.statuses
+  status: string; // must be a SensorStatusDef.id on typeId's SensorTypeDef
   /**
    * Set when this sensor is the "live status" half of a physically unified
    * device — e.g. the Fire Alarm sensor record links back to its Fire

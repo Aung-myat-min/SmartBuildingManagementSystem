@@ -87,6 +87,12 @@ export interface AppState {
   /** Forward one step, or back one step — never more, and the age never resets. */
   moveRequest: (id: string, direction: "next" | "prev") => void;
   sensorStatus: (sensorId: string, fallback: string) => string;
+  /**
+   * When the sensor entered its current status — the override's own stamp
+   * once it has been actioned here, the record's last report before that.
+   * Statuses that change tone with age are measured from this, not updatedAt.
+   */
+  sensorChangedAt: (sensorId: string, fallback: string) => string;
   setSensorStatus: (sensorId: string, status: string) => void;
   equipmentCondition: (
     unitId: string,
@@ -112,8 +118,10 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const [createdRequests, setCreatedRequests] = React.useState<
     MaintenanceRequest[]
   >([]);
+  // An override carries the moment it was made, so a door unlocked here
+  // starts its own clock rather than inheriting the record's last report.
   const [sensorOverrides, setSensorOverrides] = React.useState<
-    Record<string, string>
+    Record<string, { status: string; at: string }>
   >({});
   const [equipmentOverrides, setEquipmentOverrides] = React.useState<
     Record<string, EquipmentCondition>
@@ -234,14 +242,29 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   );
 
   const sensorStatus = React.useCallback(
+    (sensorId: string, fallback: string) => {
+      const override = sensorOverrides[sensorId];
+      if (override) return override.status;
+      // The scripted alarm trips one detector 20 seconds in. An override wins
+      // over it, which is what makes resetting the alarm stick.
+      if (alarmActive && sensorId === LIVE_ALARM_SENSOR_ID) return "triggered";
+      return fallback;
+    },
+    [sensorOverrides, alarmActive],
+  );
+
+  const sensorChangedAt = React.useCallback(
     (sensorId: string, fallback: string) =>
-      sensorOverrides[sensorId] ?? fallback,
+      sensorOverrides[sensorId]?.at ?? fallback,
     [sensorOverrides],
   );
 
   const setSensorStatus = React.useCallback(
     (sensorId: string, status: string) => {
-      setSensorOverrides((prev) => ({ ...prev, [sensorId]: status }));
+      setSensorOverrides((prev) => ({
+        ...prev,
+        [sensorId]: { status, at: new Date().toISOString() },
+      }));
     },
     [],
   );
@@ -285,6 +308,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       requestStatus,
       moveRequest,
       sensorStatus,
+      sensorChangedAt,
       setSensorStatus,
       equipmentCondition,
       setEquipmentCondition,
@@ -307,6 +331,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       requestStatus,
       moveRequest,
       sensorStatus,
+      sensorChangedAt,
       setSensorStatus,
       equipmentCondition,
       setEquipmentCondition,

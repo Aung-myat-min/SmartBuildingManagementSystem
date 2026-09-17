@@ -25,6 +25,7 @@ import type {
   Report,
   ReportDetail,
   Room,
+  SensorStatusDef,
   SensorTypeDef,
 } from "./types";
 
@@ -635,7 +636,18 @@ export const SENSOR_TYPES: SensorTypeDef[] = [
   {
     id: "fire-alarm",
     label: "Fire detector",
-    statuses: ["normal", "triggered", "offline"],
+    icon: "flame",
+    statuses: [
+      { id: "normal", label: "Normal", tone: "success", isAlarm: false },
+      {
+        id: "triggered",
+        label: "Triggered",
+        tone: "danger",
+        isAlarm: true,
+        pulse: true,
+      },
+      { id: "offline", label: "Offline", tone: "neutral", isAlarm: false },
+    ],
     actions: [
       {
         id: "reset",
@@ -650,7 +662,28 @@ export const SENSOR_TYPES: SensorTypeDef[] = [
   {
     id: "door-lock",
     label: "Door lock",
-    statuses: ["locked", "unlocked", "forced-open", "offline"],
+    icon: "lock",
+    statuses: [
+      { id: "locked", label: "Locked", tone: "success", isAlarm: false },
+      {
+        id: "unlocked",
+        label: "Unlocked",
+        tone: "info",
+        isAlarm: false,
+        // A door left open all morning is a different thing from one somebody
+        // just walked through, so the tone moves once it stops being brief.
+        escalateAfterMinutes: 30,
+        escalateTone: "warning",
+      },
+      {
+        id: "forced-open",
+        label: "Forced open",
+        tone: "danger",
+        isAlarm: true,
+        pulse: true,
+      },
+      { id: "offline", label: "Offline", tone: "neutral", isAlarm: false },
+    ],
     actions: [
       {
         id: "lock",
@@ -669,6 +702,27 @@ export const SENSOR_TYPES: SensorTypeDef[] = [
     ],
   },
 ];
+
+// Every consumer reads the registry through these three, never through
+// SENSOR_TYPES directly — the source moves into app state later, and that
+// has to stay a one-file change.
+
+/** The registry as the UI should list it: seed order, archived entries out. */
+export function sensorTypes(): SensorTypeDef[] {
+  return SENSOR_TYPES.filter((t) => !t.archived);
+}
+
+/** Resolves by id including archived types, so existing records still render. */
+export function sensorType(typeId: string): SensorTypeDef | undefined {
+  return SENSOR_TYPES.find((t) => t.id === typeId);
+}
+
+export function statusDef(
+  typeId: string,
+  statusId: string,
+): SensorStatusDef | undefined {
+  return sensorType(typeId)?.statuses.find((st) => st.id === statusId);
+}
 
 export const SENSORS: EnvironmentalSensor[] = [
   {

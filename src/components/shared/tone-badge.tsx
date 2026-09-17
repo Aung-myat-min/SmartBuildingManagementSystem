@@ -1,7 +1,10 @@
 import type * as React from "react";
+import type { Tone } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export type Tone = "success" | "warning" | "danger" | "info" | "neutral";
+// The union lives in lib/types.ts so data modules can carry a tone without
+// importing React; re-exported here because this is where callers reach for it.
+export type { Tone };
 
 const TONE_CLASSES: Record<Tone, string> = {
   success: "bg-success-muted text-success-foreground",

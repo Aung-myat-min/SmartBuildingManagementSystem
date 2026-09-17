@@ -3,8 +3,6 @@
 import {
   Bell,
   ChevronDown,
-  DoorClosed,
-  Flame,
   Lock,
   LockOpen,
   RotateCcw,
@@ -33,8 +31,9 @@ import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { useLiveClock } from "@/hooks/use-live-clock";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
-import { isAlarmStatus, isSensorOffline } from "@/lib/derive";
+import { isSensorOffline, statusTone } from "@/lib/derive";
 import { formatRelative } from "@/lib/format";
+import { sensorIcon } from "@/lib/icons";
 import {
   BUILDING_META,
   BUILDINGS,
@@ -43,8 +42,10 @@ import {
   equipmentForSensor,
   roomLabel,
   roomsForBuilding,
-  SENSOR_TYPES,
   SENSORS,
+  sensorType,
+  sensorTypes,
+  statusDef,
 } from "@/lib/mock-data";
 import {
   canAct,
@@ -56,44 +57,47 @@ import type { EnvironmentalSensor, SensorAction } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
- * Each sensor type carries its own status vocabulary, so this is a lookup
- * over whatever a SensorTypeDef declares rather than a fixed union. A new
- * sensor type only needs a tone here, not a change to the page.
+ * Actions are registry data, but a glyph is not something a registry entry
+ * carries, so known action ids keep their icon and anything else falls back.
  */
-const STATUS_TONE: Record<string, Tone> = {
-  normal: "success",
-  locked: "success",
-  unlocked: "info",
-  triggered: "danger",
-  "forced-open": "danger",
-  offline: "neutral",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  normal: "Normal",
-  locked: "Locked",
-  unlocked: "Unlocked",
-  triggered: "Triggered",
-  "forced-open": "Forced open",
-  offline: "Offline",
-};
-
 const ACTION_ICON: Record<string, React.ElementType> = {
   reset: RotateCcw,
   lock: Lock,
   unlock: LockOpen,
 };
 
-const TYPE_ICON: Record<string, React.ElementType> = {
-  "fire-alarm": Flame,
-  "door-lock": DoorClosed,
-};
+/**
+ * How a status should be drawn right now. Everything here comes from the
+ * sensor type's registry entry — this page holds no vocabulary of its own.
+ * `since` is when the sensor entered the status, which matters for the
+ * statuses whose tone changes once the state has persisted.
+ */
+function statusView(
+  typeId: string,
+  status: string,
+  since: string,
+  nowMs: number | null,
+) {
+  const def = statusDef(typeId, status);
+  if (!def) {
+    return {
+      label: status,
+      tone: "neutral" as Tone,
+      pulse: false,
+      alarm: false,
+    };
+  }
+  return {
+    label: def.label,
+    // Before mount there is no clock, so the status reads as brand new and
+    // renders its resting tone — the same thing the server rendered.
+    tone: statusTone(def, since, nowMs ?? new Date(since).getTime()),
+    pulse: def.pulse ?? false,
+    alarm: def.isAlarm,
+  };
+}
 
 type Filter = "all" | "alarms" | "offline";
-
-function statusLabel(status: string) {
-  return STATUS_LABEL[status] ?? status;
-}
 
 // useSearchParams opts the subtree into client rendering, so the deep-link
 // read sits behind its own boundary rather than blocking the whole route.
@@ -108,8 +112,13 @@ export default function SensorsPage() {
 function SensorsView() {
   const router = useRouter();
   const params = useSearchParams();
-  const { role, activeBuildingId, sensorStatus, setSensorStatus } =
-    useAppState();
+  const {
+    role,
+    activeBuildingId,
+    sensorStatus,
+    sensorChangedAt,
+    setSensorStatus,
+  } = useAppState();
   const confirm = useConfirm();
   const clock = useLiveClock();
 
@@ -132,19 +141,36 @@ function SensorsView() {
     [sensorStatus],
   );
 
+  const changedAtOf = React.useCallback(
+    (s: EnvironmentalSensor) => sensorChangedAt(s.id, s.updatedAt),
+    [sensorChangedAt],
+  );
+
+  // The clock only exists after mount, and it re-reads every second, which is
+  // what lets a status cross its escalation threshold while the page is open.
+  const nowMs = clock ? Date.now() : null;
+
+  const viewOf = React.useCallback(
+    (s: EnvironmentalSensor) =>
+      statusView(s.typeId, statusOf(s), changedAtOf(s), nowMs),
+    [statusOf, changedAtOf, nowMs],
+  );
+
   const inScope = SENSORS.filter(
     (s) => !locked || s.buildingId === activeBuildingId,
   );
 
   const matchesFilter = (s: EnvironmentalSensor) => {
-    const status = statusOf(s);
-    if (filter === "alarms") return isAlarmStatus(status);
-    if (filter === "offline") return isSensorOffline(status);
+    if (filter === "alarms") return viewOf(s).alarm;
+    // TODO: "offline" is the one status id this page still knows by name.
+    // It needs a registry flag of its own (isOffline, beside isAlarm) before
+    // a runtime-created type can have a not-reporting state.
+    if (filter === "offline") return isSensorOffline(statusOf(s));
     return true;
   };
 
   const visible = inScope.filter(matchesFilter);
-  const alarmCount = inScope.filter((s) => isAlarmStatus(statusOf(s))).length;
+  const alarmCount = inScope.filter((s) => viewOf(s).alarm).length;
   const offlineCount = inScope.filter((s) =>
     isSensorOffline(statusOf(s)),
   ).length;
@@ -160,7 +186,7 @@ function SensorsView() {
   const runAction = async (s: EnvironmentalSensor, action: SensorAction) => {
     const result = await confirm({
       title: `${action.label} ${s.id}?`,
-      body: `${roomLabel(s.roomId)} · ${buildingName(s.buildingId)}. The device moves to ${statusLabel(action.resultStatus)}.`,
+      body: `${roomLabel(s.roomId)} · ${buildingName(s.buildingId)}. The device moves to ${statusDef(s.typeId, action.resultStatus)?.label ?? action.resultStatus}.`,
       note: action.requiresNote
         ? "Resetting a fire alarm is recorded against your name in the Log Book."
         : undefined,
@@ -170,7 +196,9 @@ function SensorsView() {
     });
     if (!result.confirmed) return;
     setSensorStatus(s.id, action.resultStatus);
-    toast.success(`${s.id} → ${statusLabel(action.resultStatus)}`);
+    toast.success(
+      `${s.id} → ${statusDef(s.typeId, action.resultStatus)?.label ?? action.resultStatus}`,
+    );
   };
 
   return (
@@ -248,9 +276,7 @@ function SensorsView() {
 
       {buildings.map((b) => {
         const group = visible.filter((s) => s.buildingId === b.id);
-        const groupAlarms = group.filter((s) =>
-          isAlarmStatus(statusOf(s)),
-        ).length;
+        const groupAlarms = group.filter((s) => viewOf(s).alarm).length;
         const isOpen = !collapsed[b.id];
         return (
           <div
@@ -292,9 +318,9 @@ function SensorsView() {
 
             {isOpen && (
               <div className="grid grid-cols-2 max-lg:grid-cols-1">
-                {SENSOR_TYPES.map((type) => {
+                {sensorTypes().map((type) => {
                   const items = group.filter((s) => s.typeId === type.id);
-                  const Icon = TYPE_ICON[type.id] ?? Flame;
+                  const Icon = sensorIcon(type.icon);
                   return (
                     <div
                       key={type.id}
@@ -303,9 +329,7 @@ function SensorsView() {
                       <div className="border-divider text-muted-foreground flex items-center gap-2 border-b px-4 py-2.25">
                         <Icon className="size-3.25" />
                         <span className="flex-1 font-mono text-[10px] tracking-[0.06em] uppercase">
-                          {type.label === "Fire detector"
-                            ? "Fire detection"
-                            : "Door hardware"}
+                          {type.label}
                         </span>
                         <span className="font-mono text-[10.5px]">
                           {items.length}
@@ -314,7 +338,8 @@ function SensorsView() {
 
                       {items.map((s) => {
                         const status = statusOf(s);
-                        const alarm = isAlarmStatus(status);
+                        const view = viewOf(s);
+                        const alarm = view.alarm;
                         const offline = isSensorOffline(status);
                         const actions = type.actions.filter(
                           (a) => a.resultStatus !== status,
@@ -335,31 +360,27 @@ function SensorsView() {
                               onClick={() => setOpenId(s.id)}
                               className="flex w-full items-center gap-2.5 text-left"
                             >
-                              <PulseDot
-                                tone={STATUS_TONE[status] ?? "neutral"}
-                                pulse={alarm}
-                              />
+                              <PulseDot tone={view.tone} pulse={view.pulse} />
                               <div className="min-w-0 flex-1">
                                 <div className="truncate text-[12.5px] font-[450]">
                                   {s.id}
                                 </div>
                                 <div className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug">
                                   {roomLabel(s.roomId)} ·{" "}
-                                  {formatRelative(s.updatedAt)}
+                                  {formatRelative(changedAtOf(s))}
                                 </div>
                               </div>
-                              <ToneBadge
-                                tone={STATUS_TONE[status] ?? "neutral"}
-                              >
-                                {statusLabel(status)}
+                              <ToneBadge tone={view.tone}>
+                                {view.label}
                               </ToneBadge>
                             </button>
 
                             {(alarm || offline) && (
                               <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
                                 {actions.map((a) => {
-                                  const allowed =
-                                    mayAct && a.allowedRoles.includes(role);
+                                  // The registry's own per-action roles, not a
+                                  // blanket page-level gate.
+                                  const allowed = a.allowedRoles.includes(role);
                                   return (
                                     <button
                                       key={a.id}
@@ -418,6 +439,12 @@ function SensorsView() {
       <SensorDrawer
         sensor={selected}
         status={selected ? statusOf(selected) : ""}
+        view={
+          selected
+            ? viewOf(selected)
+            : { label: "", tone: "neutral", pulse: false, alarm: false }
+        }
+        since={selected ? changedAtOf(selected) : ""}
         role={role}
         mayAct={mayAct}
         onClose={() => {
@@ -439,6 +466,8 @@ function SensorsView() {
 function SensorDrawer({
   sensor,
   status,
+  view,
+  since,
   role,
   mayAct,
   onClose,
@@ -447,6 +476,8 @@ function SensorDrawer({
 }: {
   sensor: EnvironmentalSensor | null;
   status: string;
+  view: ReturnType<typeof statusView>;
+  since: string;
   role: ReturnType<typeof useAppState>["role"];
   mayAct: boolean;
   onClose: () => void;
@@ -468,7 +499,7 @@ function SensorDrawer({
     );
   }
 
-  const type = SENSOR_TYPES.find((t) => t.id === sensor.typeId);
+  const type = sensorType(sensor.typeId);
   const linked = equipmentForSensor(sensor);
   const offline = isSensorOffline(status);
 
@@ -476,11 +507,7 @@ function SensorDrawer({
     <DetailDrawer open size="narrow" onOpenChange={(o) => !o && onClose()}>
       <DetailDrawerHeader
         tag={sensor.id}
-        chip={
-          <ToneBadge tone={STATUS_TONE[status] ?? "neutral"}>
-            {statusLabel(status)}
-          </ToneBadge>
-        }
+        chip={<ToneBadge tone={view.tone}>{view.label}</ToneBadge>}
         onClose={onClose}
       >
         <div className="mt-2.5 text-[15px] leading-tight font-semibold">
@@ -493,14 +520,11 @@ function SensorDrawer({
 
       <DetailMetaGrid>
         <DetailMeta label="Type" value={type?.label ?? sensor.typeId} />
-        <DetailMeta label="Status" value={statusLabel(status)} />
-        <DetailMeta
-          label="Last report"
-          value={formatRelative(sensor.updatedAt)}
-        />
+        <DetailMeta label="Status" value={view.label} />
+        <DetailMeta label="Last report" value={formatRelative(since)} />
         <DetailMeta
           label="Vocabulary"
-          value={type?.statuses.map(statusLabel).join(" / ") ?? "—"}
+          value={type?.statuses.map((st) => st.label).join(" / ") ?? "—"}
         />
       </DetailMetaGrid>
 
@@ -538,7 +562,7 @@ function SensorDrawer({
           <DetailDrawerSection label={`${type?.label ?? "Device"} actions`}>
             <DrawerActionGrid>
               {(type?.actions ?? []).map((a) => {
-                const allowed = mayAct && a.allowedRoles.includes(role);
+                const allowed = a.allowedRoles.includes(role);
                 return (
                   <DrawerAction
                     key={a.id}
@@ -599,7 +623,7 @@ function SensorDrawer({
 /** The registration fields, shared by the inline edit and the new-sensor drawer. */
 function useSensorFields(seed: EnvironmentalSensor | null, active: boolean) {
   const [name, setName] = React.useState("");
-  const [typeId, setTypeId] = React.useState(SENSOR_TYPES[0]?.id ?? "");
+  const [typeId, setTypeId] = React.useState(sensorTypes()[0]?.id ?? "");
   const [buildingId, setBuildingId] = React.useState(BUILDINGS[0]?.id ?? "");
   const [roomId, setRoomId] = React.useState("");
   const [status, setStatus] = React.useState("");
@@ -610,10 +634,10 @@ function useSensorFields(seed: EnvironmentalSensor | null, active: boolean) {
   React.useEffect(() => {
     if (!active) return;
     setName(seed?.id ?? "");
-    setTypeId(seed?.typeId ?? SENSOR_TYPES[0]?.id ?? "");
+    setTypeId(seed?.typeId ?? sensorTypes()[0]?.id ?? "");
     setBuildingId(seed?.buildingId ?? BUILDINGS[0]?.id ?? "");
     setRoomId(seed?.roomId ?? "");
-    setStatus(seed?.status ?? SENSOR_TYPES[0]?.statuses[0] ?? "");
+    setStatus(seed?.status ?? sensorTypes()[0]?.statuses[0]?.id ?? "");
     setLinkTag(seed?.linkedEquipmentId ?? "");
     setError(null);
   }, [active, seed?.id]);
@@ -644,7 +668,7 @@ const FIELD_SELECT =
   "border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60";
 
 function SensorFields({ f, isEdit }: { f: SensorFieldState; isEdit: boolean }) {
-  const type = SENSOR_TYPES.find((t) => t.id === f.typeId);
+  const type = sensorType(f.typeId);
   const rooms = roomsForBuilding(f.buildingId);
   const linkable = EQUIPMENT_UNITS.filter((u) => u.buildingId === f.buildingId);
 
@@ -670,12 +694,12 @@ function SensorFields({ f, isEdit }: { f: SensorFieldState; isEdit: boolean }) {
           }
           onChange={(e) => {
             f.setTypeId(e.target.value);
-            const next = SENSOR_TYPES.find((t) => t.id === e.target.value);
-            f.setStatus(next?.statuses[0] ?? "");
+            const next = sensorType(e.target.value);
+            f.setStatus(next?.statuses[0]?.id ?? "");
           }}
           className={FIELD_SELECT}
         >
-          {SENSOR_TYPES.map((t) => (
+          {sensorTypes().map((t) => (
             <option key={t.id} value={t.id}>
               {t.label}
             </option>
@@ -722,8 +746,8 @@ function SensorFields({ f, isEdit }: { f: SensorFieldState; isEdit: boolean }) {
           className={FIELD_SELECT}
         >
           {(type?.statuses ?? []).map((st) => (
-            <option key={st} value={st}>
-              {statusLabel(st)}
+            <option key={st.id} value={st.id}>
+              {st.label}
             </option>
           ))}
         </select>

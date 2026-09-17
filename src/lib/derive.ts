@@ -2,8 +2,9 @@
 // Derived values.
 //
 // Six things in this product look like stored fields and are not: escalation,
-// due-service, forced-open, offline, open-request counts and report KPI
-// pass/fail. Storing the inputs and deriving these at read time means a
+// due-service, offline, a status's current tone, open-request counts and
+// report KPI pass/fail. Whether a status counts as an alarm is no longer one
+// of them — it is a flag on the sensor type's registry entry. Storing the inputs and deriving these at read time means a
 // threshold change is an edit here, not a data migration.
 //
 // Every screen reads these helpers rather than re-implementing the rule, so
@@ -21,6 +22,8 @@ import type {
   MaintenanceRequest,
   ReportKpi,
   RequestStatus,
+  SensorStatusDef,
+  Tone,
 } from "./types";
 
 // ---- Thresholds ------------------------------------------------------------
@@ -130,8 +133,25 @@ export function isSensorOffline(status: string): boolean {
   return status === "offline";
 }
 
-export function isAlarmStatus(status: string): boolean {
-  return status === "triggered" || status === "forced-open";
+/**
+ * The colour a status is drawn in *now*. Most statuses have one tone for
+ * good. A status carrying `escalateAfterMinutes` has two: it holds its
+ * resting tone while the state is brief, then moves to `escalateTone` once
+ * it has persisted — an unlocked door is blue for half an hour and amber
+ * after that. `since` is when the sensor entered the status, not when it
+ * last reported.
+ */
+export function statusTone(
+  def: Pick<SensorStatusDef, "tone" | "escalateAfterMinutes" | "escalateTone">,
+  since: string,
+  now = Date.now(),
+): Tone {
+  const { escalateAfterMinutes, escalateTone } = def;
+  if (escalateAfterMinutes === undefined || escalateTone === undefined) {
+    return def.tone;
+  }
+  const minutes = (now - new Date(since).getTime()) / 60000;
+  return minutes >= escalateAfterMinutes ? escalateTone : def.tone;
 }
 
 // ---- Reports ---------------------------------------------------------------
