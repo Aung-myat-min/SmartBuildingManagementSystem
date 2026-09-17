@@ -18,7 +18,7 @@ import { useLiveClock } from "@/hooks/use-live-clock";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { formatDayLabel, formatTime } from "@/lib/format";
-import { BUILDINGS, LOG_BOOK, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
+import { BUILDINGS, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
 import {
   canAccessLogBook,
   isBuildingLocked,
@@ -64,7 +64,7 @@ function dayLabel(iso: string) {
 }
 
 export default function LogBookPage() {
-  const { role, activeBuildingId, setRole } = useAppState();
+  const { role, activeBuildingId, setRole, logBook } = useAppState();
   const clock = useLiveClock();
   const [paused, setPaused] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -78,7 +78,7 @@ export default function LogBookPage() {
   const locked = isBuildingLocked(role);
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
 
-  const filtered = LOG_BOOK.filter((e) => {
+  const filtered = logBook.filter((e) => {
     if (effectiveBuilding !== "all" && e.buildingId !== effectiveBuilding)
       return false;
     if (sourceFilter !== "all" && e.source !== sourceFilter) return false;
@@ -105,17 +105,17 @@ export default function LogBookPage() {
   // The seed data is fixed, so "today" is the most recent day it holds
   // rather than the wall-clock date — otherwise the panel reads 0 of 0 the
   // day after the data was written.
-  const latestDay = LOG_BOOK.reduce(
+  const latestDay = logBook.reduce(
     (latest, e) => Math.max(latest, new Date(e.timestamp).setHours(0, 0, 0, 0)),
     0,
   );
-  const todayEntries = LOG_BOOK.filter(
+  const todayEntries = logBook.filter(
     (e) => new Date(e.timestamp).setHours(0, 0, 0, 0) === latestDay,
   );
   const alertCount = filtered.filter((e) => e.source === "alert").length;
   const sourceCounts = SOURCE_ORDER.map((s) => ({
     source: s,
-    count: LOG_BOOK.filter(
+    count: logBook.filter(
       (e) =>
         e.source === s &&
         (effectiveBuilding === "all" || e.buildingId === effectiveBuilding),
@@ -125,7 +125,7 @@ export default function LogBookPage() {
   // the automated writers carry the kind of entry they produce, since the
   // point of the panel is that nothing here is written by hand.
   const writers = Array.from(
-    LOG_BOOK.reduce(
+    logBook.reduce(
       (map, e) => {
         const found = map.get(e.actorName);
         if (found) {
@@ -357,7 +357,7 @@ export default function LogBookPage() {
             <span className="bg-foreground/40 size-2 shrink-0 rounded-sm" />
             <span className="flex-1 text-[12px]">All sources</span>
             <span className="text-muted-foreground font-mono text-[11px]">
-              {LOG_BOOK.length}
+              {logBook.length}
             </span>
           </button>
           {sourceCounts.map(({ source, count }) => (

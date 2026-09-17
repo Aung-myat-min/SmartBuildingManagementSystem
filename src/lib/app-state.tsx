@@ -3,18 +3,25 @@
 import * as React from "react";
 import { countOpenRequests } from "@/lib/derive";
 import {
+  buildingName,
   CURRENT_USERS,
+  EQUIPMENT_UNITS,
+  equipmentUnitLabel,
   LIVE_ALARM_SENSOR_ID,
+  LOG_BOOK,
   MAINTENANCE_REQUESTS,
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_STATUS,
+  roomLabel,
   SENSOR_TYPES,
   SENSORS,
+  sensorType,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
 import type {
   AppUser,
   EquipmentCondition,
+  LogBookEntry,
   MaintenanceRequest,
   SensorAction,
   SensorStatusDef,
@@ -81,6 +88,20 @@ function validateType(type: SensorTypeDef): RegistryResult {
   if (actionless) return fail("Every action needs a name.");
   return OK;
 }
+
+/**
+ * What a caller supplies when something happens. Who did it, when, and the
+ * entry's id are the book's business, not the caller's — every action in the
+ * app goes through here so no screen can write a half-formed entry, or
+ * forget to write one at all.
+ */
+export type LogDraft = Omit<
+  LogBookEntry,
+  "id" | "timestamp" | "actorUid" | "actorName" | "actorRole"
+> & {
+  /** For the entries the system writes for itself, e.g. the scripted alarm. */
+  actorName?: string;
+};
 
 /** What an in-session action can change about a request. */
 interface RequestPatch {
@@ -174,6 +195,13 @@ export interface AppState {
    */
   sensorChangedAt: (sensorId: string, fallback: string) => string;
   setSensorStatus: (sensorId: string, status: string) => void;
+  /**
+   * The Log Book: what this session wrote, newest first, in front of the seed
+   * entries. Every action in the app lands here.
+   */
+  logBook: LogBookEntry[];
+  /** Writes one entry. Screens holding their own state call it directly. */
+  log: (draft: LogDraft) => void;
   /** The live sensor type registry, archived entries included. */
   sensorTypeRegistry: SensorTypeDef[];
   addSensorType: (
@@ -243,6 +271,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   >({});
   const [sensorTypeRegistry, setSensorTypeRegistry] =
     React.useState<SensorTypeDef[]>(SENSOR_TYPES);
+  const [sessionLog, setSessionLog] = React.useState<LogBookEntry[]>([]);
   const alarmNotifAdded = React.useRef(false);
 
   // mock-data's sensorType/statusDef accessors read through this, so the page
@@ -304,6 +333,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     setSensorOverrides({});
     setEquipmentOverrides({});
     setSensorTypeRegistry(SENSOR_TYPES);
+    setSessionLog([]);
   }, []);
 
   const markNotificationRead = React.useCallback((id: string) => {
@@ -315,6 +345,31 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const markAllNotificationsRead = React.useCallback(() => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   }, []);
+
+  const log = React.useCallback(
+    (draft: LogDraft) => {
+      const actor = CURRENT_USERS[role];
+      setSessionLog((prev) => [
+        {
+          ...draft,
+          id: `lb-${Date.now()}-${prev.length}`,
+          timestamp: new Date().toISOString(),
+          actorUid: draft.actorName ? undefined : actor.uid,
+          actorName: draft.actorName ?? actor.name,
+          actorRole: draft.actorName ? undefined : role,
+        },
+        ...prev,
+      ]);
+    },
+    [role],
+  );
+
+  // What this session wrote sits in front of the seed book, newest first —
+  // the same list the Log Book page and the dashboard rail both read.
+  const logBook = React.useMemo(
+    () => [...sessionLog, ...LOG_BOOK],
+    [sessionLog],
+  );
 
   const requestStatus = React.useCallback(
     (req: MaintenanceRequest) => requestPatches[req.id]?.status ?? req.status,
@@ -344,9 +399,22 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     [scopedRequests],
   );
 
-  const addRequest = React.useCallback((request: MaintenanceRequest) => {
-    setCreatedRequests((prev) => [request, ...prev]);
-  }, []);
+  const addRequest = React.useCallback(
+    (request: MaintenanceRequest) => {
+      setCreatedRequests((prev) => [request, ...prev]);
+      log({
+        source: "request",
+        actionType: "request-created",
+        title: "Request raised",
+        detail: `${request.issue} — ${roomLabel(request.roomId)}, ${buildingName(request.buildingId)}.`,
+        targetType: "request",
+        targetId: request.id,
+        buildingId: request.buildingId,
+        refId: request.id,
+      });
+    },
+    [log],
+  );
 
   const patchRequest = React.useCallback((id: string, patch: RequestPatch) => {
     setRequestPatches((prev) => ({
@@ -357,45 +425,101 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const moveRequest = React.useCallback(
     (id: string, direction: "next" | "prev") => {
-      setRequestPatches((prev) => {
-        const base = [...createdRequests, ...MAINTENANCE_REQUESTS].find(
-          (r) => r.id === id,
-        );
-        const current = prev[id]?.status ?? base?.status ?? "requested";
-        const table =
-          direction === "next" ? REQUEST_NEXT_STATUS : REQUEST_PREV_STATUS;
-        const target = table[current];
-        if (!target) return prev;
-        return {
-          ...prev,
-          [id]: {
-            ...prev[id],
-            status: target,
-            // Approving answers the note that sent it back, so the note goes.
-            ...(current === "requested" ? { declineNote: undefined } : {}),
-          },
-        };
+      const base = [...createdRequests, ...MAINTENANCE_REQUESTS].find(
+        (r) => r.id === id,
+      );
+      const current = requestPatches[id]?.status ?? base?.status ?? "requested";
+      const table =
+        direction === "next" ? REQUEST_NEXT_STATUS : REQUEST_PREV_STATUS;
+      const target = table[current];
+      if (!target) return;
+      setRequestPatches((prev) => ({
+        ...prev,
+        [id]: {
+          ...prev[id],
+          status: target,
+          // Approving answers the note that sent it back, so the note goes.
+          ...(current === "requested" ? { declineNote: undefined } : {}),
+        },
+      }));
+      log({
+        source: "request",
+        actionType: "request-status-changed",
+        title:
+          target === "approved" && current === "requested"
+            ? "Request approved"
+            : `Request moved to ${target}`,
+        detail: `${id} — ${current} → ${target}.${base ? ` ${base.issue}.` : ""}`,
+        targetType: "request",
+        targetId: id,
+        buildingId: base?.buildingId,
+        refId: id,
       });
     },
+    [createdRequests, requestPatches, log],
+  );
+
+  const findRequest = React.useCallback(
+    (id: string) =>
+      [...createdRequests, ...MAINTENANCE_REQUESTS].find((r) => r.id === id),
     [createdRequests],
   );
 
   /** Sends a request back without moving it: the status holds, the reason lands. */
   const declineRequest = React.useCallback(
-    (id: string, reason: string) => patchRequest(id, { declineNote: reason }),
-    [patchRequest],
+    (id: string, reason: string) => {
+      patchRequest(id, { declineNote: reason });
+      const base = findRequest(id);
+      log({
+        source: "request",
+        actionType: "request-declined",
+        title: "Request sent back",
+        detail: `${id} stays in requested. Reason: ${reason}`,
+        targetType: "request",
+        targetId: id,
+        buildingId: base?.buildingId,
+        refId: id,
+      });
+    },
+    [patchRequest, findRequest, log],
   );
 
   /** Pulled back by its submitter before approval — it leaves every list. */
   const withdrawRequest = React.useCallback(
-    (id: string) => patchRequest(id, { withdrawn: true }),
-    [patchRequest],
+    (id: string) => {
+      patchRequest(id, { withdrawn: true });
+      const base = findRequest(id);
+      log({
+        source: "request",
+        actionType: "request-withdrawn",
+        title: "Request withdrawn",
+        detail: `${id} was withdrawn by its submitter before approval.${base ? ` ${base.issue}.` : ""}`,
+        targetType: "request",
+        targetId: id,
+        buildingId: base?.buildingId,
+        refId: id,
+      });
+    },
+    [patchRequest, findRequest, log],
   );
 
   /** The submitter asks for a close-out; an approver still presses it. */
   const requestVerification = React.useCallback(
-    (id: string) => patchRequest(id, { verificationRequested: true }),
-    [patchRequest],
+    (id: string) => {
+      patchRequest(id, { verificationRequested: true });
+      const base = findRequest(id);
+      log({
+        source: "request",
+        actionType: "request-verification-requested",
+        title: "Close-out requested",
+        detail: `${id} — the submitter says the resolved work looks done.`,
+        targetType: "request",
+        targetId: id,
+        buildingId: base?.buildingId,
+        refId: id,
+      });
+    },
+    [patchRequest, findRequest, log],
   );
 
   const sensorStatus = React.useCallback(
@@ -422,8 +546,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
         ...prev,
         [sensorId]: { status, at: new Date().toISOString() },
       }));
+      const sensor = SENSORS.find((s) => s.id === sensorId);
+      const type = sensor ? sensorType(sensor.typeId) : undefined;
+      const def = type?.statuses.find((st) => st.id === status);
+      log({
+        source: def?.isAlarm ? "alert" : "sensor",
+        actionType: "sensor-status-changed",
+        title: `${type?.label ?? "Sensor"} → ${def?.label ?? status}`,
+        detail: sensor
+          ? `${sensorId} — ${roomLabel(sensor.roomId)}, ${buildingName(sensor.buildingId)}.`
+          : sensorId,
+        targetType: "sensor",
+        targetId: sensorId,
+        buildingId: sensor?.buildingId,
+        refId: sensorId,
+      });
     },
-    [],
+    [log],
   );
 
   // ---- Sensor type registry ------------------------------------------------
@@ -445,7 +584,11 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   // Validation has to answer the caller now, not on the next render, so the
   // next list is built from the current one here rather than in an updater.
   const patchType = React.useCallback(
-    (typeId: string, change: (type: SensorTypeDef) => SensorTypeDef) => {
+    (
+      typeId: string,
+      change: (type: SensorTypeDef) => SensorTypeDef,
+      entry?: Pick<LogDraft, "actionType" | "title" | "detail">,
+    ) => {
       const current = sensorTypeRegistry.find((t) => t.id === typeId);
       if (!current) return fail("No sensor type with that id.");
       const next = change(current);
@@ -454,9 +597,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       setSensorTypeRegistry((prev) =>
         prev.map((t) => (t.id === typeId ? next : t)),
       );
+      // Every accepted change writes one entry — a refused one writes none,
+      // which is why this sits after the validation rather than before it.
+      log({
+        source: "admin",
+        actionType: entry?.actionType ?? "sensor-type-edited",
+        title: entry?.title ?? "Sensor type edited",
+        detail:
+          entry?.detail ??
+          `${next.label} — ${next.statuses.length} statuses, ${next.actions.length} actions.`,
+        targetType: "sensor",
+        targetId: typeId,
+      });
       return OK;
     },
-    [sensorTypeRegistry],
+    [sensorTypeRegistry, log],
   );
 
   const addSensorType = React.useCallback(
@@ -469,9 +624,17 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       const check = validateType(next);
       if (!check.ok) return check;
       setSensorTypeRegistry((prev) => [...prev, next]);
+      log({
+        source: "admin",
+        actionType: "sensor-type-added",
+        title: "Sensor type added",
+        detail: `${next.label} (${id}) — ${next.statuses.length} statuses, ${next.actions.length} actions.`,
+        targetType: "sensor",
+        targetId: id,
+      });
       return { ok: true as const, id };
     },
-    [sensorTypeRegistry],
+    [sensorTypeRegistry, log],
   );
 
   const updateSensorType = React.useCallback(
@@ -489,14 +652,23 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           `${inUse} sensor${inUse === 1 ? " is" : "s are"} registered as ${type?.label ?? typeId}. Move or remove ${inUse === 1 ? "it" : "them"} before archiving the type.`,
         );
       }
-      return patchType(typeId, (type) => ({ ...type, archived: true }));
+      const type = sensorTypeRegistry.find((t) => t.id === typeId);
+      return patchType(typeId, (t) => ({ ...t, archived: true }), {
+        actionType: "sensor-type-archived",
+        title: "Sensor type archived",
+        detail: `${type?.label ?? typeId} no longer appears on the Sensors page. Existing records still resolve it.`,
+      });
     },
     [patchType, sensorTypeRegistry],
   );
 
   const restoreSensorType = React.useCallback(
     (typeId: string) =>
-      patchType(typeId, (type) => ({ ...type, archived: false })),
+      patchType(typeId, (type) => ({ ...type, archived: false }), {
+        actionType: "sensor-type-edited",
+        title: "Sensor type restored",
+        detail: "It is back in the registry and on the Sensors page.",
+      }),
     [patchType],
   );
 
@@ -604,8 +776,21 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const setEquipmentCondition = React.useCallback(
     (unitId: string, condition: EquipmentCondition) => {
       setEquipmentOverrides((prev) => ({ ...prev, [unitId]: condition }));
+      const unit = EQUIPMENT_UNITS.find((u) => u.id === unitId);
+      log({
+        source: "equipment",
+        actionType: "equipment-status-changed",
+        title: `Equipment marked ${condition.replace("-", " ")}`,
+        detail: unit
+          ? `${equipmentUnitLabel(unit)} — ${roomLabel(unit.roomId)}, ${buildingName(unit.buildingId)}.`
+          : unitId,
+        targetType: "equipment",
+        targetId: unitId,
+        buildingId: unit?.buildingId,
+        refId: unit?.tag ?? unitId,
+      });
     },
-    [],
+    [log],
   );
 
   const value = React.useMemo<AppState>(
@@ -639,6 +824,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       sensorStatus,
       sensorChangedAt,
       setSensorStatus,
+      logBook,
+      log,
       sensorTypeRegistry,
       addSensorType,
       updateSensorType,
@@ -676,6 +863,8 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
       sensorStatus,
       sensorChangedAt,
       setSensorStatus,
+      logBook,
+      log,
       sensorTypeRegistry,
       addSensorType,
       updateSensorType,

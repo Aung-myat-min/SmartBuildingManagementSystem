@@ -288,6 +288,7 @@ function BuildingsTab({
   openRequestsFor: (buildingId: string) => number;
   confirm: ConfirmFn;
 }) {
+  const { log } = useAppState();
   const [newOpen, setNewOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<LocalBuilding | null>(null);
   const [editingRoom, setEditingRoom] = React.useState<Room | null>(null);
@@ -319,6 +320,15 @@ function BuildingsTab({
         floor: newRoomFloor,
       },
     ]);
+    log({
+      source: "admin",
+      actionType: "room-added",
+      title: "Room added",
+      detail: `${newRoomName.trim()} (${newRoomType}, floor ${newRoomFloor}) added to ${selected.name}.`,
+      targetType: "room",
+      targetId: newRoomName.trim(),
+      buildingId: selected.id,
+    });
     toast.success(`${newRoomName.trim()} added to ${selected.name}`);
     setNewRoomName("");
   };
@@ -337,6 +347,15 @@ function BuildingsTab({
     });
     if (!result.confirmed) return;
     setRooms((prev) => prev.filter((r) => r.id !== room.id));
+    log({
+      source: "admin",
+      actionType: "room-removed",
+      title: "Room removed",
+      detail: `${room.roomNumber} removed from ${selected?.name ?? "the estate"}${devices > 0 ? `, taking ${devices} device${devices === 1 ? "" : "s"} out of every count` : ""}.`,
+      targetType: "room",
+      targetId: room.id,
+      buildingId: room.buildingId,
+    });
     toast.success(`${room.roomNumber} removed`);
   };
 
@@ -356,6 +375,14 @@ function BuildingsTab({
     setBuildings((prev) => prev.filter((b) => b.id !== selected.id));
     setRooms((prev) => prev.filter((r) => r.buildingId !== selected.id));
     onSelect(buildings.find((b) => b.id !== selected.id)?.id ?? "");
+    log({
+      source: "admin",
+      actionType: "building-deleted",
+      title: "Building deleted",
+      detail: `${selected.name} removed with its ${roomCount} room${roomCount === 1 ? "" : "s"} and ${devices} device${devices === 1 ? "" : "s"}. Reason: ${result.reason ?? "—"}`,
+      targetType: "building",
+      targetId: selected.id,
+    });
     toast.success(`${selected.name} deleted`);
   };
 
@@ -559,6 +586,14 @@ function BuildingsTab({
           const id = `b-${Date.now()}`;
           setBuildings((prev) => [...prev, { id, name, code }]);
           onSelect(id);
+          log({
+            source: "admin",
+            actionType: "building-added",
+            title: "Building added",
+            detail: `${name} (${code}) added to the estate. It starts with no rooms.`,
+            targetType: "building",
+            targetId: name,
+          });
           toast.success(`${name} added to the estate`);
         }}
       />
@@ -569,6 +604,15 @@ function BuildingsTab({
           setBuildings((prev) =>
             prev.map((b) => (b.id === next.id ? next : b)),
           );
+          log({
+            source: "admin",
+            actionType: "building-edited",
+            title: "Building edited",
+            detail: `${next.name} — name and site code saved.`,
+            targetType: "building",
+            targetId: next.id,
+            buildingId: next.id,
+          });
           toast.success(`${next.name} updated`);
         }}
       />
@@ -577,6 +621,15 @@ function BuildingsTab({
         onClose={() => setEditingRoom(null)}
         onSave={(next) => {
           setRooms((prev) => prev.map((r) => (r.id === next.id ? next : r)));
+          log({
+            source: "admin",
+            actionType: "room-edited",
+            title: "Room edited",
+            detail: `${next.roomNumber} — ${next.type}, floor ${next.floor}.`,
+            targetType: "room",
+            targetId: next.id,
+            buildingId: next.buildingId,
+          });
           toast.success(`${next.roomNumber} updated`);
         }}
       />
@@ -833,6 +886,7 @@ function UsersTab({
   buildings: LocalBuilding[];
   confirm: ConfirmFn;
 }) {
+  const { log } = useAppState();
   const [query, setQuery] = React.useState("");
   const [roleFilter, setRoleFilter] = React.useState<"all" | UserRole>("all");
   const [newOpen, setNewOpen] = React.useState(false);
@@ -871,6 +925,15 @@ function UsersTab({
           : x,
       ),
     );
+    log({
+      source: "admin",
+      actionType: "user-status-changed",
+      title: suspending ? "Account suspended" : "Account restored",
+      detail: `${u.name} (${roleLabel[u.role]}) ${suspending ? "can no longer sign in" : "can sign in again"}.`,
+      targetType: "user",
+      targetId: u.uid,
+      buildingId: u.buildingId,
+    });
     toast.success(`${u.name} ${suspending ? "suspended" : "restored"}`);
   };
 
@@ -1006,6 +1069,15 @@ function UsersTab({
         onOpenChange={setNewOpen}
         onSave={(u) => {
           setUsers((prev) => [...prev, u]);
+          log({
+            source: "admin",
+            actionType: "user-added",
+            title: "Account created",
+            detail: `${u.name} — ${roleLabel[u.role]}${u.buildingId ? `, scoped to ${buildings.find((b) => b.id === u.buildingId)?.name ?? u.buildingId}` : ", all buildings"}.`,
+            targetType: "user",
+            targetId: u.uid,
+            buildingId: u.buildingId,
+          });
           toast.success(`${u.name} can now sign in`);
         }}
       />
@@ -1017,6 +1089,24 @@ function UsersTab({
         onOpenChange={(o) => !o && setEditing(null)}
         onSave={(u) => {
           setUsers((prev) => prev.map((x) => (x.uid === u.uid ? u : x)));
+          log({
+            source: "admin",
+            actionType:
+              editing && editing.role !== u.role
+                ? "user-role-changed"
+                : "user-edited",
+            title:
+              editing && editing.role !== u.role
+                ? "Account role changed"
+                : "Account edited",
+            detail:
+              editing && editing.role !== u.role
+                ? `${u.name} — ${roleLabel[editing.role]} → ${roleLabel[u.role]}.`
+                : `${u.name} — ${roleLabel[u.role]}.`,
+            targetType: "user",
+            targetId: u.uid,
+            buildingId: u.buildingId,
+          });
           toast.success(`${u.name} updated`);
         }}
       />

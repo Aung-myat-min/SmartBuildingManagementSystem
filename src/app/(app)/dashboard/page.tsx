@@ -21,7 +21,6 @@ import {
   BUILDINGS,
   buildingStats,
   EQUIPMENT,
-  LOG_BOOK,
   powerSeries,
   roomsForBuilding,
 } from "@/lib/mock-data";
@@ -56,6 +55,7 @@ export default function DashboardPage() {
     alarmSeconds,
     scopedRequests,
     moveRequest,
+    logBook,
   } = useAppState();
   const clock = useLiveClock();
   const staff = !canAct(role);
@@ -95,9 +95,9 @@ export default function DashboardPage() {
   const attentionItems = ATTENTION_ITEMS.filter(
     (a) => !staff || a.buildingId === activeBuildingId,
   );
-  const feed = LOG_BOOK.filter(
-    (e) => !staff || e.buildingId === activeBuildingId,
-  ).slice(0, 7);
+  const feed = logBook
+    .filter((e) => !staff || e.buildingId === activeBuildingId)
+    .slice(0, 7);
 
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[1fr_308px]">

@@ -486,6 +486,7 @@ function SensorDrawer({
 }) {
   // Editing stays in this drawer rather than stacking a second one on top of
   // the record being edited.
+  const { log } = useAppState();
   const [editing, setEditing] = React.useState(false);
   const fields = useSensorFields(sensor, editing);
 
@@ -550,6 +551,16 @@ function SensorDrawer({
                 fields.setError("A device needs a name.");
                 return;
               }
+              log({
+                source: "sensor",
+                actionType: "sensor-status-changed",
+                title: "Sensor registration edited",
+                detail: `${sensor.id} — ${roomLabel(sensor.roomId)}, ${buildingName(sensor.buildingId)}.`,
+                targetType: "sensor",
+                targetId: sensor.id,
+                buildingId: sensor.buildingId,
+                refId: sensor.id,
+              });
               toast.success(`${fields.name} updated`);
               setEditing(false);
             }}
@@ -785,6 +796,7 @@ function NewSensorDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const f = useSensorFields(null, open);
+  const { log } = useAppState();
 
   return (
     <FormDrawer
@@ -799,6 +811,16 @@ function NewSensorDrawer({
           f.setError("A device needs a name.");
           return;
         }
+        log({
+          source: "sensor",
+          actionType: "sensor-status-changed",
+          title: "Sensor registered",
+          detail: `${f.name} — ${sensorType(f.typeId)?.label ?? f.typeId} in ${roomLabel(f.roomId)}, ${buildingName(f.buildingId)}.`,
+          targetType: "sensor",
+          targetId: f.name,
+          buildingId: f.buildingId,
+          refId: f.name,
+        });
         toast.success(`${f.name} registered on the network`);
         onOpenChange(false);
       }}

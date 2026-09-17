@@ -439,6 +439,7 @@ function NewUnitDrawer({
   onOpenChange: (open: boolean) => void;
   defaultBuildingId: string;
 }) {
+  const { log } = useAppState();
   const [tag, setTag] = React.useState("");
   const [typeId, setTypeId] = React.useState(EQUIPMENT_TYPES[0]?.id ?? "");
   const [buildingId, setBuildingId] = React.useState(defaultBuildingId);
@@ -477,6 +478,16 @@ function NewUnitDrawer({
           setError(`${tag.trim()} is already on the register.`);
           return;
         }
+        log({
+          source: "equipment",
+          actionType: "equipment-status-changed",
+          title: "Unit added to the register",
+          detail: `${tag.trim()} — ${roomLabel(roomId)}, ${buildingName(buildingId)}.`,
+          targetType: "equipment",
+          targetId: tag.trim(),
+          buildingId,
+          refId: tag.trim(),
+        });
         toast.success(`${tag.trim()} added to the register`);
         onOpenChange(false);
       }}
@@ -631,6 +642,7 @@ function EquipmentDrawer({
   onGoToSensor: (sensorId: string) => void;
   canDecommission: boolean;
 }) {
+  const { log } = useAppState();
   const confirm = useConfirm();
   const [form, setForm] = React.useState<"none" | "service" | "move" | "edit">(
     "none",
@@ -672,6 +684,16 @@ function EquipmentDrawer({
       requireReason: true,
     });
     if (!result.confirmed) return;
+    log({
+      source: "equipment",
+      actionType: "equipment-status-changed",
+      title: "Unit deleted from the register",
+      detail: `${unit.tag} — ${roomLabel(unit.roomId)}, ${buildingName(unit.buildingId)}.`,
+      targetType: "equipment",
+      targetId: unit.id,
+      buildingId: unit.buildingId,
+      refId: unit.tag,
+    });
     toast.success(`${unit.tag} deleted from the register`);
     onClose();
   };
@@ -756,6 +778,16 @@ function EquipmentDrawer({
                 const file = e.target.files?.[0];
                 if (!file) return;
                 setPhoto(URL.createObjectURL(file));
+                log({
+                  source: "equipment",
+                  actionType: "equipment-status-changed",
+                  title: "Photo added to a unit",
+                  detail: `${unit.tag} — ${roomLabel(unit.roomId)}.`,
+                  targetType: "equipment",
+                  targetId: unit.id,
+                  buildingId: unit.buildingId,
+                  refId: unit.tag,
+                });
                 toast.success(`Photo added to ${unit.tag}`);
               }}
             />
@@ -945,6 +977,7 @@ function EditUnitForm({
   );
   const [serviceInterval, setServiceInterval] = React.useState("180");
   const [error, setError] = React.useState<string | null>(null);
+  const { log } = useAppState();
 
   return (
     <DrawerInlineForm
@@ -958,6 +991,16 @@ function EditUnitForm({
           setError("A unit needs an asset tag.");
           return;
         }
+        log({
+          source: "equipment",
+          actionType: "equipment-status-changed",
+          title: "Unit details edited",
+          detail: `${tag.trim()} — registration saved.`,
+          targetType: "equipment",
+          targetId: unit.id,
+          buildingId: unit.buildingId,
+          refId: unit.tag,
+        });
         toast.success(`${tag.trim()} updated`);
         onDone();
       }}
@@ -1014,6 +1057,7 @@ function ServiceForm({
   unit: EquipmentUnit;
   onDone: () => void;
 }) {
+  const { log } = useAppState();
   const [cost, setCost] = React.useState("");
   const [parts, setParts] = React.useState("");
 
@@ -1024,6 +1068,16 @@ function ServiceForm({
       submitLabel="Save service"
       onCancel={onDone}
       onSubmit={() => {
+        log({
+          source: "equipment",
+          actionType: "equipment-status-changed",
+          title: "Service recorded",
+          detail: `${unit.tag} — ${roomLabel(unit.roomId)}, ${buildingName(unit.buildingId)}.`,
+          targetType: "equipment",
+          targetId: unit.id,
+          buildingId: unit.buildingId,
+          refId: unit.tag,
+        });
         toast.success(`Service recorded for ${unit.tag}`);
         onDone();
       }}
@@ -1055,6 +1109,7 @@ function MoveForm({
   unit: EquipmentUnit;
   onDone: () => void;
 }) {
+  const { log } = useAppState();
   const [buildingId, setBuildingId] = React.useState(unit.buildingId);
   const [roomId, setRoomId] = React.useState(unit.roomId);
   const rooms = roomsForBuilding(buildingId);
@@ -1066,6 +1121,16 @@ function MoveForm({
       submitLabel="Move unit"
       onCancel={onDone}
       onSubmit={() => {
+        log({
+          source: "equipment",
+          actionType: "equipment-status-changed",
+          title: "Unit moved",
+          detail: `${unit.tag} — ${roomLabel(unit.roomId)} → ${roomLabel(roomId)}, ${buildingName(buildingId)}.`,
+          targetType: "equipment",
+          targetId: unit.id,
+          buildingId,
+          refId: unit.tag,
+        });
         toast.success(`${unit.tag} moved to ${roomLabel(roomId)}`);
         onDone();
       }}

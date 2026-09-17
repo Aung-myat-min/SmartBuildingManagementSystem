@@ -306,11 +306,25 @@ export type LogActionType =
   | "equipment-status-changed"
   | "request-created"
   | "request-status-changed"
+  | "request-declined"
+  | "request-withdrawn"
+  | "request-verification-requested"
   | "sensor-status-changed"
+  | "sensor-type-added"
+  | "sensor-type-edited"
+  | "sensor-type-archived"
   | "building-added"
   | "building-edited"
+  | "building-deleted"
+  | "room-added"
+  | "room-edited"
+  | "room-removed"
   | "user-added"
-  | "user-role-changed";
+  | "user-edited"
+  | "user-role-changed"
+  | "user-status-changed"
+  | "report-generated"
+  | "password-changed";
 
 export type LogBookSource =
   | "alert"
@@ -330,7 +344,14 @@ export interface LogBookEntry {
   actionType: LogActionType;
   title: string;
   detail: string;
-  targetType: "building" | "room" | "equipment" | "sensor" | "request" | "user";
+  targetType:
+    | "building"
+    | "room"
+    | "equipment"
+    | "sensor"
+    | "request"
+    | "user"
+    | "report";
   targetId: string;
   buildingId?: string; // for filtering; absent for user/building-level actions
   refId?: string; // linked REQ-/EQ-/device id, where relevant

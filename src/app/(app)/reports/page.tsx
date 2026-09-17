@@ -80,7 +80,7 @@ const KIND_TONE: Record<ReportKind, Tone> = {
 };
 
 export default function ReportsPage() {
-  const { role, setRole } = useAppState();
+  const { role, setRole, log } = useAppState();
 
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState("all");
@@ -265,6 +265,16 @@ export default function ReportsPage() {
         onOpenChange={setGenOpen}
         onGenerate={(r) => {
           setExtra((prev) => [r, ...prev]);
+          log({
+            source: "admin",
+            actionType: "report-generated",
+            title: "Report generated",
+            detail: `${r.id} — ${r.kind.replace(/-/g, " ")}, ${r.period}${r.buildingId ? `, ${buildingName(r.buildingId)}` : ", whole estate"}.`,
+            targetType: "report",
+            targetId: r.id,
+            buildingId: r.buildingId,
+            refId: r.id,
+          });
           toast.success(`${r.id} generated`, {
             description: "Visible in this session only.",
           });

@@ -369,6 +369,7 @@ function AppearanceSection() {
 // ---- Security --------------------------------------------------------------
 
 function SecuritySection() {
+  const { currentUser, log } = useAppState();
   const [current, setCurrent] = React.useState("");
   const [next, setNext] = React.useState("");
   const [confirmPass, setConfirmPass] = React.useState("");
@@ -387,6 +388,14 @@ function SecuritySection() {
     setCurrent("");
     setNext("");
     setConfirmPass("");
+    log({
+      source: "access",
+      actionType: "password-changed",
+      title: "Password changed",
+      detail: "Other sessions were left signed in.",
+      targetType: "user",
+      targetId: currentUser.uid,
+    });
     toast.success("Password changed. You've been kept signed in here.");
   };
 

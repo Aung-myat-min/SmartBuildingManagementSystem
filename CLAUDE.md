@@ -91,6 +91,15 @@ member's own unapproved request out of every list, and `requestVerification`
 flags that its submitter thinks resolved work is done. `resetDemo()` clears
 everything.
 
+It also owns the **Log Book**. `log(draft)` stamps the id, the time and the
+actor from the signed-in role, and `logBook` puts what this session wrote in
+front of the seed entries — the Log Book page and the dashboard rail both read
+it, so they cannot disagree. Every action in the app writes one entry: the
+provider logs what it owns (requests, sensor status, equipment condition, the
+sensor type registry), and a screen holding its own state (Administration's
+buildings, rooms and accounts; the equipment register; reports; the password
+form) calls `log()` itself. A refused registry change writes nothing.
+
 **`lib/permissions.ts`** — `roleRank()` (ceo=1, admin=2, staff=3), `roleLabel`, and
 `can*` predicates. Gate on **rank**, never on role equality. Administration is
 split three ways: `canManageEstate` (CEO) vs `canManageAccounts` and
@@ -161,7 +170,7 @@ tooltip — it is never hidden.
 | `/sensors` | Live device state | grouped by building, one column per registry type, alarm rows break the rhythm |
 | `/requests` | Maintenance requests | Kanban/Table toggle, new-request sheet, five-column approval workflow; staff raise, withdraw and verify, approvers move |
 | `/records` | Historical Records | range/building/type filters, daily grouping, CSV export |
-| `/logbook` | Log Book | live feed, source filters, pause |
+| `/logbook` | Log Book | live feed fed by `logBook`, source filters, pause |
 | `/reports` | Reports | library + full report view, generate sheet, PDF/CSV |
 | `/admin` | Administration | Buildings (photo, description, counts, room table) / User Accounts / Sensor Types tabs; Buildings is CEO-only and padlocked for an Admin Manager, the other two are shared |
 | `/settings` | Settings | Your account, Appearance, Password & sessions |
