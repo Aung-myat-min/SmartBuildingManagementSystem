@@ -72,6 +72,16 @@ export function canManageAccounts(role: UserRole): boolean {
 export const ESTATE_LOCK_REASON =
   "Buildings and rooms are managed by the CEO / Super Admin.";
 
+// The sensor type registry is shared with the Admin Manager rather than kept
+// with the estate: a new kind of device arriving on the network is the thing
+// they deal with day to day, and it changes no buildings or accounts.
+export function canManageSensorTypes(role: UserRole): boolean {
+  return roleRank(role) <= 2;
+}
+
+export const SENSOR_TYPE_LOCK_REASON =
+  "Sensor types are managed by Admin Managers and the CEO / Super Admin.";
+
 /** An Admin Manager may only edit Office Staff rows; the CEO may edit anyone but itself. */
 export function canEditUser(
   actor: UserRole,

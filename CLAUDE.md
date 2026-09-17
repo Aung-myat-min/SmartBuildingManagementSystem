@@ -88,7 +88,8 @@ walks a request one step; `resetDemo()` clears everything.
 
 **`lib/permissions.ts`** — `roleRank()` (ceo=1, admin=2, staff=3), `roleLabel`, and
 `can*` predicates. Gate on **rank**, never on role equality. Administration is
-split: `canManageEstate` (CEO) vs `canManageAccounts` (Admin Manager + CEO), with
+split three ways: `canManageEstate` (CEO) vs `canManageAccounts` and
+`canManageSensorTypes` (Admin Manager + CEO), with
 `canEditUser(actor, target)` limiting an Admin Manager to Office Staff rows. The
 `*_LOCK_REASON` strings are the tooltips shown on padlocked controls.
 
@@ -156,7 +157,7 @@ tooltip — it is never hidden.
 | `/records` | Historical Records | range/building/type filters, daily grouping, CSV export |
 | `/logbook` | Log Book | live feed, source filters, pause |
 | `/reports` | Reports | library + full report view, generate sheet, PDF/CSV |
-| `/admin` | Administration | Buildings (photo, description, counts, room table) / User Accounts / Sensor Types tabs; Buildings and Sensor Types are CEO-only and padlocked for an Admin Manager |
+| `/admin` | Administration | Buildings (photo, description, counts, room table) / User Accounts / Sensor Types tabs; Buildings is CEO-only and padlocked for an Admin Manager, the other two are shared |
 | `/settings` | Settings | Your account, Appearance, Password & sessions |
 | `/more` | More | phone-only overflow nav |
 

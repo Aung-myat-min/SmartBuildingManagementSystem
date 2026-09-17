@@ -37,8 +37,10 @@ import {
   canEditUser,
   canManageAccounts,
   canManageEstate,
+  canManageSensorTypes,
   ESTATE_LOCK_REASON,
   roleLabel,
+  SENSOR_TYPE_LOCK_REASON,
   userEditLockReason,
 } from "@/lib/permissions";
 import type {
@@ -93,15 +95,18 @@ export default function AdministrationPage() {
 
   const mayEstate = canManageEstate(role);
   const mayAccounts = canManageAccounts(role);
+  const maySensorTypes = canManageSensorTypes(role);
 
   // An Admin Manager lands on User Accounts with Buildings padlocked.
   const [tab, setTab] = usePersistedState<
     "buildings" | "users" | "sensor-types"
   >("admin.tab", mayEstate ? "buildings" : "users");
-  // A stored preference must not put an Admin Manager on a tab they cannot open.
+  // A stored preference must not put a role on a tab it cannot open. The two
+  // gates differ — the estate is the CEO's, sensor types are shared.
   React.useEffect(() => {
-    if (!mayEstate && tab !== "users") setTab("users");
-  }, [mayEstate, tab, setTab]);
+    if (tab === "buildings" && !mayEstate) setTab("users");
+    if (tab === "sensor-types" && !maySensorTypes) setTab("users");
+  }, [mayEstate, maySensorTypes, tab, setTab]);
 
   const [buildings, setBuildings] = React.useState<LocalBuilding[]>(() =>
     BUILDINGS.map((b) => ({
@@ -133,11 +138,12 @@ export default function AdministrationPage() {
     );
   }
 
-  const tabNote = !mayEstate
-    ? "Admin Managers manage accounts; the estate itself is the CEO's."
-    : tab === "sensor-types"
+  const tabNote =
+    tab === "sensor-types"
       ? "Sensor types decide what the Sensors page can show and who may act."
-      : "Buildings and rooms shape everything the other pages count.";
+      : mayEstate
+        ? "Buildings and rooms shape everything the other pages count."
+        : "Admin Managers manage accounts and sensor types; the estate itself is the CEO's.";
   const tabCount =
     tab === "buildings"
       ? `${buildings.length} SITES · ${rooms.length} ROOMS`
@@ -164,11 +170,11 @@ export default function AdministrationPage() {
             onClick={() => setTab("users")}
           />
           <TabButton
-            icon={mayEstate ? Waves : Lock}
+            icon={maySensorTypes ? Waves : Lock}
             label="Sensor Types"
             active={tab === "sensor-types"}
-            disabled={!mayEstate}
-            title={mayEstate ? undefined : ESTATE_LOCK_REASON}
+            disabled={!maySensorTypes}
+            title={maySensorTypes ? undefined : SENSOR_TYPE_LOCK_REASON}
             onClick={() => setTab("sensor-types")}
           />
         </div>
@@ -202,19 +208,20 @@ export default function AdministrationPage() {
           buildings={buildings}
           confirm={confirm}
         />
-      ) : mayEstate ? (
+      ) : maySensorTypes ? (
         <SensorTypesTab confirm={confirm} />
       ) : (
         <AccessDenied
           title="Sensor types are restricted"
           body={
             <>
-              The sensor type registry is managed by the CEO / Super Admin. Your
-              role is <span className="font-mono">{roleLabel[role]}</span>.
+              The sensor type registry is managed by Admin Managers and the CEO
+              / Super Admin. Your role is{" "}
+              <span className="font-mono">{roleLabel[role]}</span>.
             </>
           }
-          actionLabel="Switch to CEO for this demo"
-          onAction={() => setRole("ceo-super-admin")}
+          actionLabel="Switch to Admin Manager for this demo"
+          onAction={() => setRole("admin-manager")}
         />
       )}
     </div>
