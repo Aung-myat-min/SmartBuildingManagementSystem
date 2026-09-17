@@ -703,18 +703,27 @@ export const SENSOR_TYPES: SensorTypeDef[] = [
   },
 ];
 
-// Every consumer reads the registry through these three, never through
-// SENSOR_TYPES directly — the source moves into app state later, and that
-// has to stay a one-file change.
+// SENSOR_TYPES above is the seed. The live registry is editable from
+// Administration, so it lives in AppStateProvider — and this module holds the
+// current list behind the same three accessors every consumer already calls.
+//
+// The provider pushes each new list here with setSensorRegistrySource, which
+// is why swapping the source stayed a change to this file alone. When the
+// registry moves to Firestore, this holder is what the subscription feeds.
+let registrySource: SensorTypeDef[] = SENSOR_TYPES;
 
-/** The registry as the UI should list it: seed order, archived entries out. */
+export function setSensorRegistrySource(next: SensorTypeDef[]): void {
+  registrySource = next;
+}
+
+/** The registry as the UI should list it: current order, archived entries out. */
 export function sensorTypes(): SensorTypeDef[] {
-  return SENSOR_TYPES.filter((t) => !t.archived);
+  return registrySource.filter((t) => !t.archived);
 }
 
 /** Resolves by id including archived types, so existing records still render. */
 export function sensorType(typeId: string): SensorTypeDef | undefined {
-  return SENSOR_TYPES.find((t) => t.id === typeId);
+  return registrySource.find((t) => t.id === typeId);
 }
 
 export function statusDef(
@@ -722,6 +731,11 @@ export function statusDef(
   statusId: string,
 ): SensorStatusDef | undefined {
   return sensorType(typeId)?.statuses.find((st) => st.id === statusId);
+}
+
+/** Every type, archived included — what the Administration table lists. */
+export function allSensorTypes(): SensorTypeDef[] {
+  return registrySource;
 }
 
 export const SENSORS: EnvironmentalSensor[] = [
