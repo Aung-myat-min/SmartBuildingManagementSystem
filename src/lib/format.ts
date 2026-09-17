@@ -47,6 +47,14 @@ export function formatDate(iso: string): string {
   });
 }
 
+/**
+ * The absolute moment, for the places where "8d" is not enough — a request
+ * row has to say when it actually came in, not only how old it is.
+ */
+export function formatStamp(iso: string): string {
+  return `${formatDate(iso)} · ${formatTime(iso)}`;
+}
+
 export function formatMmk(value: number): string {
   return `${Math.round(value).toLocaleString("en-US")} MMK`;
 }

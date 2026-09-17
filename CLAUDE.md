@@ -94,7 +94,8 @@ split three ways: `canManageEstate` (CEO) vs `canManageAccounts` and
 `*_LOCK_REASON` strings are the tooltips shown on padlocked controls.
 
 **`lib/format.ts`** — `ageHours`, `formatAge`, `formatClock`, `formatTime`,
-`formatDayLabel`, `formatDate`, `formatMmk`, `formatRelative`.
+`formatDayLabel`, `formatDate`, `formatStamp` (date · time, for rows that must
+say when, not just how long ago), `formatMmk`, `formatRelative`.
 Never call `formatClock()` during render — use `useLiveClock()` (`src/hooks`), or
 the server and client disagree by a second and hydration fails.
 

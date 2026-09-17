@@ -2,6 +2,7 @@
 
 import {
   Box,
+  CalendarClock,
   Clock,
   LayoutGrid,
   Lock,
@@ -19,7 +20,7 @@ import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { ESCALATION_WINDOW_HOURS, isEscalated } from "@/lib/derive";
-import { formatAge } from "@/lib/format";
+import { formatAge, formatStamp } from "@/lib/format";
 import {
   BUILDINGS,
   buildingName,
@@ -377,8 +378,8 @@ export default function RequestsPage() {
           })}
         </div>
       ) : (
-        <div className="border-border bg-card overflow-hidden rounded-[5px] border">
-          <div className="bg-surface-subtle border-divider text-muted-foreground flex border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
+        <div className="border-border bg-card overflow-x-auto rounded-[5px] border">
+          <div className="bg-surface-subtle border-divider text-muted-foreground flex min-w-300 border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
             <span className="w-22">Id</span>
             <span className="w-28">Building</span>
             <span className="w-28">Location</span>
@@ -386,6 +387,7 @@ export default function RequestsPage() {
             <span className="flex-1">Issue</span>
             <span className="w-22">Priority</span>
             <span className="w-26">Status</span>
+            <span className="w-36">Submitted</span>
             <span className="w-18">Age</span>
             <span className="w-28">Submitted by</span>
             <span className="w-40 text-right">Action</span>
@@ -397,7 +399,7 @@ export default function RequestsPage() {
               <div
                 key={r.id}
                 className={cn(
-                  "border-rule flex items-center border-b px-4 py-2.5",
+                  "border-rule flex min-w-300 items-center border-b px-4 py-2.5",
                   aging && "border-l-danger border-l-[3px]",
                 )}
               >
@@ -431,7 +433,11 @@ export default function RequestsPage() {
                     {STATUS_LABEL[r.status]}
                   </ToneBadge>
                 </span>
+                <span className="text-neutral-foreground w-36 font-mono text-[11px]">
+                  {formatStamp(r.submittedAt)}
+                </span>
                 <span
+                  title={`Submitted ${formatStamp(r.submittedAt)} · last moved ${formatStamp(r.updatedAt)}`}
                   className={cn(
                     "flex w-18 items-center gap-1 font-mono text-[11px]",
                     aging ? "text-danger-foreground" : "text-muted-foreground",
@@ -559,12 +565,18 @@ function RequestCard({
         <div className="flex-1" />
         {aging ? (
           // Self-labelling: the red edge plus the tag, so no legend is needed.
-          <span className="bg-danger-muted text-danger-foreground flex items-center gap-1 rounded-[3px] px-1.5 py-1 font-mono text-[9.5px] leading-none font-semibold tracking-[0.05em]">
+          <span
+            title={`Submitted ${formatStamp(request.submittedAt)}`}
+            className="bg-danger-muted text-danger-foreground flex items-center gap-1 rounded-[3px] px-1.5 py-1 font-mono text-[9.5px] leading-none font-semibold tracking-[0.05em]"
+          >
             <Clock className="size-2.75" />
             AGING {formatAge(request.submittedAt)}
           </span>
         ) : (
-          <span className="text-muted-foreground font-mono text-[10px]">
+          <span
+            title={`Submitted ${formatStamp(request.submittedAt)}`}
+            className="text-muted-foreground font-mono text-[10px]"
+          >
             {formatAge(request.submittedAt)}
           </span>
         )}
@@ -582,6 +594,10 @@ function RequestCard({
         <span className="flex items-center gap-1.5">
           <Box className="size-2.75 shrink-0" />
           {equipmentLabel(request.equipmentId)}
+        </span>
+        <span className="flex items-center gap-1.5 font-mono">
+          <CalendarClock className="size-2.75 shrink-0" />
+          {formatStamp(request.submittedAt)}
         </span>
       </div>
 
