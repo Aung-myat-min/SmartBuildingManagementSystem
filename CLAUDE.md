@@ -41,7 +41,7 @@ src/
 | Users | `UserRole` (office-staff / admin-manager / ceo-super-admin), `AppUser`, `ManagedUser` |
 | Estate | `Building`, `Room`, `RoomType` |
 | Equipment | `EquipmentTypeDef`, `Equipment` (room-level count breakdown), `EquipmentUnit` (one taggable asset), `EquipmentCondition`, `EquipmentHistoryEvent` |
-| Sensors | `SensorTypeDef` (carries its own `statuses[]` + `actions[]`), `SensorAction`, `EnvironmentalSensor` |
+| Sensors | `SensorTypeDef` (own `statuses[]` + `actions[]` + `icon` key), `SensorStatusDef`, `SensorAction`, `EnvironmentalSensor` |
 | Requests | `MaintenanceRequest`, `RequestStatus`, `RequestPriority` |
 | Ledgers | `HistoricalRecord` (long-range, all roles), `LogBookEntry` (short-range, admin+CEO) |
 | Reports | `Report`, `ReportDetail`, `ReportKpi`, `ReportWeek`, `ReportOffender`, `ReportCostLine` |
@@ -59,17 +59,28 @@ Helpers: `buildingStats()`, `roomsForBuilding()`, `roomLabel()`, `buildingName()
 `equipmentUnitLabel()`, `powerSeries()`, `reportDetail()`.
 Lookups: `BUILDING_META`, `BUILDING_LOAD_KW`, `LOG_BOOK_SOURCE_META`,
 `REQUEST_NEXT_STATUS`, `REQUEST_NEXT_ACTION`, `CURRENT_USERS`, `LIVE_ALARM_SENSOR_ID`.
+Sensor registry: `sensorTypes()` / `sensorType()` / `statusDef()` — always read
+a sensor type through these, never through `SENSOR_TYPES`. They resolve against
+whatever `setSensorRegistrySource()` was last handed, which is the live registry
+the provider holds, and are where a Firestore subscription will attach.
 
 **`lib/derive.ts`** — the values that look like fields and are not. Pure rules,
 no data imports, so the layering stays `format → derive → mock-data → app-state`.
 Escalation (high + open + past `ESCALATION_WINDOW_HOURS`), due-service (healthy
-within `DUE_SERVICE_DAYS` — a board column, not a condition), offline and alarm
-status, `countOpenRequests` / `countEscalated`, and `kpiPasses`. Change a
-threshold here, not in a migration. **Never re-implement one of these inline.**
+within `DUE_SERVICE_DAYS` — a board column, not a condition), offline status,
+`statusTone` (a status whose `escalateAfterMinutes` has passed switches tone —
+an unlocked door is blue for 30 minutes, then amber), `countOpenRequests` /
+`countEscalated`, and `kpiPasses`. Change a threshold here, not in a migration.
+Whether a status counts as an alarm is **not** here — it is the `isAlarm` flag
+on the status's registry entry. **Never re-implement one of these inline.**
 
 **`lib/app-state.tsx`** — `useAppState()`, the single client-side store.
 Holds the signed-in role, active building, a 1s `elapsed` tick, notifications, and
 in-memory overrides so an action on one page shows up on every other page.
+It also holds the live sensor type registry (`sensorTypeRegistry` plus
+`addSensorType` / `updateSensorType` / `archiveSensorType` and the status and
+action mutators), which is where the registry's validation is enforced — a type
+with sensors cannot be archived, a status with sensors in it cannot be removed.
 `requests` / `scopedRequests` / `openRequestCount` are the one resolved list and
 the one count — the sidebar badge, toolbar chips, building cards and dashboard
 tiles all read them, so they cannot disagree. `moveRequest(id, "next" | "prev")`
@@ -123,6 +134,7 @@ Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 | `shared/empty-state.tsx` | Empty list/filter result. |
 | `shared/form-drawer.tsx` | `FormDrawer` — the 392px right drawer for anything with fields, plus `FormField` / `FormFieldLocked`. |
 | `shared/detail-drawer.tsx` | `DetailDrawer` — a record with history and actions (412px wide, 392px `size="narrow"`), plus `SameDevicePanel` and `DrawerAction`. |
+| `lib/icons.ts` | `SENSOR_ICONS` / `sensorIcon()` — the fixed icon allowlist a sensor type picks from by key, never a component reference. |
 
 **Container rules, fixed across every page.** Fields → form drawer. A record with
 history and actions → detail drawer. Decisions only → centred 452px confirm, whose
@@ -139,12 +151,12 @@ tooltip — it is never hidden.
 | `/login` | Sign in + demo account picker | card; `/login/forgot-password`, `/login/first-sign-in`, `/login/session-expired` |
 | `/dashboard` | Estate overview | KPI tiles, power series, estate table, requests needing a decision, live alerts, log feed |
 | `/equipment` | Asset register | Register/Board toggle, filters, detail drawer with history + 6 actions |
-| `/sensors` | Fire detection + door hardware | grouped by building, alarm rows break the rhythm |
+| `/sensors` | Live device state | grouped by building, one column per registry type, alarm rows break the rhythm |
 | `/requests` | Maintenance requests | Kanban/Table toggle, new-request sheet, status advance |
 | `/records` | Historical Records | range/building/type filters, daily grouping, CSV export |
 | `/logbook` | Log Book | live feed, source filters, pause |
 | `/reports` | Reports | library + full report view, generate sheet, PDF/CSV |
-| `/admin` | Administration | Buildings (photo, description, counts, room table) / User Accounts tabs |
+| `/admin` | Administration | Buildings (photo, description, counts, room table) / User Accounts / Sensor Types tabs; Buildings and Sensor Types are CEO-only and padlocked for an Admin Manager |
 | `/settings` | Settings | Your account, Appearance, Password & sessions |
 | `/more` | More | phone-only overflow nav |
 
