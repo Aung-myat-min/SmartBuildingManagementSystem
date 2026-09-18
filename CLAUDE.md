@@ -41,7 +41,7 @@ src/
 | Group | Types |
 | --- | --- |
 | Users | `UserRole` (office-staff / admin-manager / ceo-super-admin), `AppUser` (+ `legacyUid`), `ManagedUser` |
-| Estate | `Building`, `Room`, `RoomType` |
+| Estate | `Building` (id, name, site `code`), `Room`, `RoomType` |
 | Equipment | `EquipmentTypeDef`, `Equipment` (room-level count breakdown), `EquipmentUnit` (one taggable asset), `EquipmentCondition`, `EquipmentHistoryEvent` |
 | Sensors | `SensorTypeDef` (own `statuses[]` + `actions[]` + `icon` key), `SensorStatusDef`, `SensorAction`, `EnvironmentalSensor` |
 | Requests | `MaintenanceRequest` (+ `declineNote`, `verificationRequested`, `withdrawn`), `RequestStatus` (5 steps, approval first), `RequestPriority` |
@@ -62,6 +62,11 @@ Helpers: `buildingStats()`, `roomsForBuilding()`, `roomLabel()`, `buildingName()
 `equipmentUnitLabel()`, `powerSeries()`, `reportDetail()`.
 Lookups: `BUILDING_META`, `BUILDING_LOAD_KW`, `LOG_BOOK_SOURCE_META`,
 `REQUEST_NEXT_STATUS`, `REQUEST_NEXT_ACTION`.
+Estate: `buildings()` / `rooms()` / `roomsForBuilding()` / `roomLabel()` /
+`buildingName()` resolve through `setEstateSource()`, which the provider feeds —
+so renaming a building in Administration reaches every building filter in the
+app, not just the tab that renamed it. Never read `BUILDINGS` or `ROOMS`
+directly outside mock-data; they are the seed, not the state.
 Sensor registry: `sensorTypes()` / `sensorType()` / `statusDef()` — always read
 a sensor type through these, never through `SENSOR_TYPES`. They resolve against
 whatever `setSensorRegistrySource()` was last handed, which is the live registry
@@ -99,6 +104,13 @@ Takes the resolved `user` as a required prop and re-exposes `role` /
 the auth gate, so signing out unmounts it and discards the session's overrides.
 Holds the active building, notifications, and in-memory overrides so an action
 on one page shows up on every other page.
+It holds the **estate** (`buildings`, `rooms`, plus `addBuilding` /
+`updateBuilding` / `deleteBuilding` — which takes the building's rooms with it —
+and `addRoom` / `updateRoom` / `removeRoom`), and the resolved device list
+`sensors` with `removeSensor`. Both are single resolved lists for the same
+reason `requests` is: the Sensors page, the building device counts and the
+sensor type registry's archive guard all read the one list, so they cannot
+disagree about what exists.
 It also holds the live sensor type registry (`sensorTypeRegistry` plus
 `addSensorType` / `updateSensorType` / `archiveSensorType` and the status and
 action mutators), which is where the registry's validation is enforced — a type
@@ -176,6 +188,7 @@ Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 | `shared/access-denied.tsx` | Role-locked page: states the role and who to ask. No action — with real accounts there is nothing to switch to. |
 | `shared/empty-state.tsx` | Empty list/filter result. |
 | `shared/form-drawer.tsx` | `FormDrawer` — the 392px right drawer for anything with fields, plus `FormField` / `FormFieldLocked`. |
+| `lib/export.ts` | `toCsv()` / `downloadCsv()` — RFC 4180 quoting and a UTF-8 BOM, shared by both ledgers. `printToPdf()` is the browser's print dialog; `@media print` in globals.css drops the shell. |
 | `shared/date-range-filter.tsx` | `DateRangeFilter` — from/to bounds on a toolbar, native date inputs, `withTime` for datetime-local. `withinRange()` does the comparison; an open end means unbounded, and a bare end date covers its whole day. |
 | `shared/detail-drawer.tsx` | `DetailDrawer` — a record with history and actions (412px wide, 392px `size="narrow"`), plus `SameDevicePanel` and `DrawerAction`. |
 | `lib/icons.ts` | `SENSOR_ICONS` / `sensorIcon()` — the fixed icon allowlist a sensor type picks from by key, never a component reference. |
@@ -217,6 +230,9 @@ tooltip — it is never hidden.
 - Tailwind arbitrary values carry the design's exact sizes (`text-[12.5px]`, `size-3.5`).
 - Business logic stays in `lib/`; pages read from `useAppState()` and mock data.
 - Biome formats and lints; run `npm run lint` before finishing.
+- `npm test` runs Vitest over `src/**/*.test.ts` — the pure rules in `lib/` and
+  the export shaping. Firebase and the browser are out of scope there; mocking
+  them would test the mock.
 
 ## Auth and authorisation
 

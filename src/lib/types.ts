@@ -56,6 +56,8 @@ export interface ManagedUser extends AppUser {
 export interface Building {
   id: string;
   name: string;
+  /** Site code shown beside the name, e.g. "SITE 216". */
+  code: string;
 }
 
 export type RoomType = "lecture" | "lab" | "office" | "plant" | "common";

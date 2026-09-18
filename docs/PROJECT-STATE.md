@@ -1621,17 +1621,21 @@ same commit as the change to the other.
   padlock looks like. **The rules for every collection other than `users` are
   still the default deny, and the `users` rules must be deployed** —
   `npx firebase-tools deploy --only firestore:rules`.
-- **Building and room edits are still page-local.** `BuildingsTab` holds its own
-  `useState` copies, so an estate edit is not visible on other pages the way a
-  request move is. `UsersTab` no longer has this problem — it subscribes.
+- Estate and account edits both reach the rest of the app now: the estate lives
+  in `AppStateProvider` behind `setEstateSource()`, and accounts are a Firestore
+  subscription. Neither is page-local any more.
 - **Deleting an account is not possible from the app.** The client SDK cannot
   remove another user's Auth record; the product suspends instead. A failed
   provisioning leaves an Auth record with no profile, which signs out with an
   explanation but needs the console to clear.
-- **Stubs that only toast:** CSV export on `/records`, PDF and CSV on
-  `/reports`, sensor *Remove*, equipment photo upload (local object URL only),
-  and profile photo. Password change is real.
-- **No tests, no test runner.** Nothing in `package.json` runs a test.
+- **Stubs that only toast:** the equipment photo upload, which is a local
+  object URL and needs Firebase Storage to be real. CSV, PDF, sensor *Remove*
+  and the password change all do what they say; the profile photo button was
+  removed rather than left apologising.
+- **Test coverage is narrow.** `npm test` runs 60 Vitest cases over the pure
+  modules. Nothing covers the components, and nothing covers the security
+  rules — `@firebase/rules-unit-testing` against the emulator is the gap that
+  matters most, since a rule that allows too much is invisible until it bites.
 - **`README.md` is still `create-next-app` boilerplate.**
 - **Historical Records are PRNG-generated**, not authored — realistic in shape,
   arbitrary in detail.

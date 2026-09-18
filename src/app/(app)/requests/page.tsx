@@ -24,7 +24,6 @@ import { useAppState } from "@/lib/app-state";
 import { ESCALATION_WINDOW_HOURS, isEscalated } from "@/lib/derive";
 import { formatAge, formatStamp } from "@/lib/format";
 import {
-  BUILDINGS,
   buildingName,
   EQUIPMENT_UNITS,
   equipmentUnitLabel,
@@ -110,6 +109,7 @@ function equipmentLabel(equipmentId: string) {
 
 export default function RequestsPage() {
   const {
+    buildings,
     role,
     activeBuildingId,
     scopedRequests,
@@ -271,7 +271,7 @@ export default function RequestsPage() {
           className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
           <option value="all">All buildings</option>
-          {BUILDINGS.map((b) => (
+          {buildings.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
             </option>
@@ -553,7 +553,7 @@ export default function RequestsPage() {
       <NewRequestDrawer
         open={newOpen}
         onOpenChange={setNewOpen}
-        defaultBuildingId={locked ? activeBuildingId : BUILDINGS[0].id}
+        defaultBuildingId={locked ? activeBuildingId : buildings[0].id}
         onCreate={(request) => {
           addRequest(request);
           toast.success(`${request.id} raised`);
@@ -751,6 +751,7 @@ function NewRequestDrawer({
   submittedBy: { uid: string; name: string };
   onCreate: (request: MaintenanceRequest) => void;
 }) {
+  const { buildings } = useAppState();
   const [buildingId, setBuildingId] = React.useState(defaultBuildingId);
   const [roomId, setRoomId] = React.useState("");
   const [equipmentId, setEquipmentId] = React.useState("");
@@ -812,7 +813,7 @@ function NewRequestDrawer({
             }}
             className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
           >
-            {BUILDINGS.map((b) => (
+            {buildings.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>

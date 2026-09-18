@@ -10,12 +10,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { downloadCsv, stampedFilename } from "@/lib/export";
 import { formatDayLabel, formatTime } from "@/lib/format";
-import {
-  BUILDINGS,
-  buildingName,
-  HISTORICAL_RECORDS,
-  roomLabel,
-} from "@/lib/mock-data";
+import { buildingName, HISTORICAL_RECORDS, roomLabel } from "@/lib/mock-data";
 import { isBuildingLocked } from "@/lib/permissions";
 import type { HistoricalRecordType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -64,7 +59,7 @@ const RANGES = [
 const DAY_MS = 86400000;
 
 export default function HistoricalRecordsPage() {
-  const { role, activeBuildingId } = useAppState();
+  const { buildings, role, activeBuildingId } = useAppState();
   const locked = isBuildingLocked(role);
 
   const [range, setRange] = usePersistedState("records.range", 30);
@@ -188,7 +183,7 @@ export default function HistoricalRecordsPage() {
           className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
           <option value="all">All buildings</option>
-          {BUILDINGS.map((b) => (
+          {buildings.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
             </option>

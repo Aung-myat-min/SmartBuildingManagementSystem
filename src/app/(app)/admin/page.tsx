@@ -25,12 +25,7 @@ import { type RegistryResult, slugify, useAppState } from "@/lib/app-state";
 import { countOpenRequests } from "@/lib/derive";
 import { formatRelative } from "@/lib/format";
 import { SENSOR_ICON_KEYS, sensorIcon } from "@/lib/icons";
-import {
-  BUILDING_META,
-  BUILDINGS,
-  EQUIPMENT_UNITS,
-  ROOMS,
-} from "@/lib/mock-data";
+import { BUILDING_META, EQUIPMENT_UNITS } from "@/lib/mock-data";
 import {
   canEditUser,
   canManageAccounts,
@@ -42,6 +37,7 @@ import {
   userEditLockReason,
 } from "@/lib/permissions";
 import type {
+  Building,
   ManagedUser,
   Room,
   RoomType,
@@ -78,12 +74,6 @@ const ROLE_TONE: Record<UserRole, Tone> = {
   "ceo-super-admin": "warning",
 };
 
-interface LocalBuilding {
-  id: string;
-  name: string;
-  code: string;
-}
-
 function initials(name: string) {
   return name
     .split(" ")
@@ -94,7 +84,8 @@ function initials(name: string) {
 }
 
 export default function AdministrationPage() {
-  const { role, currentUser, requests, sensorTypeRegistry } = useAppState();
+  const { role, currentUser, requests, buildings, rooms, sensorTypeRegistry } =
+    useAppState();
   const confirm = useConfirm();
 
   const mayEstate = canManageEstate(role);
@@ -112,19 +103,11 @@ export default function AdministrationPage() {
     if (tab === "sensor-types" && !maySensorTypes) setTab("users");
   }, [mayEstate, maySensorTypes, tab, setTab]);
 
-  const [buildings, setBuildings] = React.useState<LocalBuilding[]>(() =>
-    BUILDINGS.map((b) => ({
-      id: b.id,
-      name: b.name,
-      code: BUILDING_META[b.id]?.code ?? "",
-    })),
-  );
-  const [rooms, setRooms] = React.useState<Room[]>(ROOMS);
   // Live, not a copy: a role change here reaches that person's own session
   // through the subscription in lib/auth.tsx, without a reload.
   const { users, loading: usersLoading, error: usersError } = useUsers();
   const [selectedBuildingId, setSelectedBuildingId] = React.useState(
-    BUILDINGS[0]?.id ?? "",
+    buildings[0]?.id ?? "",
   );
 
   if (!mayAccounts) {
@@ -195,9 +178,7 @@ export default function AdministrationPage() {
       {tab === "buildings" ? (
         <BuildingsTab
           buildings={buildings}
-          setBuildings={setBuildings}
           rooms={rooms}
-          setRooms={setRooms}
           users={users}
           selectedId={selectedBuildingId}
           onSelect={setSelectedBuildingId}
@@ -273,28 +254,32 @@ type ConfirmFn = ReturnType<typeof useConfirm>;
 
 function BuildingsTab({
   buildings,
-  setBuildings,
   rooms,
-  setRooms,
   users,
   selectedId,
   onSelect,
   openRequestsFor,
   confirm,
 }: {
-  buildings: LocalBuilding[];
-  setBuildings: React.Dispatch<React.SetStateAction<LocalBuilding[]>>;
+  buildings: Building[];
   rooms: Room[];
-  setRooms: React.Dispatch<React.SetStateAction<Room[]>>;
   users: ManagedUser[];
   selectedId: string;
   onSelect: (id: string) => void;
   openRequestsFor: (buildingId: string) => number;
   confirm: ConfirmFn;
 }) {
-  const { log } = useAppState();
+  const {
+    log,
+    addBuilding,
+    updateBuilding,
+    deleteBuilding,
+    addRoom,
+    updateRoom,
+    removeRoom,
+  } = useAppState();
   const [newOpen, setNewOpen] = React.useState(false);
-  const [editing, setEditing] = React.useState<LocalBuilding | null>(null);
+  const [editing, setEditing] = React.useState<Building | null>(null);
   const [editingRoom, setEditingRoom] = React.useState<Room | null>(null);
   const [newRoomName, setNewRoomName] = React.useState("");
   const [newRoomType, setNewRoomType] = React.useState<RoomType>("lecture");
@@ -312,18 +297,15 @@ function BuildingsTab({
   const staffIn = (buildingId: string) =>
     users.filter((u) => u.buildingId === buildingId).length;
 
-  const addRoom = () => {
+  const handleAddRoom = () => {
     if (!selected || newRoomName.trim().length === 0) return;
-    setRooms((prev) => [
-      ...prev,
-      {
-        id: `r-${selected.id}-${newRoomName.trim().toLowerCase().replace(/\s+/g, "-")}`,
-        buildingId: selected.id,
-        roomNumber: newRoomName.trim(),
-        type: newRoomType,
-        floor: newRoomFloor,
-      },
-    ]);
+    addRoom({
+      id: `r-${selected.id}-${newRoomName.trim().toLowerCase().replace(/\s+/g, "-")}`,
+      buildingId: selected.id,
+      roomNumber: newRoomName.trim(),
+      type: newRoomType,
+      floor: newRoomFloor,
+    });
     log({
       source: "admin",
       actionType: "room-added",
@@ -337,7 +319,7 @@ function BuildingsTab({
     setNewRoomName("");
   };
 
-  const removeRoom = async (room: Room) => {
+  const handleRemoveRoom = async (room: Room) => {
     const devices = EQUIPMENT_UNITS.filter((u) => u.roomId === room.id).length;
     const result = await confirm({
       title: `Remove ${room.roomNumber}?`,
@@ -350,7 +332,7 @@ function BuildingsTab({
       confirmLabel: "Remove room",
     });
     if (!result.confirmed) return;
-    setRooms((prev) => prev.filter((r) => r.id !== room.id));
+    removeRoom(room.id);
     log({
       source: "admin",
       actionType: "room-removed",
@@ -363,7 +345,7 @@ function BuildingsTab({
     toast.success(`${room.roomNumber} removed`);
   };
 
-  const deleteBuilding = async () => {
+  const handleDeleteBuilding = async () => {
     if (!selected) return;
     const roomCount = buildingRooms.length;
     const devices = devicesIn(selected.id);
@@ -376,8 +358,7 @@ function BuildingsTab({
       requireReason: true,
     });
     if (!result.confirmed) return;
-    setBuildings((prev) => prev.filter((b) => b.id !== selected.id));
-    setRooms((prev) => prev.filter((r) => r.buildingId !== selected.id));
+    deleteBuilding(selected.id);
     onSelect(buildings.find((b) => b.id !== selected.id)?.id ?? "");
     log({
       source: "admin",
@@ -462,7 +443,7 @@ function BuildingsTab({
                 </button>
                 <button
                   type="button"
-                  onClick={deleteBuilding}
+                  onClick={handleDeleteBuilding}
                   title="Delete this building and everything under it"
                   className="border-danger/40 text-danger-foreground bg-card hover:bg-danger-muted shrink-0 cursor-pointer rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium"
                 >
@@ -533,7 +514,7 @@ function BuildingsTab({
                   </RowButton>
                   <RowButton
                     danger
-                    onClick={() => removeRoom(r)}
+                    onClick={() => handleRemoveRoom(r)}
                     title="Remove room"
                   >
                     Remove
@@ -573,7 +554,7 @@ function BuildingsTab({
               </select>
               <button
                 type="button"
-                onClick={addRoom}
+                onClick={handleAddRoom}
                 className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer rounded border px-3.25 py-2 text-[11.5px] leading-none font-medium"
               >
                 Add room
@@ -588,7 +569,7 @@ function BuildingsTab({
         onOpenChange={setNewOpen}
         onCreate={(name, code) => {
           const id = `b-${Date.now()}`;
-          setBuildings((prev) => [...prev, { id, name, code }]);
+          addBuilding({ id, name, code });
           onSelect(id);
           log({
             source: "admin",
@@ -605,9 +586,7 @@ function BuildingsTab({
         building={editing}
         onClose={() => setEditing(null)}
         onSave={(next) => {
-          setBuildings((prev) =>
-            prev.map((b) => (b.id === next.id ? next : b)),
-          );
+          updateBuilding(next);
           log({
             source: "admin",
             actionType: "building-edited",
@@ -624,7 +603,7 @@ function BuildingsTab({
         room={editingRoom}
         onClose={() => setEditingRoom(null)}
         onSave={(next) => {
-          setRooms((prev) => prev.map((r) => (r.id === next.id ? next : r)));
+          updateRoom(next);
           log({
             source: "admin",
             actionType: "room-edited",
@@ -774,9 +753,9 @@ function EditBuildingDrawer({
   onClose,
   onSave,
 }: {
-  building: LocalBuilding | null;
+  building: Building | null;
   onClose: () => void;
-  onSave: (next: LocalBuilding) => void;
+  onSave: (next: Building) => void;
 }) {
   const [name, setName] = React.useState("");
   const [code, setCode] = React.useState("");
@@ -892,7 +871,7 @@ function UsersTab({
   users: ManagedUser[];
   loading: boolean;
   loadError: string | null;
-  buildings: LocalBuilding[];
+  buildings: Building[];
   confirm: ConfirmFn;
 }) {
   const { log } = useAppState();
@@ -1160,7 +1139,7 @@ function UserDrawer({
   actorRole: UserRole;
   open: boolean;
   editing: ManagedUser | null;
-  buildings: LocalBuilding[];
+  buildings: Building[];
   onOpenChange: (open: boolean) => void;
   /**
    * Resolves once the write has been attempted, so the drawer can hold the

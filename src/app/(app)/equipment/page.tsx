@@ -40,7 +40,6 @@ import {
 } from "@/lib/derive";
 import { formatDate, formatRelative } from "@/lib/format";
 import {
-  BUILDINGS,
   buildingName,
   EQUIPMENT_HISTORY,
   EQUIPMENT_TYPES,
@@ -94,8 +93,13 @@ function typeLabel(typeId: string) {
 
 export default function EquipmentPage() {
   const router = useRouter();
-  const { role, activeBuildingId, equipmentCondition, setEquipmentCondition } =
-    useAppState();
+  const {
+    buildings,
+    role,
+    activeBuildingId,
+    equipmentCondition,
+    setEquipmentCondition,
+  } = useAppState();
   const locked = isBuildingLocked(role);
 
   const [view, setView] = usePersistedState<"register" | "board">(
@@ -173,7 +177,7 @@ export default function EquipmentPage() {
           className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
         >
           <option value="all">All buildings</option>
-          {BUILDINGS.map((b) => (
+          {buildings.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
             </option>
@@ -420,7 +424,7 @@ export default function EquipmentPage() {
       <NewUnitDrawer
         open={newOpen}
         onOpenChange={setNewOpen}
-        defaultBuildingId={locked ? activeBuildingId : BUILDINGS[0].id}
+        defaultBuildingId={locked ? activeBuildingId : buildings[0].id}
       />
     </div>
   );
@@ -439,7 +443,7 @@ function NewUnitDrawer({
   onOpenChange: (open: boolean) => void;
   defaultBuildingId: string;
 }) {
-  const { log } = useAppState();
+  const { buildings, log } = useAppState();
   const [tag, setTag] = React.useState("");
   const [typeId, setTypeId] = React.useState(EQUIPMENT_TYPES[0]?.id ?? "");
   const [buildingId, setBuildingId] = React.useState(defaultBuildingId);
@@ -528,7 +532,7 @@ function NewUnitDrawer({
             }}
             className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
           >
-            {BUILDINGS.map((b) => (
+            {buildings.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>
@@ -1109,7 +1113,7 @@ function MoveForm({
   unit: EquipmentUnit;
   onDone: () => void;
 }) {
-  const { log } = useAppState();
+  const { buildings, log } = useAppState();
   const [buildingId, setBuildingId] = React.useState(unit.buildingId);
   const [roomId, setRoomId] = React.useState(unit.roomId);
   const rooms = roomsForBuilding(buildingId);
@@ -1145,7 +1149,7 @@ function MoveForm({
             }}
             className="border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium"
           >
-            {BUILDINGS.map((b) => (
+            {buildings.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>

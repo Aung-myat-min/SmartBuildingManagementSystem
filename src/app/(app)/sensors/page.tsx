@@ -36,7 +36,6 @@ import { formatRelative } from "@/lib/format";
 import { sensorIcon } from "@/lib/icons";
 import {
   BUILDING_META,
-  BUILDINGS,
   buildingName,
   EQUIPMENT_UNITS,
   equipmentForSensor,
@@ -112,6 +111,7 @@ function SensorsView() {
   const router = useRouter();
   const params = useSearchParams();
   const {
+    buildings,
     role,
     activeBuildingId,
     sensors,
@@ -176,7 +176,7 @@ function SensorsView() {
     isSensorOffline(statusOf(s)),
   ).length;
 
-  const buildings = BUILDINGS.filter(
+  const visibleBuildings = buildings.filter(
     (b) => !locked || b.id === activeBuildingId,
   );
 
@@ -291,7 +291,7 @@ function SensorsView() {
         )}
       </div>
 
-      {buildings.map((b) => {
+      {visibleBuildings.map((b) => {
         const group = visible.filter((s) => s.buildingId === b.id);
         const groupAlarms = group.filter((s) => viewOf(s).alarm).length;
         const isOpen = !collapsed[b.id];
@@ -653,9 +653,10 @@ function SensorDrawer({
 
 /** The registration fields, shared by the inline edit and the new-sensor drawer. */
 function useSensorFields(seed: EnvironmentalSensor | null, active: boolean) {
+  const { buildings } = useAppState();
   const [name, setName] = React.useState("");
   const [typeId, setTypeId] = React.useState(sensorTypes()[0]?.id ?? "");
-  const [buildingId, setBuildingId] = React.useState(BUILDINGS[0]?.id ?? "");
+  const [buildingId, setBuildingId] = React.useState(buildings[0]?.id ?? "");
   const [roomId, setRoomId] = React.useState("");
   const [status, setStatus] = React.useState("");
   const [linkTag, setLinkTag] = React.useState("");
@@ -666,7 +667,7 @@ function useSensorFields(seed: EnvironmentalSensor | null, active: boolean) {
     if (!active) return;
     setName(seed?.id ?? "");
     setTypeId(seed?.typeId ?? sensorTypes()[0]?.id ?? "");
-    setBuildingId(seed?.buildingId ?? BUILDINGS[0]?.id ?? "");
+    setBuildingId(seed?.buildingId ?? buildings[0]?.id ?? "");
     setRoomId(seed?.roomId ?? "");
     setStatus(seed?.status ?? sensorTypes()[0]?.statuses[0]?.id ?? "");
     setLinkTag(seed?.linkedEquipmentId ?? "");
@@ -699,6 +700,7 @@ const FIELD_SELECT =
   "border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60";
 
 function SensorFields({ f, isEdit }: { f: SensorFieldState; isEdit: boolean }) {
+  const { buildings } = useAppState();
   const type = sensorType(f.typeId);
   const rooms = roomsForBuilding(f.buildingId);
   const linkable = EQUIPMENT_UNITS.filter((u) => u.buildingId === f.buildingId);
@@ -748,7 +750,7 @@ function SensorFields({ f, isEdit }: { f: SensorFieldState; isEdit: boolean }) {
             }}
             className={FIELD_SELECT}
           >
-            {BUILDINGS.map((b) => (
+            {buildings.map((b) => (
               <option key={b.id} value={b.id}>
                 {b.name}
               </option>

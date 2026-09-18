@@ -7,7 +7,6 @@ import { AuthGate } from "@/components/shell/auth-gate";
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
 import { NotificationsMenu } from "@/components/shell/notifications-menu";
 import { useAppState } from "@/lib/app-state";
-import { BUILDINGS } from "@/lib/mock-data";
 import { MOBILE_TABS, MORE_ITEMS, NAV_ITEMS } from "@/lib/nav";
 
 const TITLES = [...NAV_ITEMS, ...MORE_ITEMS, ...MOBILE_TABS];
@@ -24,13 +23,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { role, activeBuildingId } = useAppState();
+  const { buildings, role, activeBuildingId } = useAppState();
 
   const current = TITLES.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
   const buildingName =
-    BUILDINGS.find((b) => b.id === activeBuildingId)?.name ?? "";
+    buildings.find((b) => b.id === activeBuildingId)?.name ?? "";
   const scopeNote =
     role === "office-staff"
       ? `Scoped to ${buildingName}`

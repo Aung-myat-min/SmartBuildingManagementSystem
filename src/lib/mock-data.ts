@@ -28,9 +28,9 @@ import type {
 } from "./types";
 
 export const BUILDINGS: Building[] = [
-  { id: "b216", name: "Building 216" },
-  { id: "b209", name: "Building 209" },
-  { id: "jsq", name: "Junction Square" },
+  { id: "b216", name: "Building 216", code: "SITE 216" },
+  { id: "b209", name: "Building 209", code: "SITE 209" },
+  { id: "jsq", name: "Junction Square", code: "SITE JSQ" },
 ];
 
 export const BUILDING_META: Record<
@@ -226,16 +226,45 @@ export function buildingStats(buildingId: string) {
   };
 }
 
+// BUILDINGS and ROOMS above are the seed. The estate is editable from
+// Administration, so the live lists live in AppStateProvider and it pushes
+// them here — the same shim the sensor type registry uses, and for the same
+// reason: every consumer keeps calling the same accessors, so renaming a
+// building reaches every page instead of only the tab that renamed it.
+let estateSource: { buildings: Building[]; rooms: Room[] } = {
+  buildings: BUILDINGS,
+  rooms: ROOMS,
+};
+
+export function setEstateSource(next: {
+  buildings: Building[];
+  rooms: Room[];
+}): void {
+  estateSource = next;
+}
+
+/** Every building on the estate, as it stands now. */
+export function buildings(): Building[] {
+  return estateSource.buildings;
+}
+
+/** Every room on the estate, as it stands now. */
+export function rooms(): Room[] {
+  return estateSource.rooms;
+}
+
 export function roomsForBuilding(buildingId: string): Room[] {
-  return ROOMS.filter((r) => r.buildingId === buildingId);
+  return estateSource.rooms.filter((r) => r.buildingId === buildingId);
 }
 
 export function roomLabel(roomId: string): string {
-  return ROOMS.find((r) => r.id === roomId)?.roomNumber ?? roomId;
+  return estateSource.rooms.find((r) => r.id === roomId)?.roomNumber ?? roomId;
 }
 
 export function buildingName(buildingId: string): string {
-  return BUILDINGS.find((b) => b.id === buildingId)?.name ?? buildingId;
+  return (
+    estateSource.buildings.find((b) => b.id === buildingId)?.name ?? buildingId
+  );
 }
 
 // ---- Equipment types + registry ------------------------------------------

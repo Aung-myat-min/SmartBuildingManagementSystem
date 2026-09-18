@@ -30,12 +30,7 @@ import { useAppState } from "@/lib/app-state";
 import { kpiPasses } from "@/lib/derive";
 import { printToPdf, stampedFilename, toCsv } from "@/lib/export";
 import { formatDate, formatMmk, formatPeriod } from "@/lib/format";
-import {
-  BUILDINGS,
-  buildingName,
-  REPORTS,
-  reportDetail,
-} from "@/lib/mock-data";
+import { buildingName, REPORTS, reportDetail } from "@/lib/mock-data";
 import { canAccessReports, roleLabel } from "@/lib/permissions";
 import type {
   Report,
@@ -156,7 +151,7 @@ function downloadReportCsv(report: Report): void {
 }
 
 export default function ReportsPage() {
-  const { role, log } = useAppState();
+  const { buildings, role, log } = useAppState();
 
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState("all");
@@ -235,7 +230,7 @@ export default function ReportsPage() {
           className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
           <option value="all">All buildings</option>
-          {BUILDINGS.map((b) => (
+          {buildings.map((b) => (
             <option key={b.id} value={b.id}>
               {b.name}
             </option>
@@ -396,7 +391,7 @@ function GenerateReportSheet({
   onOpenChange: (open: boolean) => void;
   onGenerate: (r: Report) => void;
 }) {
-  const { currentUser } = useAppState();
+  const { buildings, currentUser } = useAppState();
   const [kind, setKind] = React.useState<ReportKind>("maintenance-performance");
   const [buildingId, setBuildingId] = React.useState("all");
   // A report covers whatever range someone picks, rather than the three
@@ -471,7 +466,7 @@ function GenerateReportSheet({
               className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
             >
               <option value="all">Whole estate</option>
-              {BUILDINGS.map((b) => (
+              {buildings.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
                 </option>

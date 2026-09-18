@@ -24,7 +24,7 @@ import { useLiveClock } from "@/hooks/use-live-clock";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { formatDayLabel, formatTime } from "@/lib/format";
-import { BUILDINGS, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
+import { LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
 import {
   canAccessLogBook,
   isBuildingLocked,
@@ -70,7 +70,7 @@ function dayLabel(iso: string) {
 }
 
 export default function LogBookPage() {
-  const { role, activeBuildingId, logBook } = useAppState();
+  const { buildings, role, activeBuildingId, logBook } = useAppState();
   const clock = useLiveClock();
   const [paused, setPaused] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -244,7 +244,7 @@ export default function LogBookPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All buildings</SelectItem>
-              {BUILDINGS.map((b) => (
+              {buildings.map((b) => (
                 <SelectItem key={b.id} value={b.id}>
                   {b.name}
                 </SelectItem>

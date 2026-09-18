@@ -3,6 +3,7 @@
 import * as React from "react";
 import { countOpenRequests } from "@/lib/derive";
 import {
+  BUILDINGS,
   buildingName,
   EQUIPMENT_UNITS,
   equipmentUnitLabel,
@@ -10,18 +11,22 @@ import {
   MAINTENANCE_REQUESTS,
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_STATUS,
+  ROOMS,
   roomLabel,
   SENSOR_TYPES,
   SENSORS,
   sensorType,
+  setEstateSource,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
 import type {
   AppUser,
+  Building,
   EnvironmentalSensor,
   EquipmentCondition,
   LogBookEntry,
   MaintenanceRequest,
+  Room,
   SensorAction,
   SensorStatusDef,
   SensorTypeDef,
@@ -189,6 +194,16 @@ export interface AppState {
   requestVerification: (id: string) => void;
   /** Forward one step, or back one step — never more, and the age never resets. */
   moveRequest: (id: string, direction: "next" | "prev") => void;
+  /** The estate as it stands, not as it was seeded. */
+  buildings: Building[];
+  rooms: Room[];
+  addBuilding: (building: Building) => void;
+  updateBuilding: (building: Building) => void;
+  /** Deletes the building and every room in it. */
+  deleteBuilding: (buildingId: string) => void;
+  addRoom: (room: Room) => void;
+  updateRoom: (room: Room) => void;
+  removeRoom: (roomId: string) => void;
   /** Every device still on the network — removed ones are already gone. */
   sensors: EnvironmentalSensor[];
   /** Takes a device off the network for this session. */
@@ -295,11 +310,20 @@ export function AppStateProvider({
     React.useState<SensorTypeDef[]>(SENSOR_TYPES);
   const [sessionLog, setSessionLog] = React.useState<LogBookEntry[]>([]);
   const [removedSensorIds, setRemovedSensorIds] = React.useState<string[]>([]);
+  // The estate is editable from Administration. Held here rather than on that
+  // page so a renamed building reaches every building filter in the app, not
+  // just the tab that renamed it.
+  const [estateBuildings, setEstateBuildings] =
+    React.useState<Building[]>(BUILDINGS);
+  const [estateRooms, setEstateRooms] = React.useState<Room[]>(ROOMS);
 
   // mock-data's sensorType/statusDef accessors read through this, so the page
   // sees an edit on the same render that made it. Assigning the current list
   // is idempotent, which is why it can sit in the render body.
   setSensorRegistrySource(sensorTypeRegistry);
+  // Same shim, same reason: roomLabel/buildingName/roomsForBuilding resolve
+  // through this, so no consumer has to know the estate can change.
+  setEstateSource({ buildings: estateBuildings, rooms: estateRooms });
 
   const setActiveBuildingId = React.useCallback(
     (id: string) => {
@@ -748,6 +772,36 @@ export function AppStateProvider({
     [patchType],
   );
 
+  // ---- Estate ---------------------------------------------------------------
+
+  const addBuilding = React.useCallback((building: Building) => {
+    setEstateBuildings((prev) => [...prev, building]);
+  }, []);
+
+  const updateBuilding = React.useCallback((next: Building) => {
+    setEstateBuildings((prev) =>
+      prev.map((b) => (b.id === next.id ? next : b)),
+    );
+  }, []);
+
+  /** Takes its rooms with it — a room cannot outlive the building it is in. */
+  const deleteBuilding = React.useCallback((buildingId: string) => {
+    setEstateBuildings((prev) => prev.filter((b) => b.id !== buildingId));
+    setEstateRooms((prev) => prev.filter((r) => r.buildingId !== buildingId));
+  }, []);
+
+  const addRoom = React.useCallback((room: Room) => {
+    setEstateRooms((prev) => [...prev, room]);
+  }, []);
+
+  const updateRoom = React.useCallback((next: Room) => {
+    setEstateRooms((prev) => prev.map((r) => (r.id === next.id ? next : r)));
+  }, []);
+
+  const removeRoom = React.useCallback((roomId: string) => {
+    setEstateRooms((prev) => prev.filter((r) => r.id !== roomId));
+  }, []);
+
   const removeSensor = React.useCallback(
     (sensorId: string) => {
       const sensor = SENSORS.find((s) => s.id === sensorId);
@@ -813,6 +867,14 @@ export function AppStateProvider({
       withdrawRequest,
       requestVerification,
       moveRequest,
+      buildings: estateBuildings,
+      rooms: estateRooms,
+      addBuilding,
+      updateBuilding,
+      deleteBuilding,
+      addRoom,
+      updateRoom,
+      removeRoom,
       sensors,
       removeSensor,
       sensorStatus,
@@ -851,6 +913,14 @@ export function AppStateProvider({
       withdrawRequest,
       requestVerification,
       moveRequest,
+      estateBuildings,
+      estateRooms,
+      addBuilding,
+      updateBuilding,
+      deleteBuilding,
+      addRoom,
+      updateRoom,
+      removeRoom,
       sensors,
       removeSensor,
       sensorStatus,

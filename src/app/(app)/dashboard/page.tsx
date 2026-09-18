@@ -18,7 +18,6 @@ import {
 import { formatAge, formatTime } from "@/lib/format";
 import {
   ATTENTION_ITEMS,
-  BUILDINGS,
   buildingName,
   buildingStats,
   EQUIPMENT,
@@ -53,6 +52,7 @@ const STATUS_TONE: Record<string, Tone> = {
 
 export default function DashboardPage() {
   const {
+    buildings,
     role,
     activeBuildingId,
     setActiveBuildingId,
@@ -65,8 +65,8 @@ export default function DashboardPage() {
   const clock = useLiveClock();
   const staff = !canAct(role);
   const visibleBuildings = staff
-    ? BUILDINGS.filter((b) => b.id === activeBuildingId)
-    : BUILDINGS;
+    ? buildings.filter((b) => b.id === activeBuildingId)
+    : buildings;
   const rooms = roomsForBuilding(activeBuildingId);
 
   const eqForBuilding = EQUIPMENT.filter(
@@ -128,7 +128,7 @@ export default function DashboardPage() {
                   onChange={(e) => setActiveBuildingId(e.target.value)}
                   className="border-border bg-card text-foreground rounded-md border px-2 py-1 text-[19px] font-semibold"
                 >
-                  {BUILDINGS.map((b) => (
+                  {buildings.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}
                     </option>
@@ -250,7 +250,7 @@ export default function DashboardPage() {
             <span className="text-[13px] font-semibold">Estate overview</span>
             <div className="flex-1" />
             <span className="text-muted-foreground text-[11px]">
-              {visibleBuildings.length} of {BUILDINGS.length} sites shown
+              {visibleBuildings.length} of {buildings.length} sites shown
             </span>
           </div>
           <div className="bg-surface-subtle border-border text-muted-foreground flex border-b px-4 py-2 font-mono text-[10px] tracking-wider">
