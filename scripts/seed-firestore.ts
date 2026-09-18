@@ -35,6 +35,7 @@ import {
   EQUIPMENT_HISTORY,
   EQUIPMENT_UNITS,
   LOG_BOOK,
+  MAINTENANCE_REQUESTS,
   ROOMS,
   SENSOR_TYPES,
   SENSORS,
@@ -123,6 +124,7 @@ async function main(): Promise<void> {
     await clear("sensors");
     await clear("equipmentUnits");
     await clear("equipmentHistory");
+    await clear("requests");
     console.log("");
   }
 
@@ -183,6 +185,11 @@ async function main(): Promise<void> {
   await writeAll(
     "equipmentHistory",
     EQUIPMENT_HISTORY.map(({ id, ...data }) => ({ id, data })),
+  );
+
+  await writeAll(
+    "requests",
+    MAINTENANCE_REQUESTS.map(({ id, ...data }) => ({ id, data })),
   );
 
   await signOut(auth);

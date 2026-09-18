@@ -15,6 +15,7 @@ import type {
   EquipmentHistoryEvent,
   EquipmentUnit,
   LogBookEntry,
+  MaintenanceRequest,
   Room,
   SensorTypeDef,
 } from "@/lib/types";
@@ -150,5 +151,31 @@ export function toEquipmentHistory(
     at: d.at ?? "",
     summary: d.summary ?? "",
     actorName: d.actorName ?? "System",
+  };
+}
+
+export function toRequest(
+  id: string,
+  data: Record<string, unknown>,
+): MaintenanceRequest {
+  const d = data as Partial<MaintenanceRequest>;
+  return {
+    id,
+    buildingId: d.buildingId ?? "",
+    roomId: d.roomId ?? "",
+    equipmentId: d.equipmentId ?? "",
+    issue: d.issue ?? "",
+    priority: d.priority ?? "normal",
+    // Approval is the first step, so an unreadable status is the one the
+    // request would have started at rather than one further along.
+    status: d.status ?? "requested",
+    submittedBy: d.submittedBy ?? "",
+    submittedByName: d.submittedByName ?? "",
+    submittedAt: d.submittedAt ?? "",
+    updatedAt: d.updatedAt ?? d.submittedAt ?? "",
+    notes: d.notes,
+    declineNote: d.declineNote,
+    verificationRequested: d.verificationRequested,
+    withdrawn: d.withdrawn,
   };
 }

@@ -26,6 +26,7 @@ import {
   isEscalated,
   nextSequentialId,
 } from "@/lib/derive";
+import type { WriteResult } from "@/lib/firestore-store";
 import { formatAge, formatStamp } from "@/lib/format";
 import {
   buildingName,
@@ -122,6 +123,7 @@ export default function RequestsPage() {
     declineRequest,
     withdrawRequest,
     requestVerification,
+    requestIds,
     addRequest,
     currentUser,
   } = useAppState();
@@ -193,7 +195,11 @@ export default function RequestsPage() {
       if (!result.confirmed) return;
     }
 
-    moveRequest(r.id, direction);
+    const written = await moveRequest(r.id, direction);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     toast.success(`${r.id} → ${STATUS_LABEL[target]}`);
   };
 
@@ -210,7 +216,11 @@ export default function RequestsPage() {
       reasonPlaceholder: "What needs to change before this can be approved?",
     });
     if (!result.confirmed || !result.reason) return;
-    declineRequest(r.id, result.reason);
+    const written = await declineRequest(r.id, result.reason);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     toast.success(`${r.id} sent back to ${r.submittedByName}`);
   };
 
@@ -223,12 +233,20 @@ export default function RequestsPage() {
       confirmLabel: "Withdraw request",
     });
     if (!result.confirmed) return;
-    withdrawRequest(r.id);
+    const written = await withdrawRequest(r.id);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     toast.success(`${r.id} withdrawn`);
   };
 
-  const verify = (r: MaintenanceRequest) => {
-    requestVerification(r.id);
+  const verify = async (r: MaintenanceRequest) => {
+    const written = await requestVerification(r.id);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     toast.success(`${r.id} — close-out requested`);
   };
 
@@ -559,11 +577,8 @@ export default function RequestsPage() {
         open={newOpen}
         onOpenChange={setNewOpen}
         defaultBuildingId={locked ? activeBuildingId : buildings[0].id}
-        existingIds={scopedRequests.map((r) => r.id)}
-        onCreate={(request) => {
-          addRequest(request);
-          toast.success(`${request.id} raised`);
-        }}
+        existingIds={requestIds}
+        onCreate={addRequest}
         submittedBy={currentUser}
       />
     </div>
@@ -758,7 +773,7 @@ function NewRequestDrawer({
   /** Every id already in use, so a new one cannot collide with one of them. */
   existingIds: string[];
   submittedBy: { uid: string; name: string };
-  onCreate: (request: MaintenanceRequest) => void;
+  onCreate: (request: MaintenanceRequest) => Promise<WriteResult>;
 }) {
   const { buildings } = useAppState();
   const [buildingId, setBuildingId] = React.useState(defaultBuildingId);
@@ -789,17 +804,18 @@ function NewRequestDrawer({
       description="Raised against a specific unit so the register and the request stay in step."
       submitLabel="Raise request"
       error={error}
-      onSubmit={() => {
+      onSubmit={async () => {
         if (issue.trim().length < 8) {
           setError("Describe the fault in a sentence so it can be triaged.");
           return;
         }
         const now = new Date().toISOString();
-        onCreate({
-          id: nextSequentialId("REQ", existingIds, 4200),
+        const id = nextSequentialId("REQ", existingIds, 4200);
+        const written = await onCreate({
+          id,
           buildingId,
           roomId,
-          equipmentId: equipmentId || units[0]?.tag || "—",
+          equipmentId: equipmentId || units[0]?.id || "—",
           issue: issue.trim(),
           priority,
           status: "requested",
@@ -808,6 +824,11 @@ function NewRequestDrawer({
           submittedAt: now,
           updatedAt: now,
         });
+        if (!written.ok) {
+          setError(written.message);
+          return;
+        }
+        toast.success(`${id} raised`);
         onOpenChange(false);
       }}
     >
@@ -857,7 +878,7 @@ function NewRequestDrawer({
             <option value="">No units in this room</option>
           )}
           {units.map((u) => (
-            <option key={u.id} value={u.tag}>
+            <option key={u.id} value={u.id}>
               {u.tag} · {equipmentUnitLabel(u)}
             </option>
           ))}

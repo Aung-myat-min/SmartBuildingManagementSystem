@@ -28,7 +28,6 @@ import { appendLogEntry, type LogDraft, useLogBook } from "@/lib/logbook-store";
 import {
   buildingName,
   equipmentUnitLabel,
-  MAINTENANCE_REQUESTS,
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_STATUS,
   roomLabel,
@@ -37,6 +36,12 @@ import {
   setEstateSource,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
+import {
+  CLEAR,
+  createRequest,
+  patchRequestWrite,
+  useRequests,
+} from "@/lib/requests-store";
 import { useSensorTypes, writeSensorType } from "@/lib/sensor-types-store";
 import {
   createSensor,
@@ -121,14 +126,6 @@ function validateType(type: SensorTypeDef): RegistryResult {
   return OK;
 }
 
-/** What an in-session action can change about a request. */
-interface RequestPatch {
-  status?: MaintenanceRequest["status"];
-  declineNote?: string;
-  verificationRequested?: boolean;
-  withdrawn?: boolean;
-}
-
 export interface Notification {
   id: string;
   tone: "danger" | "warning" | "info" | "neutral";
@@ -198,16 +195,21 @@ export interface AppState {
    * cards and the dashboard tiles all read this, so they cannot disagree.
    */
   openRequestCount: number;
-  addRequest: (request: MaintenanceRequest) => void;
-  requestStatus: (req: MaintenanceRequest) => MaintenanceRequest["status"];
+  /**
+   * Every request id in the collection, withdrawn ones included — what a new
+   * id has to avoid. `requests` is not enough: it drops withdrawn requests,
+   * and the id is the document id, so re-minting one would overwrite it.
+   */
+  requestIds: string[];
+  addRequest: (request: MaintenanceRequest) => Promise<WriteResult>;
   /** Attaches the reason an approver sent a request back. The status holds. */
-  declineRequest: (id: string, reason: string) => void;
+  declineRequest: (id: string, reason: string) => Promise<WriteResult>;
   /** Its submitter pulls it back before approval; it leaves every list. */
-  withdrawRequest: (id: string) => void;
+  withdrawRequest: (id: string) => Promise<WriteResult>;
   /** Its submitter says the resolved work looks done. A flag, not a status. */
-  requestVerification: (id: string) => void;
+  requestVerification: (id: string) => Promise<WriteResult>;
   /** Forward one step, or back one step — never more, and the age never resets. */
-  moveRequest: (id: string, direction: "next" | "prev") => void;
+  moveRequest: (id: string, direction: "next" | "prev") => Promise<WriteResult>;
   /** The estate as it stands, not as it was seeded. */
   buildings: Building[];
   rooms: Room[];
@@ -354,15 +356,6 @@ export function AppStateProvider({
   );
   const [notifications, setNotifications] =
     React.useState<Notification[]>(BASE_NOTIFICATIONS);
-  // A request now carries more in-session change than a status: the reason an
-  // approver sent it back, its submitter's "this looks done", and whether it
-  // was withdrawn before approval. One patch per request keeps them together.
-  const [requestPatches, setRequestPatches] = React.useState<
-    Record<string, RequestPatch>
-  >({});
-  const [createdRequests, setCreatedRequests] = React.useState<
-    MaintenanceRequest[]
-  >([]);
   // The registry is a collection now. Archiving is still the product's
   // "delete", so an archived type keeps resolving labels on the records that
   // name it — the subscription carries archived rows and the pages filter them.
@@ -428,19 +421,24 @@ export function AppStateProvider({
     [user],
   );
 
-  const requestStatus = React.useCallback(
-    (req: MaintenanceRequest) => requestPatches[req.id]?.status ?? req.status,
-    [requestPatches],
-  );
+  const {
+    items: allRequests,
+    loading: requestsLoading,
+    error: requestsError,
+  } = useRequests();
 
   // The one resolved list. A withdrawn request drops out here rather than
-  // being filtered again on every screen, so no count can disagree.
+  // being filtered again on every screen, so no count can disagree. It stays
+  // a field rather than a delete: withdrawing is a thing that happened, and
+  // the Log Book entry recording it has to still resolve.
   const requests = React.useMemo(
-    () =>
-      [...createdRequests, ...MAINTENANCE_REQUESTS]
-        .map((r) => ({ ...r, ...requestPatches[r.id] }))
-        .filter((r) => !r.withdrawn),
-    [createdRequests, requestPatches],
+    () => allRequests.filter((r) => !r.withdrawn),
+    [allRequests],
+  );
+
+  const requestIds = React.useMemo(
+    () => allRequests.map((r) => r.id),
+    [allRequests],
   );
 
   const scopedRequests = React.useMemo(
@@ -457,8 +455,9 @@ export function AppStateProvider({
   );
 
   const addRequest = React.useCallback(
-    (request: MaintenanceRequest) => {
-      setCreatedRequests((prev) => [request, ...prev]);
+    async (request: MaintenanceRequest) => {
+      const written = await createRequest(request);
+      if (!written.ok) return written;
       log({
         source: "request",
         actionType: "request-created",
@@ -469,36 +468,32 @@ export function AppStateProvider({
         buildingId: request.buildingId,
         refId: request.id,
       });
+      return written;
     },
     [log],
   );
 
-  const patchRequest = React.useCallback((id: string, patch: RequestPatch) => {
-    setRequestPatches((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], ...patch },
-    }));
-  }, []);
+  const findRequest = React.useCallback(
+    (id: string) => allRequests.find((r) => r.id === id),
+    [allRequests],
+  );
 
   const moveRequest = React.useCallback(
-    (id: string, direction: "next" | "prev") => {
-      const base = [...createdRequests, ...MAINTENANCE_REQUESTS].find(
-        (r) => r.id === id,
-      );
-      const current = requestPatches[id]?.status ?? base?.status ?? "requested";
+    async (id: string, direction: "next" | "prev") => {
+      const base = findRequest(id);
+      const current = base?.status ?? "requested";
       const table =
         direction === "next" ? REQUEST_NEXT_STATUS : REQUEST_PREV_STATUS;
       const target = table[current];
-      if (!target) return;
-      setRequestPatches((prev) => ({
-        ...prev,
-        [id]: {
-          ...prev[id],
-          status: target,
-          // Approving answers the note that sent it back, so the note goes.
-          ...(current === "requested" ? { declineNote: undefined } : {}),
-        },
-      }));
+      if (!target) return { ok: false as const, message: "Nowhere to move." };
+      const written = await patchRequestWrite(id, {
+        status: target,
+        updatedAt: new Date().toISOString(),
+        // Approving answers the note that sent it back, so the note goes —
+        // and it has to go explicitly, because `undefined` is ignored.
+        ...(current === "requested" ? { declineNote: CLEAR } : {}),
+      });
+      if (!written.ok) return written;
       log({
         source: "request",
         actionType: "request-status-changed",
@@ -512,21 +507,17 @@ export function AppStateProvider({
         buildingId: base?.buildingId,
         refId: id,
       });
+      return written;
     },
-    [createdRequests, requestPatches, log],
-  );
-
-  const findRequest = React.useCallback(
-    (id: string) =>
-      [...createdRequests, ...MAINTENANCE_REQUESTS].find((r) => r.id === id),
-    [createdRequests],
+    [findRequest, log],
   );
 
   /** Sends a request back without moving it: the status holds, the reason lands. */
   const declineRequest = React.useCallback(
-    (id: string, reason: string) => {
-      patchRequest(id, { declineNote: reason });
+    async (id: string, reason: string) => {
       const base = findRequest(id);
+      const written = await patchRequestWrite(id, { declineNote: reason });
+      if (!written.ok) return written;
       log({
         source: "request",
         actionType: "request-declined",
@@ -537,15 +528,17 @@ export function AppStateProvider({
         buildingId: base?.buildingId,
         refId: id,
       });
+      return written;
     },
-    [patchRequest, findRequest, log],
+    [findRequest, log],
   );
 
   /** Pulled back by its submitter before approval — it leaves every list. */
   const withdrawRequest = React.useCallback(
-    (id: string) => {
-      patchRequest(id, { withdrawn: true });
+    async (id: string) => {
       const base = findRequest(id);
+      const written = await patchRequestWrite(id, { withdrawn: true });
+      if (!written.ok) return written;
       log({
         source: "request",
         actionType: "request-withdrawn",
@@ -556,15 +549,19 @@ export function AppStateProvider({
         buildingId: base?.buildingId,
         refId: id,
       });
+      return written;
     },
-    [patchRequest, findRequest, log],
+    [findRequest, log],
   );
 
   /** The submitter asks for a close-out; an approver still presses it. */
   const requestVerification = React.useCallback(
-    (id: string) => {
-      patchRequest(id, { verificationRequested: true });
+    async (id: string) => {
       const base = findRequest(id);
+      const written = await patchRequestWrite(id, {
+        verificationRequested: true,
+      });
+      if (!written.ok) return written;
       log({
         source: "request",
         actionType: "request-verification-requested",
@@ -575,8 +572,9 @@ export function AppStateProvider({
         buildingId: base?.buildingId,
         refId: id,
       });
+      return written;
     },
-    [patchRequest, findRequest, log],
+    [findRequest, log],
   );
 
   /**
@@ -1131,8 +1129,8 @@ export function AppStateProvider({
       requests,
       scopedRequests,
       openRequestCount,
+      requestIds,
       addRequest,
-      requestStatus,
       declineRequest,
       withdrawRequest,
       requestVerification,
@@ -1157,13 +1155,15 @@ export function AppStateProvider({
         roomsLoading ||
         sensorTypesLoading ||
         sensorsLoading ||
-        unitsLoading,
+        unitsLoading ||
+        requestsLoading,
       dataError:
         buildingsError ??
         roomsError ??
         sensorTypesError ??
         sensorsError ??
         unitsError ??
+        requestsError ??
         logBookError,
       log,
       sensorTypeRegistry,
@@ -1197,8 +1197,8 @@ export function AppStateProvider({
       requests,
       scopedRequests,
       openRequestCount,
+      requestIds,
       addRequest,
-      requestStatus,
       declineRequest,
       withdrawRequest,
       requestVerification,
@@ -1226,6 +1226,8 @@ export function AppStateProvider({
       sensorsError,
       unitsLoading,
       unitsError,
+      requestsLoading,
+      requestsError,
       buildingsError,
       roomsLoading,
       roomsError,
