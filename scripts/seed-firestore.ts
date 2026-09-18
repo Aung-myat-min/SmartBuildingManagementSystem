@@ -29,7 +29,13 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
-import { BUILDINGS, LOG_BOOK, ROOMS, SENSOR_TYPES } from "../src/lib/mock-data";
+import {
+  BUILDINGS,
+  LOG_BOOK,
+  ROOMS,
+  SENSOR_TYPES,
+  SENSORS,
+} from "../src/lib/mock-data";
 import { ACCOUNTS, DEV_PASSWORD } from "./accounts.mjs";
 
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -111,6 +117,7 @@ async function main(): Promise<void> {
     await clear("buildings");
     await clear("rooms");
     await clear("sensorTypes");
+    await clear("sensors");
     console.log("");
   }
 
@@ -142,6 +149,17 @@ async function main(): Promise<void> {
   await writeAll(
     "sensorTypes",
     SENSOR_TYPES.map(({ id, ...data }) => ({ id, data })),
+  );
+
+  // `statusChangedAt` is seeded from the last report: the corpus has no
+  // record of when a device entered its status, and dating it from the report
+  // is the only answer that is not invented.
+  await writeAll(
+    "sensors",
+    SENSORS.map(({ id, ...data }) => ({
+      id,
+      data: { ...data, statusChangedAt: data.updatedAt },
+    })),
   );
 
   await signOut(auth);

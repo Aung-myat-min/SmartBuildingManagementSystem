@@ -25,7 +25,6 @@ import {
   powerSeries,
   roomLabel,
   roomsForBuilding,
-  SENSORS,
   sensorType,
   statusDef,
 } from "@/lib/mock-data";
@@ -57,8 +56,7 @@ export default function DashboardPage() {
     role,
     activeBuildingId,
     setActiveBuildingId,
-    sensorStatus,
-    sensorChangedAt,
+    sensors,
     scopedRequests,
     moveRequest,
     logBook,
@@ -92,15 +90,15 @@ export default function DashboardPage() {
 
   // Derived from real sensor state rather than a scripted timer: whatever is
   // in an alarm status right now, in the building being looked at.
-  const alarming = SENSORS.filter(
+  const alarming = sensors.filter(
     (s) =>
       s.buildingId === activeBuildingId &&
-      (statusDef(s.typeId, sensorStatus(s.id, s.status))?.isAlarm ?? false),
+      (statusDef(s.typeId, s.status)?.isAlarm ?? false),
   );
   const alarm = alarming[0];
   const buildingAlarm = alarming.length > 0;
   const alarmAge = alarm
-    ? formatAge(sensorChangedAt(alarm.id, alarm.updatedAt))
+    ? formatAge(alarm.statusChangedAt ?? alarm.updatedAt)
     : "";
 
   const openRequests = scopedRequests.filter((r) => isRequestOpen(r.status));

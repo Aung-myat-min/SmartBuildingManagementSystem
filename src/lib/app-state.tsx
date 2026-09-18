@@ -23,13 +23,19 @@ import {
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_STATUS,
   roomLabel,
-  SENSORS,
   sensorType,
   setAssetSource,
   setEstateSource,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
 import { useSensorTypes, writeSensorType } from "@/lib/sensor-types-store";
+import {
+  createSensor,
+  deleteSensor,
+  updateSensor,
+  useSensors,
+  writeSensorStatus,
+} from "@/lib/sensors-store";
 import type {
   AppUser,
   Building,
@@ -204,18 +210,17 @@ export interface AppState {
   addRoom: (room: Room) => Promise<WriteResult>;
   updateRoom: (room: Room) => Promise<WriteResult>;
   removeRoom: (roomId: string) => Promise<WriteResult>;
-  /** Every device still on the network — removed ones are already gone. */
+  /** Every device on the network. */
   sensors: EnvironmentalSensor[];
-  /** Takes a device off the network for this session. */
-  removeSensor: (sensorId: string) => void;
-  sensorStatus: (sensorId: string, fallback: string) => string;
-  /**
-   * When the sensor entered its current status — the override's own stamp
-   * once it has been actioned here, the record's last report before that.
-   * Statuses that change tone with age are measured from this, not updatedAt.
-   */
-  sensorChangedAt: (sensorId: string, fallback: string) => string;
-  setSensorStatus: (sensorId: string, status: string) => void;
+  addSensor: (sensor: EnvironmentalSensor) => Promise<WriteResult>;
+  /** Registration only: a device's id is frozen once it is on the network. */
+  editSensor: (
+    sensorId: string,
+    patch: Partial<Omit<EnvironmentalSensor, "id">>,
+  ) => Promise<WriteResult>;
+  /** Takes a device off the network for good. */
+  removeSensor: (sensorId: string) => Promise<WriteResult>;
+  setSensorStatus: (sensorId: string, status: string) => Promise<WriteResult>;
   /**
    * The Log Book: what this session wrote, newest first, in front of the seed
    * entries. Every action in the app lands here.
@@ -316,11 +321,6 @@ export function AppStateProvider({
   const [createdRequests, setCreatedRequests] = React.useState<
     MaintenanceRequest[]
   >([]);
-  // An override carries the moment it was made, so a door unlocked here
-  // starts its own clock rather than inheriting the record's last report.
-  const [sensorOverrides, setSensorOverrides] = React.useState<
-    Record<string, { status: string; at: string }>
-  >({});
   const [equipmentOverrides, setEquipmentOverrides] = React.useState<
     Record<string, EquipmentCondition>
   >({});
@@ -339,7 +339,6 @@ export function AppStateProvider({
     loading: logBookLoading,
     error: logBookError,
   } = useLogBook();
-  const [removedSensorIds, setRemovedSensorIds] = React.useState<string[]>([]);
   // The estate is editable from Administration and now lives in Firestore, so
   // a renamed building reaches every building filter in the app — and every
   // other open tab — rather than just the tab that renamed it.
@@ -547,10 +546,11 @@ export function AppStateProvider({
    * type registry's "N sensors use this type" guard cannot disagree about what
    * still exists.
    */
-  const sensors = React.useMemo(
-    () => SENSORS.filter((s) => !removedSensorIds.includes(s.id)),
-    [removedSensorIds],
-  );
+  const {
+    items: sensors,
+    loading: sensorsLoading,
+    error: sensorsError,
+  } = useSensors();
 
   // The third holder, beside the estate and the sensor registry:
   // sensorForEquipment / equipmentForSensor / buildingStats are module
@@ -558,28 +558,17 @@ export function AppStateProvider({
   // answering for them after everything else went live.
   setAssetSource({ units: EQUIPMENT_UNITS, sensors });
 
-  const sensorStatus = React.useCallback(
-    (sensorId: string, fallback: string) => {
-      const override = sensorOverrides[sensorId];
-      if (override) return override.status;
-      return fallback;
-    },
-    [sensorOverrides],
-  );
-
-  const sensorChangedAt = React.useCallback(
-    (sensorId: string, fallback: string) =>
-      sensorOverrides[sensorId]?.at ?? fallback,
-    [sensorOverrides],
-  );
-
   const setSensorStatus = React.useCallback(
-    (sensorId: string, status: string) => {
-      setSensorOverrides((prev) => ({
-        ...prev,
-        [sensorId]: { status, at: new Date().toISOString() },
-      }));
-      const sensor = SENSORS.find((s) => s.id === sensorId);
+    async (sensorId: string, status: string) => {
+      const sensor = sensors.find((s) => s.id === sensorId);
+      // The stamp goes in with the status, not after it: a status whose tone
+      // changes with age is measured from it, so the two are one write.
+      const written = await writeSensorStatus(
+        sensorId,
+        status,
+        new Date().toISOString(),
+      );
+      if (!written.ok) return written;
       const type = sensor ? sensorType(sensor.typeId) : undefined;
       const def = type?.statuses.find((st) => st.id === status);
       log({
@@ -594,8 +583,9 @@ export function AppStateProvider({
         buildingId: sensor?.buildingId,
         refId: sensorId,
       });
+      return written;
     },
-    [log],
+    [log, sensors],
   );
 
   // ---- Sensor type registry ------------------------------------------------
@@ -603,15 +593,12 @@ export function AppStateProvider({
   // Every guard below is about records that already point at what is being
   // changed. The registry is free to grow; it is not free to strand a sensor.
 
-  /** Sensors currently sitting in a status, overrides counted. */
+  /** Sensors currently sitting in a status. */
   const sensorsInStatus = React.useCallback(
     (typeId: string, statusId: string) =>
-      sensors.filter(
-        (s) =>
-          s.typeId === typeId &&
-          (sensorOverrides[s.id]?.status ?? s.status) === statusId,
-      ).length,
-    [sensorOverrides, sensors],
+      sensors.filter((s) => s.typeId === typeId && s.status === statusId)
+        .length,
+    [sensors],
   );
 
   // Validation has to answer the caller now, not on the next render, so the
@@ -846,10 +833,53 @@ export function AppStateProvider({
     [],
   );
 
+  const addSensor = React.useCallback(
+    async (sensor: EnvironmentalSensor) => {
+      const written = await createSensor(sensor);
+      if (!written.ok) return written;
+      log({
+        source: "sensor",
+        actionType: "sensor-status-changed",
+        title: "Sensor registered",
+        detail: `${sensor.id} — ${sensorType(sensor.typeId)?.label ?? sensor.typeId} in ${roomLabel(sensor.roomId)}, ${buildingName(sensor.buildingId)}.`,
+        targetType: "sensor",
+        targetId: sensor.id,
+        buildingId: sensor.buildingId,
+        refId: sensor.id,
+      });
+      return written;
+    },
+    [log],
+  );
+
+  const editSensor = React.useCallback(
+    async (
+      sensorId: string,
+      patch: Partial<Omit<EnvironmentalSensor, "id">>,
+    ) => {
+      const written = await updateSensor(sensorId, patch);
+      if (!written.ok) return written;
+      const next = { ...sensors.find((s) => s.id === sensorId), ...patch };
+      log({
+        source: "sensor",
+        actionType: "sensor-status-changed",
+        title: "Sensor registration edited",
+        detail: `${sensorId} — ${roomLabel(next.roomId ?? "")}, ${buildingName(next.buildingId ?? "")}.`,
+        targetType: "sensor",
+        targetId: sensorId,
+        buildingId: next.buildingId,
+        refId: sensorId,
+      });
+      return written;
+    },
+    [log, sensors],
+  );
+
   const removeSensor = React.useCallback(
-    (sensorId: string) => {
-      const sensor = SENSORS.find((s) => s.id === sensorId);
-      setRemovedSensorIds((prev) => [...prev, sensorId]);
+    async (sensorId: string) => {
+      const sensor = sensors.find((s) => s.id === sensorId);
+      const written = await deleteSensor(sensorId);
+      if (!written.ok) return written;
       log({
         source: "sensor",
         actionType: "sensor-status-changed",
@@ -862,8 +892,9 @@ export function AppStateProvider({
         buildingId: sensor?.buildingId,
         refId: sensorId,
       });
+      return written;
     },
-    [log],
+    [log, sensors],
   );
 
   const equipmentCondition = React.useCallback(
@@ -920,15 +951,23 @@ export function AppStateProvider({
       updateRoom,
       removeRoom,
       sensors,
+      addSensor,
+      editSensor,
       removeSensor,
-      sensorStatus,
-      sensorChangedAt,
       setSensorStatus,
       logBook,
       logBookLoading,
-      dataLoading: buildingsLoading || roomsLoading || sensorTypesLoading,
+      dataLoading:
+        buildingsLoading ||
+        roomsLoading ||
+        sensorTypesLoading ||
+        sensorsLoading,
       dataError:
-        buildingsError ?? roomsError ?? sensorTypesError ?? logBookError,
+        buildingsError ??
+        roomsError ??
+        sensorTypesError ??
+        sensorsError ??
+        logBookError,
       log,
       sensorTypeRegistry,
       addSensorType,
@@ -970,9 +1009,9 @@ export function AppStateProvider({
       updateRoom,
       removeRoom,
       sensors,
+      addSensor,
+      editSensor,
       removeSensor,
-      sensorStatus,
-      sensorChangedAt,
       setSensorStatus,
       logBook,
       logBookLoading,
@@ -980,6 +1019,8 @@ export function AppStateProvider({
       buildingsLoading,
       sensorTypesLoading,
       sensorTypesError,
+      sensorsLoading,
+      sensorsError,
       buildingsError,
       roomsLoading,
       roomsError,

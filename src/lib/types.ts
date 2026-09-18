@@ -220,6 +220,14 @@ export interface EnvironmentalSensor {
    * Sensor equipment record. Two records, one physical device.
    */
   linkedEquipmentId?: string;
+  /**
+   * When the sensor entered its current status, as distinct from when it last
+   * reported. A status whose tone changes with age is measured from this — an
+   * unlocked door is blue for thirty minutes and amber after — so a routine
+   * report must not restart the clock. Absent on a device that has never
+   * changed status, where `updatedAt` is the best answer there is.
+   */
+  statusChangedAt?: string;
   updatedAt: string;
 }
 

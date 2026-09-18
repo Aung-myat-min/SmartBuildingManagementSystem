@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toLogEntry, toSensorType } from "./store-mappers";
+import { toLogEntry, toSensor, toSensorType } from "./store-mappers";
 
 /** A Firestore Timestamp, duck-typed — the mapper only ever calls toDate(). */
 const stamp = (iso: string) => ({ toDate: () => new Date(iso) });
@@ -81,5 +81,30 @@ describe("toSensorType", () => {
     expect(type.icon).toBe("activity");
     expect(type.archived).toBe(false);
     expect(type.label).toBe("bare");
+  });
+});
+
+describe("toSensor", () => {
+  it("keeps statusChangedAt distinct from the last report", () => {
+    // They are different questions. A routine report must not restart the
+    // clock a tone-with-age status is measured against.
+    const sensor = toSensor("DL-209-02", {
+      buildingId: "b209",
+      roomId: "r-209-01",
+      typeId: "door-lock",
+      status: "unlocked",
+      statusChangedAt: "2026-09-09T20:00:00Z",
+      updatedAt: "2026-09-09T20:38:00Z",
+    });
+    expect(sensor.statusChangedAt).toBe("2026-09-09T20:00:00Z");
+    expect(sensor.updatedAt).toBe("2026-09-09T20:38:00Z");
+  });
+
+  it("leaves statusChangedAt absent on a device that never changed", () => {
+    const sensor = toSensor("FD-216-08", {
+      updatedAt: "2026-09-09T20:38:00Z",
+    });
+    expect(sensor.statusChangedAt).toBeUndefined();
+    expect(sensor.id).toBe("FD-216-08");
   });
 });

@@ -9,7 +9,13 @@
 // ============================================================================
 
 import type { Timestamp } from "firebase/firestore";
-import type { Building, LogBookEntry, Room, SensorTypeDef } from "@/lib/types";
+import type {
+  Building,
+  EnvironmentalSensor,
+  LogBookEntry,
+  Room,
+  SensorTypeDef,
+} from "@/lib/types";
 
 /**
  * A Firestore `Timestamp` as an ISO string. ISO everywhere above this line —
@@ -86,5 +92,22 @@ export function toSensorType(
       : [{ id: "unknown", label: "Unknown", tone: "neutral", isAlarm: false }],
     actions: d.actions ?? [],
     archived: d.archived ?? false,
+  };
+}
+
+export function toSensor(
+  id: string,
+  data: Record<string, unknown>,
+): EnvironmentalSensor {
+  const d = data as Partial<EnvironmentalSensor>;
+  return {
+    id,
+    buildingId: d.buildingId ?? "",
+    roomId: d.roomId ?? "",
+    typeId: d.typeId ?? "",
+    status: d.status ?? "",
+    linkedEquipmentId: d.linkedEquipmentId,
+    statusChangedAt: d.statusChangedAt,
+    updatedAt: d.updatedAt ?? new Date().toISOString(),
   };
 }

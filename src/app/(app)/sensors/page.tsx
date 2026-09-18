@@ -116,8 +116,6 @@ function SensorsView() {
     activeBuildingId,
     sensors,
     removeSensor,
-    sensorStatus,
-    sensorChangedAt,
     setSensorStatus,
   } = useAppState();
   const confirm = useConfirm();
@@ -137,14 +135,11 @@ function SensorsView() {
     if (deviceParam) setOpenId(deviceParam);
   }, [deviceParam]);
 
-  const statusOf = React.useCallback(
-    (s: EnvironmentalSensor) => sensorStatus(s.id, s.status),
-    [sensorStatus],
-  );
-
+  // A device that has never changed status has no `statusChangedAt`, and its
+  // last report is the best answer there is to "since when".
   const changedAtOf = React.useCallback(
-    (s: EnvironmentalSensor) => sensorChangedAt(s.id, s.updatedAt),
-    [sensorChangedAt],
+    (s: EnvironmentalSensor) => s.statusChangedAt ?? s.updatedAt,
+    [],
   );
 
   // The clock only exists after mount, and it re-reads every second, which is
@@ -153,8 +148,8 @@ function SensorsView() {
 
   const viewOf = React.useCallback(
     (s: EnvironmentalSensor) =>
-      statusView(s.typeId, statusOf(s), changedAtOf(s), nowMs),
-    [statusOf, changedAtOf, nowMs],
+      statusView(s.typeId, s.status, changedAtOf(s), nowMs),
+    [changedAtOf, nowMs],
   );
 
   const inScope = sensors.filter(
@@ -166,15 +161,13 @@ function SensorsView() {
     // TODO: "offline" is the one status id this page still knows by name.
     // It needs a registry flag of its own (isOffline, beside isAlarm) before
     // a runtime-created type can have a not-reporting state.
-    if (filter === "offline") return isSensorOffline(statusOf(s));
+    if (filter === "offline") return isSensorOffline(s.status);
     return true;
   };
 
   const visible = inScope.filter(matchesFilter);
   const alarmCount = inScope.filter((s) => viewOf(s).alarm).length;
-  const offlineCount = inScope.filter((s) =>
-    isSensorOffline(statusOf(s)),
-  ).length;
+  const offlineCount = inScope.filter((s) => isSensorOffline(s.status)).length;
 
   const visibleBuildings = buildings.filter(
     (b) => !locked || b.id === activeBuildingId,
@@ -196,7 +189,11 @@ function SensorsView() {
       requireReason: action.requiresNote,
     });
     if (!result.confirmed) return;
-    setSensorStatus(s.id, action.resultStatus);
+    const written = await setSensorStatus(s.id, action.resultStatus);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     toast.success(
       `${s.id} → ${statusDef(s.typeId, action.resultStatus)?.label ?? action.resultStatus}`,
     );
@@ -213,7 +210,11 @@ function SensorsView() {
       requireReason: true,
     });
     if (!result.confirmed) return;
-    removeSensor(s.id);
+    const written = await removeSensor(s.id);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     setOpenId(null);
     toast.success(`${s.id} removed from the network`);
   };
@@ -354,7 +355,7 @@ function SensorsView() {
                       </div>
 
                       {items.map((s) => {
-                        const status = statusOf(s);
+                        const status = s.status;
                         const view = viewOf(s);
                         const alarm = view.alarm;
                         const offline = isSensorOffline(status);
@@ -455,7 +456,7 @@ function SensorsView() {
 
       <SensorDrawer
         sensor={selected}
-        status={selected ? statusOf(selected) : ""}
+        status={selected?.status ?? ""}
         view={
           selected
             ? viewOf(selected)
@@ -506,7 +507,7 @@ function SensorDrawer({
 }) {
   // Editing stays in this drawer rather than stacking a second one on top of
   // the record being edited.
-  const { log } = useAppState();
+  const { editSensor } = useAppState();
   const [editing, setEditing] = React.useState(false);
   const fields = useSensorFields(sensor, editing);
 
@@ -566,22 +567,23 @@ function SensorDrawer({
             submitLabel="Save changes"
             error={fields.error}
             onCancel={() => setEditing(false)}
-            onSubmit={() => {
-              if (fields.name.trim().length === 0) {
-                fields.setError("A device needs a name.");
+            onSubmit={async () => {
+              if (fields.roomId.length === 0) {
+                fields.setError("A device needs a room.");
                 return;
               }
-              log({
-                source: "sensor",
-                actionType: "sensor-status-changed",
-                title: "Sensor registration edited",
-                detail: `${sensor.id} — ${roomLabel(sensor.roomId)}, ${buildingName(sensor.buildingId)}.`,
-                targetType: "sensor",
-                targetId: sensor.id,
-                buildingId: sensor.buildingId,
-                refId: sensor.id,
+              // The id is not in the patch: it is the document id, and the
+              // unit this device shares a body with points at it by name.
+              const written = await editSensor(sensor.id, {
+                buildingId: fields.buildingId,
+                roomId: fields.roomId,
+                linkedEquipmentId: fields.linkTag || undefined,
               });
-              toast.success(`${fields.name} updated`);
+              if (!written.ok) {
+                fields.setError(written.message);
+                return;
+              }
+              toast.success(`${sensor.id} updated`);
               setEditing(false);
             }}
           >
@@ -707,12 +709,22 @@ function SensorFields({ f, isEdit }: { f: SensorFieldState; isEdit: boolean }) {
 
   return (
     <>
-      <DrawerField label="Device name">
+      <DrawerField label="Device id">
         <input
           value={f.name}
-          onChange={(e) => f.setName(e.target.value)}
-          placeholder="e.g. Room 305 detector"
-          className={FIELD_INPUT}
+          disabled={isEdit}
+          onChange={(e) => f.setName(e.target.value.toUpperCase())}
+          placeholder="e.g. FD-216-14"
+          title={
+            isEdit
+              ? "A device's id is the one printed on it, and the equipment unit it shares a body with points at it by name. Remove the device and register the replacement instead."
+              : undefined
+          }
+          className={cn(
+            FIELD_INPUT,
+            "font-mono",
+            isEdit && "cursor-not-allowed opacity-60",
+          )}
         />
       </DrawerField>
 
@@ -818,7 +830,7 @@ function NewSensorDrawer({
   onOpenChange: (open: boolean) => void;
 }) {
   const f = useSensorFields(null, open);
-  const { log } = useAppState();
+  const { addSensor, sensors } = useAppState();
 
   return (
     <FormDrawer
@@ -828,22 +840,38 @@ function NewSensorDrawer({
       description="Register a device already on the network. It starts reporting at the next poll."
       submitLabel="Register sensor"
       error={f.error}
-      onSubmit={() => {
-        if (f.name.trim().length === 0) {
-          f.setError("A device needs a name.");
+      onSubmit={async () => {
+        const id = f.name.trim();
+        if (id.length === 0) {
+          f.setError("A device needs the id printed on it.");
           return;
         }
-        log({
-          source: "sensor",
-          actionType: "sensor-status-changed",
-          title: "Sensor registered",
-          detail: `${f.name} — ${sensorType(f.typeId)?.label ?? f.typeId} in ${roomLabel(f.roomId)}, ${buildingName(f.buildingId)}.`,
-          targetType: "sensor",
-          targetId: f.name,
+        // The id is the document id, so a duplicate would overwrite the
+        // device already wearing it rather than be refused.
+        if (sensors.some((s) => s.id === id)) {
+          f.setError(`${id} is already on the network.`);
+          return;
+        }
+        if (f.roomId.length === 0) {
+          f.setError("A device needs a room.");
+          return;
+        }
+        const now = new Date().toISOString();
+        const written = await addSensor({
+          id,
           buildingId: f.buildingId,
-          refId: f.name,
+          roomId: f.roomId,
+          typeId: f.typeId,
+          status: f.status,
+          linkedEquipmentId: f.linkTag || undefined,
+          statusChangedAt: now,
+          updatedAt: now,
         });
-        toast.success(`${f.name} registered on the network`);
+        if (!written.ok) {
+          f.setError(written.message);
+          return;
+        }
+        toast.success(`${id} registered on the network`);
         onOpenChange(false);
       }}
     >
