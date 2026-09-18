@@ -204,12 +204,9 @@ export const BUILDING_LOAD_KW: Record<string, number> = {
 };
 
 export function buildingStats(buildingId: string) {
-  const faulty = EQUIPMENT_UNITS.filter(
-    (u) => u.buildingId === buildingId && u.condition === "faulty",
-  ).length;
-  const maint = EQUIPMENT_UNITS.filter(
-    (u) => u.buildingId === buildingId && u.condition === "under-maintenance",
-  ).length;
+  const units = equipmentUnits().filter((u) => u.buildingId === buildingId);
+  const faulty = units.filter((u) => u.condition === "faulty").length;
+  const maint = units.filter((u) => u.condition === "under-maintenance").length;
   // Seed figures only. Anything on screen counts through useAppState so it
   // reflects moves made this session — see derive.countOpenRequests.
   const openReq = countOpenRequests(MAINTENANCE_REQUESTS, buildingId);
@@ -607,20 +604,16 @@ export const EQUIPMENT_UNITS: EquipmentUnit[] = [
 // EnvironmentalSensor is the live state (status, last report). They are
 // joined by linkedEquipmentId and never merged — both drawers cross to the
 // other record rather than duplicating its fields.
-
-export function sensorForEquipment(
-  equipmentTag: string,
-): EnvironmentalSensor | undefined {
-  return SENSORS.find((s) => s.linkedEquipmentId === equipmentTag);
-}
-
-export function equipmentForSensor(
-  sensor: EnvironmentalSensor,
-): EquipmentUnit | undefined {
-  if (!sensor.linkedEquipmentId) return undefined;
-  return EQUIPMENT_UNITS.find((u) => u.tag === sensor.linkedEquipmentId);
-}
-
+//
+// The join key is the unit's **id**, not its tag. They are equal in the seed,
+// which is exactly why this has to be settled now: a tag is a label somebody
+// can edit, and the day the equipment drawer's "Save details" writes for real,
+// a rename would otherwise orphan this join, every request's equipmentId and
+// every log entry's refId at once.
+//
+// Like the estate and the sensor registry, these read through a holder the
+// provider feeds, so they answer for the live register rather than the frozen
+// seed once the data is subscribed.
 export function equipmentUnitLabel(u: EquipmentUnit): string {
   return typeLabel(u.typeId);
 }
@@ -920,6 +913,35 @@ export const SENSORS: EnvironmentalSensor[] = [
 ];
 
 /** Room 302's fire detector — the sensor the scripted 20s demo alarm drives. */
+let assetSource: { units: EquipmentUnit[]; sensors: EnvironmentalSensor[] } = {
+  units: EQUIPMENT_UNITS,
+  sensors: SENSORS,
+};
+
+export function setAssetSource(next: {
+  units: EquipmentUnit[];
+  sensors: EnvironmentalSensor[];
+}): void {
+  assetSource = next;
+}
+
+export function equipmentUnits(): EquipmentUnit[] {
+  return assetSource.units;
+}
+
+export function sensorForEquipment(
+  equipmentId: string,
+): EnvironmentalSensor | undefined {
+  return assetSource.sensors.find((s) => s.linkedEquipmentId === equipmentId);
+}
+
+export function equipmentForSensor(
+  sensor: EnvironmentalSensor,
+): EquipmentUnit | undefined {
+  if (!sensor.linkedEquipmentId) return undefined;
+  return assetSource.units.find((u) => u.id === sensor.linkedEquipmentId);
+}
+
 // ---- Maintenance requests ---------------------------------------------------
 
 export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [

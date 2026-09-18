@@ -172,6 +172,28 @@ export function openRequestsForUnit(
   ).length;
 }
 
+/**
+ * The next id in a human-readable sequence — `REQ-4192`, `RPT-1043`.
+ *
+ * These used to be `prefix + Math.floor(base + Math.random() * 99)`: ninety-nine
+ * slots, so a collision was near-certain within a session. In memory that was
+ * invisible, because two records could share an id and still both render. As a
+ * document id it would silently overwrite an existing record, so the id has to
+ * be derived from what already exists rather than guessed.
+ */
+export function nextSequentialId(
+  prefix: string,
+  existingIds: string[],
+  floor: number,
+): string {
+  const used = existingIds
+    .filter((id) => id.startsWith(`${prefix}-`))
+    .map((id) => Number.parseInt(id.slice(prefix.length + 1), 10))
+    .filter((n) => Number.isFinite(n));
+  const next = Math.max(floor - 1, ...used) + 1;
+  return `${prefix}-${next}`;
+}
+
 // ---- Sensors ---------------------------------------------------------------
 
 /**

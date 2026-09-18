@@ -19,7 +19,11 @@ import {
   initializeApp,
 } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
+import {
+  connectFirestoreEmulator,
+  getFirestore,
+  initializeFirestore,
+} from "firebase/firestore";
 
 // Read as literal member expressions: Next inlines NEXT_PUBLIC_* only where it
 // can see the whole name, so a computed lookup would come back undefined.
@@ -51,7 +55,22 @@ if (!useEmulators && !firebaseConfig.apiKey) {
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+// `ignoreUndefinedProperties` because the domain is full of optionals —
+// declineNote, lastServiceAt, buildingId on a non-staff account — and Firestore
+// rejects an `undefined` value outright rather than treating it as absent.
+// Without this every document builder would need its own strip pass.
+//
+// initializeFirestore throws if the instance already exists, which Turbopack's
+// hot reload makes routine, so the second pass falls through to the existing
+// one. Checking getApps() here would not work: the app is created above, so it
+// is always non-empty by this line.
+export const db = (() => {
+  try {
+    return initializeFirestore(app, { ignoreUndefinedProperties: true });
+  } catch {
+    return getFirestore(app);
+  }
+})();
 
 // connectXEmulator throws if called twice against the same instance, and hot
 // reload will call it again, so the wiring is latched.

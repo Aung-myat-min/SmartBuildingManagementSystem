@@ -27,7 +27,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAppState } from "@/lib/app-state";
-import { kpiPasses } from "@/lib/derive";
+import { kpiPasses, nextSequentialId } from "@/lib/derive";
 import { printToPdf, stampedFilename, toCsv } from "@/lib/export";
 import { formatDate, formatMmk, formatPeriod } from "@/lib/format";
 import { buildingName, REPORTS, reportDetail } from "@/lib/mock-data";
@@ -355,6 +355,7 @@ export default function ReportsPage() {
       <GenerateReportSheet
         open={genOpen}
         onOpenChange={setGenOpen}
+        existingIds={all.map((r) => r.id)}
         onGenerate={(r) => {
           setExtra((prev) => [r, ...prev]);
           log({
@@ -385,10 +386,13 @@ function toInputDate(d: Date): string {
 function GenerateReportSheet({
   open,
   onOpenChange,
+  existingIds,
   onGenerate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Every id already in use, so a new one cannot collide with one of them. */
+  existingIds: string[];
   onGenerate: (r: Report) => void;
 }) {
   const { buildings, currentUser } = useAppState();
@@ -492,7 +496,7 @@ function GenerateReportSheet({
                 return;
               }
               onGenerate({
-                id: `RPT-${Math.floor(1000 + Math.random() * 8999)}`,
+                id: nextSequentialId("RPT", existingIds, 1000),
                 kind,
                 period,
                 buildingId: buildingId === "all" ? undefined : buildingId,

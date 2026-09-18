@@ -678,7 +678,7 @@ function EquipmentDrawer({
   const history = EQUIPMENT_HISTORY.filter(
     (h) => h.equipmentUnitId === unit.id,
   );
-  const linkedSensor = sensorForEquipment(unit.tag);
+  const linkedSensor = sensorForEquipment(unit.id);
   const days = daysUntilService(unit);
 
   // Decommission retires a unit but keeps its history; Delete removes the

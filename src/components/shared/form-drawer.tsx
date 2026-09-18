@@ -1,6 +1,6 @@
 "use client";
 
-import type * as React from "react";
+import * as React from "react";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -32,7 +32,12 @@ export function FormDrawer({
   description?: React.ReactNode;
   submitLabel: string;
   cancelLabel?: string;
-  onSubmit: () => void;
+  /**
+   * May be async. While it is in flight the drawer holds itself open, disables
+   * its own controls and labels the submit button — so no screen has to
+   * reinvent a pending state once these writes reach a database.
+   */
+  onSubmit: () => void | Promise<void>;
   error?: string | null;
   submitDisabled?: boolean;
   children: React.ReactNode;
@@ -40,6 +45,20 @@ export function FormDrawer({
   // On a phone the drawer is re-drawn as a bottom sheet — same fields,
   // reachable with a thumb.
   const isMobile = useIsMobile();
+  const [saving, setSaving] = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    const result = onSubmit();
+    if (!(result instanceof Promise)) return;
+    setSaving(true);
+    try {
+      await result;
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -54,10 +73,7 @@ export function FormDrawer({
         )}
       >
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit();
-          }}
+          onSubmit={handleSubmit}
           className="flex h-full flex-col gap-2.75 overflow-y-auto px-5 py-4.5"
         >
           <div className="flex items-center gap-2.5">
@@ -91,13 +107,14 @@ export function FormDrawer({
           <div className="flex gap-1.75 pt-0.5">
             <button
               type="submit"
-              disabled={submitDisabled}
+              disabled={submitDisabled || saving}
               className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 min-h-11 flex-1 cursor-pointer rounded border px-2 py-2 text-[11.5px] leading-none font-medium disabled:cursor-not-allowed disabled:opacity-45 md:min-h-0"
             >
-              {submitLabel}
+              {saving ? "Saving…" : submitLabel}
             </button>
             <button
               type="button"
+              disabled={saving}
               onClick={() => onOpenChange(false)}
               className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground min-h-11 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium md:min-h-0"
             >

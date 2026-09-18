@@ -252,7 +252,7 @@ export function DrawerInlineForm({
   title: string;
   description?: React.ReactNode;
   submitLabel: string;
-  onSubmit: () => void;
+  onSubmit: () => void | Promise<void>;
   onCancel: () => void;
   error?: string | null;
   children: React.ReactNode;

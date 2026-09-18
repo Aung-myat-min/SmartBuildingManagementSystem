@@ -21,7 +21,11 @@ import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
-import { ESCALATION_WINDOW_HOURS, isEscalated } from "@/lib/derive";
+import {
+  ESCALATION_WINDOW_HOURS,
+  isEscalated,
+  nextSequentialId,
+} from "@/lib/derive";
 import { formatAge, formatStamp } from "@/lib/format";
 import {
   buildingName,
@@ -554,6 +558,7 @@ export default function RequestsPage() {
         open={newOpen}
         onOpenChange={setNewOpen}
         defaultBuildingId={locked ? activeBuildingId : buildings[0].id}
+        existingIds={scopedRequests.map((r) => r.id)}
         onCreate={(request) => {
           addRequest(request);
           toast.success(`${request.id} raised`);
@@ -743,11 +748,14 @@ function NewRequestDrawer({
   onOpenChange,
   defaultBuildingId,
   submittedBy,
+  existingIds,
   onCreate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultBuildingId: string;
+  /** Every id already in use, so a new one cannot collide with one of them. */
+  existingIds: string[];
   submittedBy: { uid: string; name: string };
   onCreate: (request: MaintenanceRequest) => void;
 }) {
@@ -787,7 +795,7 @@ function NewRequestDrawer({
         }
         const now = new Date().toISOString();
         onCreate({
-          id: `REQ-${Math.floor(4200 + Math.random() * 99)}`,
+          id: nextSequentialId("REQ", existingIds, 4200),
           buildingId,
           roomId,
           equipmentId: equipmentId || units[0]?.tag || "—",

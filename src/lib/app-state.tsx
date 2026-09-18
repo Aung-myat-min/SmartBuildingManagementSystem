@@ -16,6 +16,7 @@ import {
   SENSOR_TYPES,
   SENSORS,
   sensorType,
+  setAssetSource,
   setEstateSource,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
@@ -529,6 +530,12 @@ export function AppStateProvider({
     () => SENSORS.filter((s) => !removedSensorIds.includes(s.id)),
     [removedSensorIds],
   );
+
+  // The third holder, beside the estate and the sensor registry:
+  // sensorForEquipment / equipmentForSensor / buildingStats are module
+  // functions that would otherwise close over the frozen seed arrays and keep
+  // answering for them after everything else went live.
+  setAssetSource({ units: EQUIPMENT_UNITS, sensors });
 
   const sensorStatus = React.useCallback(
     (sensorId: string, fallback: string) => {
