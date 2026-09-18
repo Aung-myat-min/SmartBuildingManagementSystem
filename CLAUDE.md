@@ -109,7 +109,9 @@ split three ways: `canManageEstate` (CEO) vs `canManageAccounts` and
 
 **`lib/format.ts`** — `ageHours`, `formatAge`, `formatClock`, `formatTime`,
 `formatDayLabel`, `formatDate`, `formatStamp` (date · time, for rows that must
-say when, not just how long ago), `formatMmk`, `formatRelative`.
+say when, not just how long ago), `formatPeriod` (a date range read back as a
+report's label — a whole calendar month is named, anything else shows its
+span), `formatMmk`, `formatRelative`.
 Never call `formatClock()` during render — use `useLiveClock()` (`src/hooks`), or
 the server and client disagree by a second and hydration fails.
 
@@ -149,6 +151,7 @@ Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 | `shared/access-denied.tsx` | Role-locked page: states the role, offers a switch. |
 | `shared/empty-state.tsx` | Empty list/filter result. |
 | `shared/form-drawer.tsx` | `FormDrawer` — the 392px right drawer for anything with fields, plus `FormField` / `FormFieldLocked`. |
+| `shared/date-range-filter.tsx` | `DateRangeFilter` — from/to bounds on a toolbar, native date inputs, `withTime` for datetime-local. `withinRange()` does the comparison; an open end means unbounded, and a bare end date covers its whole day. |
 | `shared/detail-drawer.tsx` | `DetailDrawer` — a record with history and actions (412px wide, 392px `size="narrow"`), plus `SameDevicePanel` and `DrawerAction`. |
 | `lib/icons.ts` | `SENSOR_ICONS` / `sensorIcon()` — the fixed icon allowlist a sensor type picks from by key, never a component reference. |
 
@@ -170,8 +173,8 @@ tooltip — it is never hidden.
 | `/sensors` | Live device state | grouped by building, one column per registry type, alarm rows break the rhythm |
 | `/requests` | Maintenance requests | Kanban/Table toggle, new-request sheet, five-column approval workflow; staff raise, withdraw and verify, approvers move |
 | `/records` | Historical Records | range/building/type filters, daily grouping, CSV export |
-| `/logbook` | Log Book | live feed fed by `logBook`, source filters, pause |
-| `/reports` | Reports | library + full report view, generate sheet, PDF/CSV |
+| `/logbook` | Log Book | live feed fed by `logBook`, source and date-time filters, pause |
+| `/reports` | Reports | library + full report view, generated-between filter, generate sheet with a date-range period, PDF/CSV |
 | `/admin` | Administration | Buildings (photo, description, counts, room table) / User Accounts / Sensor Types tabs; Buildings is CEO-only and padlocked for an Admin Manager, the other two are shared |
 | `/settings` | Settings | Your account, Appearance, Password & sessions |
 | `/more` | More | phone-only overflow nav |

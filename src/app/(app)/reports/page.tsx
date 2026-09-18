@@ -4,6 +4,12 @@ import { ArrowLeft, Download, Info, Search } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { AccessDenied } from "@/components/shared/access-denied";
+import {
+  type DateRange,
+  DateRangeFilter,
+  EMPTY_RANGE,
+  withinRange,
+} from "@/components/shared/date-range-filter";
 import { EmptyState } from "@/components/shared/empty-state";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
@@ -22,7 +28,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useAppState } from "@/lib/app-state";
 import { kpiPasses } from "@/lib/derive";
-import { formatDate, formatMmk } from "@/lib/format";
+import { formatDate, formatMmk, formatPeriod } from "@/lib/format";
 import {
   BUILDINGS,
   buildingName,
@@ -85,6 +91,7 @@ export default function ReportsPage() {
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState("all");
   const [kindFilter, setKindFilter] = React.useState<"all" | ReportKind>("all");
+  const [range, setRange] = React.useState<DateRange>(EMPTY_RANGE);
   const [genOpen, setGenOpen] = React.useState(false);
   const [extra, setExtra] = React.useState<Report[]>([]);
   const [openReportId, setOpenReportId] = React.useState<string | null>(null);
@@ -110,6 +117,9 @@ export default function ReportsPage() {
     if (buildingFilter !== "all" && (r.buildingId ?? "all") !== buildingFilter)
       return false;
     if (kindFilter !== "all" && r.kind !== kindFilter) return false;
+    // Filtered on when a report was generated — its period is a label, not a
+    // date the list can compare.
+    if (!withinRange(r.generatedAt, range)) return false;
     if (query.trim()) {
       const q = query.toLowerCase();
       const hay =
@@ -170,6 +180,12 @@ export default function ReportsPage() {
             </option>
           ))}
         </select>
+        <DateRangeFilter
+          value={range}
+          onChange={setRange}
+          withTime
+          label="Generated"
+        />
         <div className="bg-border h-5.5 w-px" />
         <ToneBadge tone="info">{filtered.length} reports</ToneBadge>
         {/*<div className="flex-1" />*/}
@@ -284,6 +300,12 @@ export default function ReportsPage() {
   );
 }
 
+/** A Date as the native date input wants it, in local time rather than UTC. */
+function toInputDate(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function GenerateReportSheet({
   open,
   onOpenChange,
@@ -295,8 +317,25 @@ function GenerateReportSheet({
 }) {
   const { currentUser } = useAppState();
   const [kind, setKind] = React.useState<ReportKind>("maintenance-performance");
-  const [period, setPeriod] = React.useState("September 2026");
   const [buildingId, setBuildingId] = React.useState("all");
+  // A report covers whatever range someone picks, rather than the three
+  // canned periods this used to offer. The label is read back from the dates.
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!open) return;
+    // Defaults to the month the reader is standing in.
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    setFrom(toInputDate(first));
+    setTo(toInputDate(last));
+    setError(null);
+  }, [open]);
+
+  const period = from && to ? formatPeriod(from, to) : "—";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -320,16 +359,29 @@ function GenerateReportSheet({
               ))}
             </select>
           </Field>
-          <Field label="Period">
-            <select
-              value={period}
-              onChange={(e) => setPeriod(e.target.value)}
-              className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-            >
-              <option value="September 2026">September 2026</option>
-              <option value="01–08 Sep 2026">01–08 Sep 2026 (ad hoc)</option>
-              <option value="Q3 2026">Q3 2026</option>
-            </select>
+          <Field label="Period covered">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="date"
+                value={from}
+                max={to || undefined}
+                aria-label="Period from"
+                onChange={(e) => setFrom(e.target.value)}
+                className="border-input focus:border-primary bg-card w-full rounded border px-2 py-2 text-[11.5px] font-medium outline-none"
+              />
+              <input
+                type="date"
+                value={to}
+                min={from || undefined}
+                aria-label="Period to"
+                onChange={(e) => setTo(e.target.value)}
+                className="border-input focus:border-primary bg-card w-full rounded border px-2 py-2 text-[11.5px] font-medium outline-none"
+              />
+            </div>
+            <p className="text-muted-foreground mt-1.5 text-[10.5px] leading-relaxed">
+              Reads back as <span className="font-medium">{period}</span>. A
+              whole calendar month is named; anything else shows its span.
+            </p>
           </Field>
           <Field label="Scope">
             <select
@@ -346,10 +398,23 @@ function GenerateReportSheet({
             </select>
           </Field>
         </div>
+        {error && (
+          <p className="text-warning-foreground px-4 text-[11.5px] leading-relaxed">
+            {error}
+          </p>
+        )}
         <div className="mt-2 flex gap-2 px-4">
           <Button
             className="flex-1"
             onClick={() => {
+              if (!from || !to) {
+                setError("A report needs a start and an end date.");
+                return;
+              }
+              if (new Date(from) > new Date(to)) {
+                setError("The start date is after the end date.");
+                return;
+              }
               onGenerate({
                 id: `RPT-${Math.floor(1000 + Math.random() * 8999)}`,
                 kind,

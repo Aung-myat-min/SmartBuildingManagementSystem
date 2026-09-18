@@ -55,6 +55,34 @@ export function formatStamp(iso: string): string {
   return `${formatDate(iso)} · ${formatTime(iso)}`;
 }
 
+/**
+ * The label a generated report carries, read back from the dates it covers:
+ * a whole calendar month reads as its name, anything else as its span. The
+ * "YYYY-MM-DD" parts are read directly rather than through `new Date`, which
+ * would treat them as UTC midnight and slip a day west of Greenwich.
+ */
+export function formatPeriod(from: string, to: string): string {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  if (!fy || !ty) return "—";
+  const start = new Date(fy, fm - 1, fd);
+  if (fy === ty && fm === tm) {
+    const lastDay = new Date(ty, tm, 0).getDate();
+    if (fd === 1 && td === lastDay) {
+      return start.toLocaleDateString("en-GB", {
+        month: "long",
+        year: "numeric",
+      });
+    }
+    const month = start.toLocaleDateString("en-GB", { month: "short" });
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(fd)}–${pad(td)} ${month} ${fy}`;
+  }
+  return `${formatDate(new Date(fy, fm - 1, fd).toISOString())} – ${formatDate(
+    new Date(ty, tm - 1, td).toISOString(),
+  )}`;
+}
+
 export function formatMmk(value: number): string {
   return `${Math.round(value).toLocaleString("en-US")} MMK`;
 }

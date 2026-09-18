@@ -3,6 +3,12 @@
 import { Link2, Pause, Play, Search } from "lucide-react";
 import * as React from "react";
 import { AccessDenied } from "@/components/shared/access-denied";
+import {
+  type DateRange,
+  DateRangeFilter,
+  EMPTY_RANGE,
+  withinRange,
+} from "@/components/shared/date-range-filter";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
@@ -74,6 +80,9 @@ export default function LogBookPage() {
   const [sourceFilter, setSourceFilter] = usePersistedState<
     LogBookSource | "all"
   >("logbook.source", "all");
+  // The book runs long, so a reader narrowing to one shift needs the hour,
+  // not just the day.
+  const [range, setRange] = React.useState<DateRange>(EMPTY_RANGE);
 
   const locked = isBuildingLocked(role);
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
@@ -82,6 +91,7 @@ export default function LogBookPage() {
     if (effectiveBuilding !== "all" && e.buildingId !== effectiveBuilding)
       return false;
     if (sourceFilter !== "all" && e.source !== sourceFilter) return false;
+    if (!withinRange(e.timestamp, range)) return false;
     if (query.trim()) {
       const q = query.toLowerCase();
       const hay =
@@ -243,6 +253,7 @@ export default function LogBookPage() {
               ))}
             </SelectContent>
           </Select>
+          <DateRangeFilter value={range} onChange={setRange} withTime />
           <div className="bg-border h-5.5 w-px" />
           <ToneBadge tone="info" title="Entries shown">
             {filtered.length} shown
