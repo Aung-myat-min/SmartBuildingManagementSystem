@@ -42,7 +42,6 @@ import {
   equipmentForSensor,
   roomLabel,
   roomsForBuilding,
-  SENSORS,
   sensorType,
   sensorTypes,
   statusDef,
@@ -115,6 +114,8 @@ function SensorsView() {
   const {
     role,
     activeBuildingId,
+    sensors,
+    removeSensor,
     sensorStatus,
     sensorChangedAt,
     setSensorStatus,
@@ -156,7 +157,7 @@ function SensorsView() {
     [statusOf, changedAtOf, nowMs],
   );
 
-  const inScope = SENSORS.filter(
+  const inScope = sensors.filter(
     (s) => !locked || s.buildingId === activeBuildingId,
   );
 
@@ -180,7 +181,7 @@ function SensorsView() {
   );
 
   const selected = openId
-    ? (SENSORS.find((s) => s.id === openId) ?? null)
+    ? (sensors.find((s) => s.id === openId) ?? null)
     : null;
 
   const runAction = async (s: EnvironmentalSensor, action: SensorAction) => {
@@ -199,6 +200,22 @@ function SensorsView() {
     toast.success(
       `${s.id} → ${statusDef(s.typeId, action.resultStatus)?.label ?? action.resultStatus}`,
     );
+  };
+
+  const remove = async (s: EnvironmentalSensor) => {
+    const type = sensorType(s.typeId);
+    const result = await confirm({
+      title: `Remove ${s.id}?`,
+      body: `${type?.label ?? "This device"} in ${roomLabel(s.roomId)}, ${buildingName(s.buildingId)}.`,
+      note: "It stops reporting and leaves every count. Its history stays in the Log Book and Historical Records.",
+      tone: "danger",
+      confirmLabel: "Remove device",
+      requireReason: true,
+    });
+    if (!result.confirmed) return;
+    removeSensor(s.id);
+    setOpenId(null);
+    toast.success(`${s.id} removed from the network`);
   };
 
   return (
@@ -452,6 +469,7 @@ function SensorsView() {
           if (deviceParam) router.replace("/sensors");
         }}
         onRunAction={runAction}
+        onRemove={remove}
         onGoToEquipment={() => {
           setOpenId(null);
           router.push("/equipment");
@@ -472,6 +490,7 @@ function SensorDrawer({
   mayAct,
   onClose,
   onRunAction,
+  onRemove,
   onGoToEquipment,
 }: {
   sensor: EnvironmentalSensor | null;
@@ -482,6 +501,7 @@ function SensorDrawer({
   mayAct: boolean;
   onClose: () => void;
   onRunAction: (s: EnvironmentalSensor, a: SensorAction) => void;
+  onRemove: (s: EnvironmentalSensor) => void;
   onGoToEquipment: () => void;
 }) {
   // Editing stays in this drawer rather than stacking a second one on top of
@@ -613,7 +633,7 @@ function SensorDrawer({
               type="button"
               disabled={!mayAct}
               title={mayAct ? "Remove this sensor" : SENSOR_LOCK_REASON}
-              onClick={() => toast.info("Removing a sensor is demo-only here.")}
+              onClick={() => onRemove(sensor)}
               className={cn(
                 "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
                 mayAct

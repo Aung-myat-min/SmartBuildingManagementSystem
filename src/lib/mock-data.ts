@@ -1,8 +1,8 @@
 // ============================================================================
-// Seed data for the demo — mirrors the estate described in the design pass:
-// Building 216, Building 209, Junction Square. Everything here is static;
-// the "live" feel (ticking clock, the Room 302 fire alarm scenario) is
-// layered on top by src/lib/app-state.tsx, not stored here.
+// Seed data — mirrors the estate described in the design pass: Building 216,
+// Building 209, Junction Square. Everything here is static, including the one
+// device in alarm; app-state.tsx layers this session's changes on top as
+// overrides, and no longer scripts anything.
 // ============================================================================
 
 import {
@@ -41,7 +41,7 @@ export const BUILDING_META: Record<
     code: "SITE 216",
     address: "216 University Avenue",
     description:
-      "The main teaching block — lecture theatres, two teaching labs and the estate's oldest plant room. Highest device density of the three sites and the building most often referenced in demos, since its Room 302 fire detector is the one that trips during the scripted walkthrough.",
+      "The main teaching block — lecture theatres, two teaching labs and the estate's oldest plant room. Highest device density of the three sites, and the building most often referenced: its Room 302 fire detector is the one currently in alarm.",
     photoHint: "Drop a photo of Building 216",
   },
   b209: {

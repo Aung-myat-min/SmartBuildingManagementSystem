@@ -30,7 +30,6 @@ import {
   BUILDINGS,
   EQUIPMENT_UNITS,
   ROOMS,
-  SENSORS,
 } from "@/lib/mock-data";
 import {
   canEditUser,
@@ -1293,6 +1292,7 @@ function UserDrawer({
 
 function SensorTypesTab({ confirm }: { confirm: ConfirmFn }) {
   const {
+    sensors,
     sensorTypeRegistry,
     addSensorType,
     updateSensorType,
@@ -1306,7 +1306,7 @@ function SensorTypesTab({ confirm }: { confirm: ConfirmFn }) {
 
   const editing = sensorTypeRegistry.find((t) => t.id === editingId) ?? null;
   const sensorsOf = (typeId: string) =>
-    SENSORS.filter((s) => s.typeId === typeId).length;
+    sensors.filter((s) => s.typeId === typeId).length;
 
   const archive = async (type: SensorTypeDef) => {
     const inUse = sensorsOf(type.id);

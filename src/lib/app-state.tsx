@@ -18,6 +18,7 @@ import {
 } from "@/lib/mock-data";
 import type {
   AppUser,
+  EnvironmentalSensor,
   EquipmentCondition,
   LogBookEntry,
   MaintenanceRequest,
@@ -188,6 +189,10 @@ export interface AppState {
   requestVerification: (id: string) => void;
   /** Forward one step, or back one step — never more, and the age never resets. */
   moveRequest: (id: string, direction: "next" | "prev") => void;
+  /** Every device still on the network — removed ones are already gone. */
+  sensors: EnvironmentalSensor[];
+  /** Takes a device off the network for this session. */
+  removeSensor: (sensorId: string) => void;
   sensorStatus: (sensorId: string, fallback: string) => string;
   /**
    * When the sensor entered its current status — the override's own stamp
@@ -289,6 +294,7 @@ export function AppStateProvider({
   const [sensorTypeRegistry, setSensorTypeRegistry] =
     React.useState<SensorTypeDef[]>(SENSOR_TYPES);
   const [sessionLog, setSessionLog] = React.useState<LogBookEntry[]>([]);
+  const [removedSensorIds, setRemovedSensorIds] = React.useState<string[]>([]);
 
   // mock-data's sensorType/statusDef accessors read through this, so the page
   // sees an edit on the same render that made it. Assigning the current list
@@ -489,6 +495,17 @@ export function AppStateProvider({
     [patchRequest, findRequest, log],
   );
 
+  /**
+   * The one resolved device list. A removed sensor drops out here rather than
+   * being filtered again on every screen, so the Sensors page and the sensor
+   * type registry's "N sensors use this type" guard cannot disagree about what
+   * still exists.
+   */
+  const sensors = React.useMemo(
+    () => SENSORS.filter((s) => !removedSensorIds.includes(s.id)),
+    [removedSensorIds],
+  );
+
   const sensorStatus = React.useCallback(
     (sensorId: string, fallback: string) => {
       const override = sensorOverrides[sensorId];
@@ -537,12 +554,12 @@ export function AppStateProvider({
   /** Sensors currently sitting in a status, overrides counted. */
   const sensorsInStatus = React.useCallback(
     (typeId: string, statusId: string) =>
-      SENSORS.filter(
+      sensors.filter(
         (s) =>
           s.typeId === typeId &&
           (sensorOverrides[s.id]?.status ?? s.status) === statusId,
       ).length,
-    [sensorOverrides],
+    [sensorOverrides, sensors],
   );
 
   // Validation has to answer the caller now, not on the next render, so the
@@ -609,7 +626,7 @@ export function AppStateProvider({
 
   const archiveSensorType = React.useCallback(
     (typeId: string) => {
-      const inUse = SENSORS.filter((s) => s.typeId === typeId).length;
+      const inUse = sensors.filter((s) => s.typeId === typeId).length;
       if (inUse > 0) {
         const type = sensorTypeRegistry.find((t) => t.id === typeId);
         return fail(
@@ -623,7 +640,7 @@ export function AppStateProvider({
         detail: `${type?.label ?? typeId} no longer appears on the Sensors page. Existing records still resolve it.`,
       });
     },
-    [patchType, sensorTypeRegistry],
+    [patchType, sensorTypeRegistry, sensors],
   );
 
   const restoreSensorType = React.useCallback(
@@ -731,6 +748,26 @@ export function AppStateProvider({
     [patchType],
   );
 
+  const removeSensor = React.useCallback(
+    (sensorId: string) => {
+      const sensor = SENSORS.find((s) => s.id === sensorId);
+      setRemovedSensorIds((prev) => [...prev, sensorId]);
+      log({
+        source: "sensor",
+        actionType: "sensor-status-changed",
+        title: "Sensor removed",
+        detail: sensor
+          ? `${sensorId} taken off the network — ${roomLabel(sensor.roomId)}, ${buildingName(sensor.buildingId)}.`
+          : sensorId,
+        targetType: "sensor",
+        targetId: sensorId,
+        buildingId: sensor?.buildingId,
+        refId: sensorId,
+      });
+    },
+    [log],
+  );
+
   const equipmentCondition = React.useCallback(
     (unitId: string, fallback: EquipmentCondition) =>
       equipmentOverrides[unitId] ?? fallback,
@@ -776,6 +813,8 @@ export function AppStateProvider({
       withdrawRequest,
       requestVerification,
       moveRequest,
+      sensors,
+      removeSensor,
       sensorStatus,
       sensorChangedAt,
       setSensorStatus,
@@ -812,6 +851,8 @@ export function AppStateProvider({
       withdrawRequest,
       requestVerification,
       moveRequest,
+      sensors,
+      removeSensor,
       sensorStatus,
       sensorChangedAt,
       setSensorStatus,

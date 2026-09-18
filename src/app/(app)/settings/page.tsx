@@ -180,13 +180,6 @@ function ProfileSection({
             {email}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => toast.info("Photo upload (demo only).")}
-        >
-          Change photo
-        </Button>
       </div>
 
       <div className="mt-4.5 grid grid-cols-2 gap-3">
