@@ -2,12 +2,12 @@
 
 import * as React from "react";
 import { countOpenRequests } from "@/lib/derive";
+import { appendLogEntry, type LogDraft, useLogBook } from "@/lib/logbook-store";
 import {
   BUILDINGS,
   buildingName,
   EQUIPMENT_UNITS,
   equipmentUnitLabel,
-  LOG_BOOK,
   MAINTENANCE_REQUESTS,
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_STATUS,
@@ -93,20 +93,6 @@ function validateType(type: SensorTypeDef): RegistryResult {
   if (actionless) return fail("Every action needs a name.");
   return OK;
 }
-
-/**
- * What a caller supplies when something happens. Who did it, when, and the
- * entry's id are the book's business, not the caller's — every action in the
- * app goes through here so no screen can write a half-formed entry, or
- * forget to write one at all.
- */
-export type LogDraft = Omit<
-  LogBookEntry,
-  "id" | "timestamp" | "actorUid" | "actorName" | "actorRole"
-> & {
-  /** For the entries the system writes for itself, e.g. the scripted alarm. */
-  actorName?: string;
-};
 
 /** What an in-session action can change about a request. */
 interface RequestPatch {
@@ -222,6 +208,13 @@ export interface AppState {
    * entries. Every action in the app lands here.
    */
   logBook: LogBookEntry[];
+  /** True until the Log Book's first snapshot arrives. */
+  logBookLoading: boolean;
+  /**
+   * A live subscription that stopped. Surfaced once in the shell rather than
+   * per page — a reader can still work with what is cached.
+   */
+  dataError: string | null;
   /** Writes one entry. Screens holding their own state call it directly. */
   log: (draft: LogDraft) => void;
   /** The live sensor type registry, archived entries included. */
@@ -309,7 +302,13 @@ export function AppStateProvider({
   >({});
   const [sensorTypeRegistry, setSensorTypeRegistry] =
     React.useState<SensorTypeDef[]>(SENSOR_TYPES);
-  const [sessionLog, setSessionLog] = React.useState<LogBookEntry[]>([]);
+  // The Log Book is the first collection to leave memory. Nothing merges a
+  // seed list in front of it any more — the seeded entries are documents.
+  const {
+    items: logBook,
+    loading: logBookLoading,
+    error: logBookError,
+  } = useLogBook();
   const [removedSensorIds, setRemovedSensorIds] = React.useState<string[]>([]);
   // The estate is editable from Administration. Held here rather than on that
   // page so a renamed building reaches every building filter in the app, not
@@ -346,27 +345,12 @@ export function AppStateProvider({
 
   const log = React.useCallback(
     (draft: LogDraft) => {
-      const actor = user;
-      setSessionLog((prev) => [
-        {
-          ...draft,
-          id: `lb-${Date.now()}-${prev.length}`,
-          timestamp: new Date().toISOString(),
-          actorUid: draft.actorName ? undefined : actor.uid,
-          actorName: draft.actorName ?? actor.name,
-          actorRole: draft.actorName ? undefined : user.role,
-        },
-        ...prev,
-      ]);
+      // Fire-and-forget: an audit side effect must never block the action that
+      // caused it, or fail it. Firestore applies the write to the local
+      // snapshot before the server acks, so the entry appears immediately.
+      void appendLogEntry(draft, user);
     },
     [user],
-  );
-
-  // What this session wrote sits in front of the seed book, newest first —
-  // the same list the Log Book page and the dashboard rail both read.
-  const logBook = React.useMemo(
-    () => [...sessionLog, ...LOG_BOOK],
-    [sessionLog],
   );
 
   const requestStatus = React.useCallback(
@@ -888,6 +872,8 @@ export function AppStateProvider({
       sensorChangedAt,
       setSensorStatus,
       logBook,
+      logBookLoading,
+      dataError: logBookError,
       log,
       sensorTypeRegistry,
       addSensorType,
@@ -934,6 +920,8 @@ export function AppStateProvider({
       sensorChangedAt,
       setSensorStatus,
       logBook,
+      logBookLoading,
+      logBookError,
       log,
       sensorTypeRegistry,
       addSensorType,

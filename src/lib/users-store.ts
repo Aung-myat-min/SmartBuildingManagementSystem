@@ -30,6 +30,7 @@ import {
 import * as React from "react";
 import { authErrorMessage } from "@/lib/auth-errors";
 import { auth, db, provisionerApp } from "@/lib/firebase";
+import { writeError } from "@/lib/firestore-store";
 import type { ManagedUser, UserRole } from "@/lib/types";
 
 export type UserResult = { ok: true } | { ok: false; message: string };
@@ -114,7 +115,7 @@ export async function updateUser(
     });
     return { ok: true };
   } catch (error) {
-    return { ok: false, message: writeError(error) };
+    return { ok: false, message: accountError(error) };
   }
 }
 
@@ -174,7 +175,7 @@ export async function createUser(input: {
     await sendPasswordResetEmail(auth, input.email.trim());
     return { ok: true, uid: cred.user.uid };
   } catch (error) {
-    return { ok: false, message: writeError(error) };
+    return { ok: false, message: accountError(error) };
   } finally {
     if (secondary) {
       await signOut(getAuth(secondary)).catch(() => {});
@@ -190,14 +191,15 @@ function throwawayPassword(): string {
   return `Aa1${Array.from(bytes, (b) => b.toString(36)).join("")}`;
 }
 
-function writeError(error: unknown): string {
+/**
+ * Account writes can fail as Firestore writes *or* as Auth operations — the
+ * provisioning path does both — so an `auth/` code keeps its own wording
+ * ("an account already uses that email") rather than the generic one.
+ */
+function accountError(error: unknown): string {
   const code =
     typeof error === "object" && error !== null && "code" in error
       ? String((error as { code: unknown }).code)
       : "";
-  if (code === "permission-denied") {
-    return "Your role does not allow that change.";
-  }
-  if (code.startsWith("auth/")) return authErrorMessage(error);
-  return "Could not save. Check your connection and try again.";
+  return code.startsWith("auth/") ? authErrorMessage(error) : writeError(error);
 }

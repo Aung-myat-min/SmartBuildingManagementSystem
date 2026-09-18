@@ -23,7 +23,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { buildings, role, activeBuildingId } = useAppState();
+  const { buildings, role, activeBuildingId, dataError } = useAppState();
 
   const current = TITLES.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
@@ -61,6 +61,12 @@ function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Bottom padding clears the tab bar, which floats over the page. */}
+        {dataError && (
+          <div className="bg-warning-muted text-warning-foreground border-divider border-b px-4 py-2 text-[11.5px] lg:px-5">
+            {dataError}
+          </div>
+        )}
+
         <main className="flex flex-1 flex-col gap-4 p-4 pb-24 md:pb-4 lg:p-5 lg:pb-5">
           {children}
         </main>

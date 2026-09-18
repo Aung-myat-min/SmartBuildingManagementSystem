@@ -13,7 +13,8 @@
     "bootstrap": "node scripts/bootstrap-live.mjs",
     "rules:deploy": "firebase deploy --only firestore:rules",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "seed:data": "npx vite-node --config vitest.config.mts scripts/seed-firestore.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -70,7 +70,8 @@ function dayLabel(iso: string) {
 }
 
 export default function LogBookPage() {
-  const { buildings, role, activeBuildingId, logBook } = useAppState();
+  const { buildings, role, activeBuildingId, logBook, logBookLoading } =
+    useAppState();
   const clock = useLiveClock();
   const [paused, setPaused] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -264,9 +265,12 @@ export default function LogBookPage() {
         </Card>
 
         <div className="flex flex-col gap-3">
-          {grouped.length === 0 && (
-            <EmptyState>Nothing recorded under these filters.</EmptyState>
-          )}
+          {grouped.length === 0 &&
+            (logBookLoading ? (
+              <EmptyState>Loading the log…</EmptyState>
+            ) : (
+              <EmptyState>Nothing recorded under these filters.</EmptyState>
+            ))}
           {grouped.map(([shift, entries]) => (
             <Card key={shift} className="gap-0 overflow-hidden p-0">
               <div className="bg-surface-subtle border-border flex items-center gap-2 border-b px-4 py-2">
