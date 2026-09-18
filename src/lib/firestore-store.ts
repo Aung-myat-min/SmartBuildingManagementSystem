@@ -25,6 +25,8 @@ export type WriteResult = { ok: true } | { ok: false; message: string };
 export const COLLECTIONS = {
   users: "users",
   logBook: "logBook",
+  buildings: "buildings",
+  rooms: "rooms",
 } as const;
 
 /**

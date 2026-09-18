@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/shell/app-sidebar";
 import { AuthGate } from "@/components/shell/auth-gate";
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
 import { NotificationsMenu } from "@/components/shell/notifications-menu";
+import { ShellSkeleton } from "@/components/shell/shell-skeleton";
 import { useAppState } from "@/lib/app-state";
 import { MOBILE_TABS, MORE_ITEMS, NAV_ITEMS } from "@/lib/nav";
 
@@ -23,7 +24,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
 function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { buildings, role, activeBuildingId, dataError } = useAppState();
+  const { buildings, role, activeBuildingId, dataError, dataLoading } =
+    useAppState();
 
   const current = TITLES.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
@@ -34,6 +36,10 @@ function AppShell({ children }: { children: React.ReactNode }) {
     role === "office-staff"
       ? `Scoped to ${buildingName}`
       : "All buildings in scope";
+
+  // The estate has to be there before any page renders — every building
+  // filter, every room label and the header's own scope note read it.
+  if (dataLoading) return <ShellSkeleton note="Loading your estate…" />;
 
   return (
     <div className="flex min-h-screen">

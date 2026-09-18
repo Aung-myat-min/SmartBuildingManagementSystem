@@ -29,7 +29,7 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
-import { LOG_BOOK } from "../src/lib/mock-data";
+import { BUILDINGS, LOG_BOOK, ROOMS } from "../src/lib/mock-data";
 import { ACCOUNTS, DEV_PASSWORD } from "./accounts.mjs";
 
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -108,6 +108,8 @@ async function main(): Promise<void> {
   if (RESET) {
     console.log("Clearing:");
     await clear("logBook");
+    await clear("buildings");
+    await clear("rooms");
     console.log("");
   }
 
@@ -122,6 +124,16 @@ async function main(): Promise<void> {
         data: { ...rest, timestamp: Timestamp.fromDate(new Date(timestamp)) },
       };
     }),
+  );
+
+  await writeAll(
+    "buildings",
+    BUILDINGS.map(({ id, ...data }) => ({ id, data })),
+  );
+
+  await writeAll(
+    "rooms",
+    ROOMS.map(({ id, ...data }) => ({ id, data })),
   );
 
   await signOut(auth);

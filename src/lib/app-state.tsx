@@ -2,16 +2,26 @@
 
 import * as React from "react";
 import { countOpenRequests } from "@/lib/derive";
+import { buildingDeletionRefusal, roomsToCascade } from "@/lib/estate-rules";
+import {
+  createBuilding,
+  createRoom,
+  deleteBuildingWithRooms,
+  deleteRoom,
+  useBuildings,
+  useRooms,
+  updateBuilding as writeBuilding,
+  updateRoom as writeRoom,
+} from "@/lib/estate-store";
+import type { WriteResult } from "@/lib/firestore-store";
 import { appendLogEntry, type LogDraft, useLogBook } from "@/lib/logbook-store";
 import {
-  BUILDINGS,
   buildingName,
   EQUIPMENT_UNITS,
   equipmentUnitLabel,
   MAINTENANCE_REQUESTS,
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_STATUS,
-  ROOMS,
   roomLabel,
   SENSOR_TYPES,
   SENSORS,
@@ -184,13 +194,16 @@ export interface AppState {
   /** The estate as it stands, not as it was seeded. */
   buildings: Building[];
   rooms: Room[];
-  addBuilding: (building: Building) => void;
-  updateBuilding: (building: Building) => void;
-  /** Deletes the building and every room in it. */
-  deleteBuilding: (buildingId: string) => void;
-  addRoom: (room: Room) => void;
-  updateRoom: (room: Room) => void;
-  removeRoom: (roomId: string) => void;
+  addBuilding: (building: Building) => Promise<WriteResult>;
+  updateBuilding: (building: Building) => Promise<WriteResult>;
+  /**
+   * Deletes the building and every room in it — or refuses, with the counts,
+   * while anything that could outlive it still points at it.
+   */
+  deleteBuilding: (buildingId: string) => Promise<WriteResult>;
+  addRoom: (room: Room) => Promise<WriteResult>;
+  updateRoom: (room: Room) => Promise<WriteResult>;
+  removeRoom: (roomId: string) => Promise<WriteResult>;
   /** Every device still on the network — removed ones are already gone. */
   sensors: EnvironmentalSensor[];
   /** Takes a device off the network for this session. */
@@ -210,6 +223,11 @@ export interface AppState {
   logBook: LogBookEntry[];
   /** True until the Log Book's first snapshot arrives. */
   logBookLoading: boolean;
+  /**
+   * True until the collections every page needs have arrived. The shell waits
+   * on this once, rather than nine pages each learning about loading.
+   */
+  dataLoading: boolean;
   /**
    * A live subscription that stopped. Surfaced once in the shell rather than
    * per page — a reader can still work with what is cached.
@@ -310,12 +328,19 @@ export function AppStateProvider({
     error: logBookError,
   } = useLogBook();
   const [removedSensorIds, setRemovedSensorIds] = React.useState<string[]>([]);
-  // The estate is editable from Administration. Held here rather than on that
-  // page so a renamed building reaches every building filter in the app, not
-  // just the tab that renamed it.
-  const [estateBuildings, setEstateBuildings] =
-    React.useState<Building[]>(BUILDINGS);
-  const [estateRooms, setEstateRooms] = React.useState<Room[]>(ROOMS);
+  // The estate is editable from Administration and now lives in Firestore, so
+  // a renamed building reaches every building filter in the app — and every
+  // other open tab — rather than just the tab that renamed it.
+  const {
+    items: estateBuildings,
+    loading: buildingsLoading,
+    error: buildingsError,
+  } = useBuildings();
+  const {
+    items: estateRooms,
+    loading: roomsLoading,
+    error: roomsError,
+  } = useRooms();
 
   // mock-data's sensorType/statusDef accessors read through this, so the page
   // sees an edit on the same render that made it. Assigning the current list
@@ -765,33 +790,46 @@ export function AppStateProvider({
 
   // ---- Estate ---------------------------------------------------------------
 
-  const addBuilding = React.useCallback((building: Building) => {
-    setEstateBuildings((prev) => [...prev, building]);
-  }, []);
+  const addBuilding = React.useCallback(
+    (building: Building) => createBuilding(building),
+    [],
+  );
 
-  const updateBuilding = React.useCallback((next: Building) => {
-    setEstateBuildings((prev) =>
-      prev.map((b) => (b.id === next.id ? next : b)),
-    );
-  }, []);
+  const updateBuilding = React.useCallback(
+    (next: Building) => writeBuilding(next),
+    [],
+  );
 
-  /** Takes its rooms with it — a room cannot outlive the building it is in. */
-  const deleteBuilding = React.useCallback((buildingId: string) => {
-    setEstateBuildings((prev) => prev.filter((b) => b.id !== buildingId));
-    setEstateRooms((prev) => prev.filter((r) => r.buildingId !== buildingId));
-  }, []);
+  /**
+   * Takes its rooms with it — a room cannot outlive the building it is in —
+   * but refuses outright while equipment, sensors or open requests still point
+   * at the building, rather than leaving them referencing an id that no longer
+   * resolves. Same shape as the sensor type registry's archive guard.
+   */
+  const deleteBuilding = React.useCallback(
+    async (buildingId: string) => {
+      const refusal = buildingDeletionRefusal(buildingId, {
+        units: EQUIPMENT_UNITS,
+        sensors,
+        requests,
+      });
+      if (refusal) return { ok: false as const, message: refusal };
+      return deleteBuildingWithRooms(
+        buildingId,
+        roomsToCascade(buildingId, estateRooms).map((r) => r.id),
+      );
+    },
+    [sensors, requests, estateRooms],
+  );
 
-  const addRoom = React.useCallback((room: Room) => {
-    setEstateRooms((prev) => [...prev, room]);
-  }, []);
+  const addRoom = React.useCallback((room: Room) => createRoom(room), []);
 
-  const updateRoom = React.useCallback((next: Room) => {
-    setEstateRooms((prev) => prev.map((r) => (r.id === next.id ? next : r)));
-  }, []);
+  const updateRoom = React.useCallback((next: Room) => writeRoom(next), []);
 
-  const removeRoom = React.useCallback((roomId: string) => {
-    setEstateRooms((prev) => prev.filter((r) => r.id !== roomId));
-  }, []);
+  const removeRoom = React.useCallback(
+    (roomId: string) => deleteRoom(roomId),
+    [],
+  );
 
   const removeSensor = React.useCallback(
     (sensorId: string) => {
@@ -873,7 +911,8 @@ export function AppStateProvider({
       setSensorStatus,
       logBook,
       logBookLoading,
-      dataError: logBookError,
+      dataLoading: buildingsLoading || roomsLoading,
+      dataError: buildingsError ?? roomsError ?? logBookError,
       log,
       sensorTypeRegistry,
       addSensorType,
@@ -922,6 +961,10 @@ export function AppStateProvider({
       logBook,
       logBookLoading,
       logBookError,
+      buildingsLoading,
+      buildingsError,
+      roomsLoading,
+      roomsError,
       log,
       sensorTypeRegistry,
       addSensorType,

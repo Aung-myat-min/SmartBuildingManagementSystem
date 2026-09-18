@@ -9,7 +9,7 @@
 // ============================================================================
 
 import type { Timestamp } from "firebase/firestore";
-import type { LogBookEntry } from "@/lib/types";
+import type { Building, LogBookEntry, Room } from "@/lib/types";
 
 /**
  * A Firestore `Timestamp` as an ISO string. ISO everywhere above this line —
@@ -43,5 +43,28 @@ export function toLogEntry(
     targetId: d.targetId ?? "",
     buildingId: d.buildingId,
     refId: d.refId,
+  };
+}
+
+export function toBuilding(
+  id: string,
+  data: Record<string, unknown>,
+): Building {
+  const d = data as Partial<Building>;
+  return {
+    id,
+    name: d.name ?? id,
+    code: d.code ?? "",
+  };
+}
+
+export function toRoom(id: string, data: Record<string, unknown>): Room {
+  const d = data as Partial<Room>;
+  return {
+    id,
+    buildingId: d.buildingId ?? "",
+    roomNumber: d.roomNumber ?? id,
+    type: d.type ?? "common",
+    floor: d.floor ?? "G",
   };
 }

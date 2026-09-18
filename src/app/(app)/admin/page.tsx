@@ -299,7 +299,7 @@ function BuildingsTab({
 
   const handleAddRoom = () => {
     if (!selected || newRoomName.trim().length === 0) return;
-    addRoom({
+    void addRoom({
       id: `r-${selected.id}-${newRoomName.trim().toLowerCase().replace(/\s+/g, "-")}`,
       buildingId: selected.id,
       roomNumber: newRoomName.trim(),
@@ -332,7 +332,11 @@ function BuildingsTab({
       confirmLabel: "Remove room",
     });
     if (!result.confirmed) return;
-    removeRoom(room.id);
+    const written = await removeRoom(room.id);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     log({
       source: "admin",
       actionType: "room-removed",
@@ -351,20 +355,29 @@ function BuildingsTab({
     const devices = devicesIn(selected.id);
     const result = await confirm({
       title: `Delete ${selected.name}?`,
-      body: `${selected.name} and everything recorded under it is removed.`,
-      note: `Its ${roomCount} room${roomCount === 1 ? "" : "s"} and ${devices} device${devices === 1 ? "" : "s"} stop reporting, and ${staffIn(selected.id)} account${staffIn(selected.id) === 1 ? "" : "s"} lose their building scope.`,
+      body: `${selected.name} and its ${roomCount} room${roomCount === 1 ? "" : "s"} are removed.`,
+      note:
+        devices > 0
+          ? `${devices} device${devices === 1 ? " is" : "s are"} still registered here, so this will be refused.`
+          : `${staffIn(selected.id)} account${staffIn(selected.id) === 1 ? "" : "s"} lose their building scope.`,
       tone: "danger",
       confirmLabel: "Delete building",
       requireReason: true,
     });
     if (!result.confirmed) return;
-    deleteBuilding(selected.id);
+    // The store refuses while equipment, sensors or open requests still point
+    // at the building, rather than leaving them pointing at nothing.
+    const written = await deleteBuilding(selected.id);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     onSelect(buildings.find((b) => b.id !== selected.id)?.id ?? "");
     log({
       source: "admin",
       actionType: "building-deleted",
       title: "Building deleted",
-      detail: `${selected.name} removed with its ${roomCount} room${roomCount === 1 ? "" : "s"} and ${devices} device${devices === 1 ? "" : "s"}. Reason: ${result.reason ?? "—"}`,
+      detail: `${selected.name} removed with its ${roomCount} room${roomCount === 1 ? "" : "s"}. Reason: ${result.reason ?? "—"}`,
       targetType: "building",
       targetId: selected.id,
     });
@@ -569,7 +582,7 @@ function BuildingsTab({
         onOpenChange={setNewOpen}
         onCreate={(name, code) => {
           const id = `b-${Date.now()}`;
-          addBuilding({ id, name, code });
+          void addBuilding({ id, name, code });
           onSelect(id);
           log({
             source: "admin",
@@ -586,7 +599,7 @@ function BuildingsTab({
         building={editing}
         onClose={() => setEditing(null)}
         onSave={(next) => {
-          updateBuilding(next);
+          void updateBuilding(next);
           log({
             source: "admin",
             actionType: "building-edited",
@@ -603,7 +616,7 @@ function BuildingsTab({
         room={editingRoom}
         onClose={() => setEditingRoom(null)}
         onSave={(next) => {
-          updateRoom(next);
+          void updateRoom(next);
           log({
             source: "admin",
             actionType: "room-edited",
