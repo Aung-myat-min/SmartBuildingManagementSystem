@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/tooltip";
 import { useAppState } from "@/lib/app-state";
 import { kpiPasses } from "@/lib/derive";
+import { printToPdf, stampedFilename, toCsv } from "@/lib/export";
 import { formatDate, formatMmk, formatPeriod } from "@/lib/format";
 import {
   BUILDINGS,
@@ -36,7 +37,12 @@ import {
   reportDetail,
 } from "@/lib/mock-data";
 import { canAccessReports, roleLabel } from "@/lib/permissions";
-import type { Report, ReportKind, ReportStatus } from "@/lib/types";
+import type {
+  Report,
+  ReportDetail,
+  ReportKind,
+  ReportStatus,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 const KIND_LABEL: Record<ReportKind, string> = {
@@ -85,6 +91,70 @@ const KIND_TONE: Record<ReportKind, Tone> = {
   "cost-of-maintenance": "success",
 };
 
+/**
+ * A report is five tables, not one, so the file is sectioned: a title row, the
+ * table, a blank line. Every spreadsheet reads that; flattening them into one
+ * grid would need a column set none of them share.
+ */
+function reportCsv(detail: ReportDetail): string {
+  const sections: string[] = [
+    `${KIND_LABEL[detail.kind]} — ${detail.period}`,
+    detail.buildingId ? buildingName(detail.buildingId) : "Whole estate",
+    `Generated,${formatDate(detail.generatedAt)},by,${detail.generatedBy}`,
+    "",
+    "KPIs",
+    toCsv(detail.kpis, [
+      { header: "Measure", value: (k) => k.label },
+      { header: "Value", value: (k) => k.value },
+      { header: "Unit", value: (k) => k.unit },
+      { header: "Target", value: (k) => k.targetLabel },
+      { header: "Met", value: (k) => (kpiPasses(k) ? "yes" : "no") },
+    ]),
+    "",
+    "Weekly resolution",
+    toCsv(detail.weeks, [
+      { header: "Week", value: (w) => w.label },
+      { header: "Resolved", value: (w) => w.resolved },
+      { header: "Carried over", value: (w) => w.carriedOver },
+    ]),
+    "",
+    "Fault types",
+    toCsv(detail.faultTypes, [
+      { header: "Type", value: (f) => f.typeLabel },
+      { header: "Count", value: (f) => f.count },
+    ]),
+    "",
+    "Worst offenders",
+    toCsv(detail.offenders, [
+      { header: "Tag", value: (o) => o.tag },
+      { header: "Unit", value: (o) => o.unitLabel },
+      { header: "Faults", value: (o) => o.faults },
+      { header: "Downtime (h)", value: (o) => o.downtimeHours },
+      { header: "Cost (MMK)", value: (o) => o.costMmk },
+    ]),
+    "",
+    "Costs",
+    toCsv(detail.costs, [
+      { header: "Line", value: (c) => c.label },
+      { header: "MMK", value: (c) => c.valueMmk },
+    ]),
+  ];
+  return sections.join("\r\n");
+}
+
+function downloadReportCsv(report: Report): void {
+  const detail = reportDetail(report);
+  const blob = new Blob([`\uFEFF${reportCsv(detail)}`], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = stampedFilename(report.id.toLowerCase());
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function ReportsPage() {
   const { role, log } = useAppState();
 
@@ -95,6 +165,9 @@ export default function ReportsPage() {
   const [genOpen, setGenOpen] = React.useState(false);
   const [extra, setExtra] = React.useState<Report[]>([]);
   const [openReportId, setOpenReportId] = React.useState<string | null>(null);
+  // Set by the library card's PDF button, cleared once the detail view has
+  // rendered and printed.
+  const [printOnOpen, setPrintOnOpen] = React.useState(false);
 
   if (!canAccessReports(role)) {
     return (
@@ -137,6 +210,8 @@ export default function ReportsPage() {
     return (
       <ReportDetailView
         report={openReport}
+        printOnOpen={printOnOpen}
+        onPrinted={() => setPrintOnOpen(false)}
         onBack={() => setOpenReportId(null)}
       />
     );
@@ -252,8 +327,13 @@ export default function ReportsPage() {
                       size="sm"
                       variant="outline"
                       disabled={disabled}
-                      title="Download as PDF"
-                      onClick={() => toast.info("PDF export (demo only).")}
+                      title="Open this report and print it to PDF"
+                      onClick={() => {
+                        // Printing the library would print the library, so the
+                        // report is opened first and printed once it renders.
+                        setPrintOnOpen(true);
+                        setOpenReportId(r.id);
+                      }}
                     >
                       PDF
                     </Button>
@@ -262,7 +342,10 @@ export default function ReportsPage() {
                       variant="outline"
                       disabled={disabled}
                       title="Download the underlying rows as CSV"
-                      onClick={() => toast.info("CSV export (demo only).")}
+                      onClick={() => {
+                        downloadReportCsv(r);
+                        toast.success(`${r.id} exported to CSV`);
+                      }}
                     >
                       CSV
                     </Button>
@@ -455,12 +538,25 @@ function Field({
 
 function ReportDetailView({
   report,
+  printOnOpen,
+  onPrinted,
   onBack,
 }: {
   report: Report;
+  printOnOpen: boolean;
+  onPrinted: () => void;
   onBack: () => void;
 }) {
   const detail = React.useMemo(() => reportDetail(report), [report]);
+
+  // The library's PDF button opens the report and prints it. Printing from an
+  // effect rather than the click handler is what guarantees the page being
+  // printed is this one, fully rendered.
+  React.useEffect(() => {
+    if (!printOnOpen) return;
+    onPrinted();
+    printToPdf();
+  }, [printOnOpen, onPrinted]);
   const budgetPct = Math.min(
     100,
     Math.round((detail.spentMmk / detail.budgetMmk) * 100),
@@ -510,20 +606,21 @@ function ReportDetailView({
           </div>
         </div>
         <div className="flex-1" />
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => toast.info("PDF export (demo only).")}
-        >
-          <Download className="size-3" /> PDF
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={() => toast.info("CSV export (demo only).")}
-        >
-          <Download className="size-3" /> CSV
-        </Button>
+        <div data-print-hide className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={printToPdf}>
+            <Download className="size-3" /> PDF
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              downloadReportCsv(report);
+              toast.success(`${report.id} exported to CSV`);
+            }}
+          >
+            <Download className="size-3" /> CSV
+          </Button>
+        </div>
       </Card>
 
       <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">

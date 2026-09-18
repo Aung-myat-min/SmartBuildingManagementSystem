@@ -245,3 +245,39 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Printing is how a report becomes a PDF — every browser can print to one, and
+   it costs no dependency. What prints is the page itself, so the shell has to
+   get out of the way: chrome, controls and the ledger rails are furniture for
+   reading on screen, not part of the document. Anything marked
+   `data-print-hide` is dropped; the rest lays out on white.
+
+   No !important anywhere: Tailwind v4 puts its utilities in a cascade layer,
+   and an unlayered rule like these beats a layered one outright. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  aside,
+  nav,
+  header,
+  [data-print-hide],
+  .print\:hidden {
+    display: none;
+  }
+
+  html,
+  body {
+    background: #fff;
+    color: #111318;
+  }
+
+  /* Cards stop being surfaces and become sections: no shadow, a hairline rule,
+     and never split across a page break mid-table. */
+  [data-slot="card"] {
+    box-shadow: none;
+    border-color: #d8dbe1;
+    break-inside: avoid;
+  }
+}

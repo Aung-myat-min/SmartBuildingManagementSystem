@@ -8,6 +8,7 @@ import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
+import { downloadCsv, stampedFilename } from "@/lib/export";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import {
   BUILDINGS,
@@ -210,11 +211,29 @@ export default function HistoricalRecordsPage() {
         {/*<div className="flex-1" />*/}
         <button
           type="button"
-          onClick={() =>
-            toast.info(
-              `Exported ${filtered.length} records to CSV (demo only).`,
-            )
-          }
+          onClick={() => {
+            // The filtered set, not the whole ledger: what is exported is what
+            // is on screen, or the file disagrees with the count beside it.
+            downloadCsv(stampedFilename("historical-records"), filtered, [
+              { header: "Timestamp", value: (r) => r.timestamp },
+              { header: "Type", value: (r) => TYPE_META[r.type].label },
+              {
+                header: "Building",
+                value: (r) =>
+                  r.buildingId ? buildingName(r.buildingId) : "Estate",
+              },
+              {
+                header: "Room",
+                value: (r) => (r.roomId ? roomLabel(r.roomId) : ""),
+              },
+              { header: "Record", value: (r) => r.text },
+              { header: "Reference", value: (r) => r.refId ?? "" },
+              { header: "Recorded by", value: (r) => r.actorName },
+            ]);
+            toast.success(
+              `Exported ${filtered.length} record${filtered.length === 1 ? "" : "s"} to CSV`,
+            );
+          }}
           className="border-border hover:border-primary hover:text-info-foreground flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium"
         >
           <Download className="size-3" /> Export CSV

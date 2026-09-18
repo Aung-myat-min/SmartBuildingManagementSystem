@@ -56,11 +56,12 @@ Two invariants the code relies on:
 
 **`lib/mock-data.ts`** (~1750 lines) — seed data + derivations.
 3 buildings · 19 rooms · 10 equipment types · 19 units · 2 sensor types · 17 sensors ·
-14 requests · 8 users · 18 log entries · 13 reports.
+14 requests · 18 log entries · 13 reports. Accounts are **not** here — they
+live in Firestore; see `lib/users-store.ts`.
 Helpers: `buildingStats()`, `roomsForBuilding()`, `roomLabel()`, `buildingName()`,
 `equipmentUnitLabel()`, `powerSeries()`, `reportDetail()`.
 Lookups: `BUILDING_META`, `BUILDING_LOAD_KW`, `LOG_BOOK_SOURCE_META`,
-`REQUEST_NEXT_STATUS`, `REQUEST_NEXT_ACTION`, `CURRENT_USERS`, `LIVE_ALARM_SENSOR_ID`.
+`REQUEST_NEXT_STATUS`, `REQUEST_NEXT_ACTION`.
 Sensor registry: `sensorTypes()` / `sensorType()` / `statusDef()` — always read
 a sensor type through these, never through `SENSOR_TYPES`. They resolve against
 whatever `setSensorRegistrySource()` was last handed, which is the live registry
@@ -172,7 +173,7 @@ Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 | `shared/tone-badge.tsx` | `<ToneBadge tone>` — every status, priority, condition, record type. `toneDotClass()` for raw dots. |
 | `shared/pulse-dot.tsx` | Live dot; only where something is genuinely happening now. |
 | `shared/confirm-dialog.tsx` | `useConfirm()` → promise. Decisions only, plus the one optional `requireReason` textarea. |
-| `shared/access-denied.tsx` | Role-locked page: states the role, offers a switch. |
+| `shared/access-denied.tsx` | Role-locked page: states the role and who to ask. No action — with real accounts there is nothing to switch to. |
 | `shared/empty-state.tsx` | Empty list/filter result. |
 | `shared/form-drawer.tsx` | `FormDrawer` — the 392px right drawer for anything with fields, plus `FormField` / `FormFieldLocked`. |
 | `shared/date-range-filter.tsx` | `DateRangeFilter` — from/to bounds on a toolbar, native date inputs, `withTime` for datetime-local. `withinRange()` does the comparison; an open end means unbounded, and a bare end date covers its whole day. |

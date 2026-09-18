@@ -11,7 +11,9 @@
     "emulators": "firebase emulators:start --only auth,firestore",
     "seed": "NEXT_PUBLIC_FIREBASE_EMULATORS=1 node scripts/seed-users.mjs",
     "bootstrap": "node scripts/bootstrap-live.mjs",
-    "rules:deploy": "firebase deploy --only firestore:rules"
+    "rules:deploy": "firebase deploy --only firestore:rules",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -35,6 +37,7 @@
     "@types/react-dom": "^19",
     "firebase-admin": "^14.4.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^5.0.1"
   }
 }
