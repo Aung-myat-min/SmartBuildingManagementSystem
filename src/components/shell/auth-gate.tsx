@@ -17,7 +17,7 @@ import { useAuth } from "@/lib/auth";
  * actually refuses anybody.
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
-  const { status, user } = useAuth();
+  const { status, user, endedReason } = useAuth();
   const router = useRouter();
 
   const signedOut =
@@ -27,11 +27,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   React.useEffect(() => {
     if (!signedOut) return;
+    // A session that was working and stopped gets the explanation screen; a
+    // cold signed-out load and a deliberate sign-out both just get the form.
     // replace, not push — otherwise Back bounces between the two screens.
     router.replace(
-      status === "signed-out" ? "/login" : `/login?reason=${status}`,
+      endedReason ? `/login/session-expired?reason=${endedReason}` : "/login",
     );
-  }, [signedOut, status, router]);
+  }, [signedOut, endedReason, router]);
 
   // Children must not render without an identity: every page calls
   // useAppState(), which throws outside the provider below.

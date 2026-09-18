@@ -1,13 +1,44 @@
 "use client";
 
 import { Clock } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth";
+
+/**
+ * Firebase sessions do not time out on idle — a refresh token lives until it
+ * is revoked — so this screen is no longer about thirty quiet minutes. It is
+ * reached when a session that was working stopped working: the account was
+ * suspended, its profile went, or the token was revoked elsewhere (a password
+ * change on another device does exactly that).
+ */
+const REASONS: Record<string, string> = {
+  suspended:
+    "This account has been suspended, so you were signed out. An Admin Manager can restore it.",
+  "no-profile":
+    "This account no longer has a profile, so it cannot be used. Ask an Admin Manager to set it up again.",
+  revoked:
+    "Your session was ended somewhere else — usually a password change on another device.",
+};
 
 const GHOST_ROWS = [64, 84, 52, 90, 70];
 
 export default function SessionExpiredPage() {
+  return (
+    <React.Suspense fallback={null}>
+      <SessionExpiredView />
+    </React.Suspense>
+  );
+}
+
+function SessionExpiredView() {
   const router = useRouter();
+  const params = useSearchParams();
+  const { lastEmail } = useAuth();
+  const detail =
+    REASONS[params.get("reason") ?? ""] ??
+    "You were signed out. Nothing you had open has been lost.";
 
   return (
     <div className="bg-background relative flex min-h-screen items-center justify-center overflow-hidden p-6">
@@ -42,16 +73,17 @@ export default function SessionExpiredPage() {
         <div className="flex items-center gap-2.25">
           <Clock className="text-warning-foreground size-4 shrink-0" />
           <span className="text-[13px] font-semibold">
-            Your session has expired
+            Your session has ended
           </span>
         </div>
         <p className="text-foreground/80 mt-2.25 text-[12px] leading-relaxed">
-          You were signed out after 30 minutes without activity. Nothing you had
-          open has been lost — sign in and you come back to this page.
+          {detail}
         </p>
-        <p className="text-muted-foreground mt-2.25 font-mono text-[11px]">
-          thet.naing@university.edu
-        </p>
+        {lastEmail && (
+          <p className="text-muted-foreground mt-2.25 font-mono text-[11px]">
+            {lastEmail}
+          </p>
+        )}
         <div className="mt-3.75 flex gap-2">
           <Button className="flex-1" onClick={() => router.push("/login")}>
             Sign in again

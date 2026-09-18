@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
+import { useAuth } from "@/lib/auth";
 import { formatRelative } from "@/lib/format";
 import { BUILDINGS } from "@/lib/mock-data";
 import { roleLabel } from "@/lib/permissions";
@@ -370,18 +371,34 @@ function AppearanceSection() {
 
 function SecuritySection() {
   const { currentUser, log } = useAppState();
+  const { changePassword } = useAuth();
   const [current, setCurrent] = React.useState("");
   const [next, setNext] = React.useState("");
   const [confirmPass, setConfirmPass] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [pending, setPending] = React.useState(false);
 
-  const handleChangePassword = () => {
+  const handleChangePassword = async () => {
+    if (pending) return;
+    if (current.length === 0) {
+      setError("Enter your current password.");
+      return;
+    }
     if (next.length < 10) {
       setError("New password must be at least 10 characters.");
       return;
     }
     if (next !== confirmPass) {
       setError("New password and confirmation don't match.");
+      return;
+    }
+    setPending(true);
+    // Reauthenticates first, so the "Current" field is finally checked against
+    // something rather than being decoration.
+    const result = await changePassword(current, next);
+    setPending(false);
+    if (!result.ok) {
+      setError(result.message);
       return;
     }
     setError(null);
@@ -403,7 +420,7 @@ function SecuritySection() {
     <div className="flex flex-col gap-3.5">
       <SectionCard
         title="Password"
-        detail="Changing your password signs you out on every other device. Last changed 62 days ago."
+        detail="You stay signed in here. Other devices keep their session until it next refreshes."
       >
         <div className="grid grid-cols-3 gap-3 max-sm:grid-cols-1">
           <div className="flex flex-col gap-1.5">
@@ -437,7 +454,9 @@ function SecuritySection() {
           </p>
         )}
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <Button onClick={handleChangePassword}>Change password</Button>
+          <Button onClick={handleChangePassword} disabled={pending}>
+            {pending ? "Changing…" : "Change password"}
+          </Button>
           <Link
             href="/login/forgot-password"
             className="text-primary text-[11.5px] font-medium hover:underline"

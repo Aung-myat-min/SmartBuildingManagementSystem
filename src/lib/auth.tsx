@@ -49,6 +49,9 @@ export type AuthStatus =
 
 export type AuthResult = { ok: true } | { ok: false; message: string };
 
+/** Firebase sessions do not time out on idle; these are the real endings. */
+export type SessionEndReason = "suspended" | "no-profile" | "revoked";
+
 export interface AuthState {
   status: AuthStatus;
   user: AppUser | null;
@@ -56,6 +59,12 @@ export interface AuthState {
   firebaseUser: User | null;
   /** Survives the sign-out, so the session-expired screen can name them. */
   lastEmail: string | null;
+  /**
+   * Why a session that was working stopped. Null for a deliberate sign-out and
+   * for a cold signed-out load — the difference is what decides between the
+   * sign-in screen and the session-ended one.
+   */
+  endedReason: SessionEndReason | null;
   signIn: (
     email: string,
     password: string,
@@ -82,6 +91,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = React.useState<AppUser | null>(null);
   const [firebaseUser, setFirebaseUser] = React.useState<User | null>(null);
   const [lastEmail, setLastEmail] = React.useState<string | null>(null);
+  const [endedReason, setEndedReason] = React.useState<SessionEndReason | null>(
+    null,
+  );
+  // Distinguishes "they pressed Sign out" from "the session was taken away",
+  // which are the same event as far as onAuthStateChanged is concerned.
+  const deliberate = React.useRef(false);
+  const hadSession = React.useRef(false);
   // The sign-in stamp writes once per session, not on every snapshot — the
   // write produces a snapshot, which would otherwise write again forever.
   const stampedFor = React.useRef<string | null>(null);
@@ -97,7 +113,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!fbUser) {
         setUser(null);
         stampedFor.current = null;
-        setStatus((prev) => (prev === "loading" ? "signed-out" : prev));
+        setStatus((prev) => {
+          // suspended / no-profile already set their own status and reason.
+          if (prev === "suspended" || prev === "no-profile") return prev;
+          // A token revoked elsewhere (a password change on another device,
+          // an admin revoking it) ends a working session without warning.
+          if (hadSession.current && !deliberate.current) {
+            setEndedReason("revoked");
+          }
+          return "signed-out";
+        });
+        hadSession.current = false;
+        deliberate.current = false;
         return;
       }
 
@@ -112,6 +139,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         (snap) => {
           if (!snap.exists()) {
             setUser(null);
+            setEndedReason("no-profile");
             setStatus("no-profile");
             void signOut(auth);
             return;
@@ -121,6 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (data.status === "suspended") {
             setUser(null);
+            setEndedReason("suspended");
             setStatus("suspended");
             void signOut(auth);
             return;
@@ -139,6 +168,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             legacyUid: data.legacyUid ?? undefined,
           });
           setStatus("signed-in");
+          hadSession.current = true;
+          setEndedReason(null);
 
           if (stampedFor.current !== fbUser.uid) {
             stampedFor.current = fbUser.uid;
@@ -154,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // here, so it lands in the same place rather than needing a second
           // mechanism.
           setUser(null);
+          setEndedReason("suspended");
           setStatus("suspended");
           void signOut(auth);
         },
@@ -185,7 +217,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const signOutNow = React.useCallback(async () => {
+    deliberate.current = true;
     stampedFor.current = null;
+    setEndedReason(null);
+    setLastEmail(null);
     await signOut(auth);
     setStatus("signed-out");
   }, []);
@@ -220,6 +255,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await updatePassword(fbUser, next);
         return { ok: true as const };
       } catch (error) {
+        // The shared map deliberately blurs a bad credential into "that email
+        // and password don't match", which is right on the sign-in screen and
+        // wrong here: we already know who this is, so the only thing in doubt
+        // is the password they just typed.
+        const code =
+          typeof error === "object" && error !== null && "code" in error
+            ? String((error as { code: unknown }).code)
+            : "";
+        if (
+          code === "auth/invalid-credential" ||
+          code === "auth/wrong-password"
+        ) {
+          return {
+            ok: false as const,
+            message: "That is not your current password.",
+          };
+        }
         return { ok: false as const, message: authErrorMessage(error) };
       }
     },
@@ -232,6 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       firebaseUser,
       lastEmail,
+      endedReason,
       signIn,
       signOutNow,
       sendReset,
@@ -242,6 +295,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user,
       firebaseUser,
       lastEmail,
+      endedReason,
       signIn,
       signOutNow,
       sendReset,

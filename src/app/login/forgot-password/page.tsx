@@ -6,7 +6,7 @@ import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatClock } from "@/lib/format";
+import { useAuth } from "@/lib/auth";
 
 function BrandMark() {
   return (
@@ -22,10 +22,11 @@ function BrandMark() {
 }
 
 export default function ForgotPasswordPage() {
+  const { sendReset } = useAuth();
   const [email, setEmail] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const [sent, setSent] = React.useState(false);
-  const [expiry, setExpiry] = React.useState("");
+  const [pending, setPending] = React.useState(false);
   const [resendCooldown, setResendCooldown] = React.useState(0);
 
   React.useEffect(() => {
@@ -34,16 +35,29 @@ export default function ForgotPasswordPage() {
     return () => clearTimeout(t);
   }, [resendCooldown]);
 
-  const handleSend = (e: React.FormEvent) => {
+  const send = async () => {
+    const result = await sendReset(email);
+    if (!result.ok) {
+      setError(result.message);
+      return false;
+    }
+    setError(null);
+    setResendCooldown(30);
+    return true;
+  };
+
+  const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending) return;
     if (!email.includes("@")) {
       setError("Enter the university address your account uses.");
       return;
     }
-    setError(null);
-    setExpiry(formatClock(new Date(Date.now() + 30 * 60 * 1000)));
-    setSent(true);
-    setResendCooldown(30);
+    setPending(true);
+    // An address the system does not hold reports success too — anything else
+    // turns this form into a way of testing whether somebody has an account.
+    if (await send()) setSent(true);
+    setPending(false);
   };
 
   return (
@@ -58,7 +72,7 @@ export default function ForgotPasswordPage() {
             </div>
             <p className="text-muted-foreground mt-2 text-[12px] leading-relaxed">
               Enter the university address your account uses. We send a
-              single-use link that expires in 30 minutes.
+              single-use link that expires in about an hour.
             </p>
             <form
               onSubmit={handleSend}
@@ -82,8 +96,12 @@ export default function ForgotPasswordPage() {
                   {error}
                 </p>
               )}
-              <Button type="submit" className="mt-2.5 w-full">
-                Send reset link
+              <Button
+                type="submit"
+                disabled={pending}
+                className="mt-2.5 w-full"
+              >
+                {pending ? "Sending…" : "Send reset link"}
               </Button>
             </form>
             <div className="border-border mt-4.5 flex items-center gap-1.5 border-t pt-3.5">
@@ -107,9 +125,9 @@ export default function ForgotPasswordPage() {
               Check your email
             </div>
             <p className="text-foreground/80 mt-2 text-[12px] leading-relaxed">
-              A reset link is on its way to{" "}
-              <span className="font-mono text-[11.5px]">{email}</span>. It works
-              once and expires at {expiry}.
+              If <span className="font-mono text-[11.5px]">{email}</span> is on
+              the system, a reset link is on its way. It works once, and expires
+              in about an hour.
             </p>
             <p className="text-muted-foreground border-border bg-surface-subtle mt-3 rounded-md border p-2.75 text-[11.5px] leading-relaxed">
               Nothing arrived? Check the junk folder, then ask an Admin Manager
@@ -118,8 +136,8 @@ export default function ForgotPasswordPage() {
             <Button
               variant="outline"
               className="mt-4 w-full"
-              disabled={resendCooldown > 0}
-              onClick={() => setResendCooldown(30)}
+              disabled={resendCooldown > 0 || pending}
+              onClick={() => void send()}
             >
               {resendCooldown > 0
                 ? `Resend link in ${resendCooldown}s`
