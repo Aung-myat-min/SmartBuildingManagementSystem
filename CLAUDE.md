@@ -1,7 +1,8 @@
 # Smart Building Monitoring — codebase map
 
-Facilities-operations dashboard for a 3-building estate (CET333). Frontend only;
-all data is in-memory mock data. Firebase is planned as the backend later.
+Facilities-operations dashboard for a 3-building estate (CET333). Firebase Auth
+is real and the `users` collection lives in Firestore; every other collection is
+still in-memory mock data.
 
 Full reference — build status, every exported function, page-by-page behaviour
 and the known gaps — lives in [`docs/PROJECT-STATE.md`](docs/PROJECT-STATE.md).
@@ -22,13 +23,14 @@ src/
     page.tsx              redirects to /login
     login/                login + account-access screens (outside the app shell)
     (app)/
-      layout.tsx          app shell: sidebar + 54px header + demo banner
+      layout.tsx          auth gate, then the shell: sidebar + 54px header
       <route>/page.tsx    one file per page, sub-components colocated
   components/
-    shell/                sidebar, header widgets (account, notifications, role switcher, demo banner)
+    shell/                sidebar, header widgets (account, notifications), auth-gate
     shared/               cross-page primitives (tone-badge, pulse-dot, access-denied, empty-state, confirm-dialog)
     ui/                   shadcn primitives
-    providers.tsx         AppStateProvider + ConfirmProvider
+    providers.tsx         ThemeProvider + AuthProvider + ConfirmProvider
+                          (AppStateProvider lives inside the auth gate, below)
   lib/                    types, mock data, app state, permissions, formatting, nav
 ```
 
@@ -38,7 +40,7 @@ src/
 
 | Group | Types |
 | --- | --- |
-| Users | `UserRole` (office-staff / admin-manager / ceo-super-admin), `AppUser`, `ManagedUser` |
+| Users | `UserRole` (office-staff / admin-manager / ceo-super-admin), `AppUser` (+ `legacyUid`), `ManagedUser` |
 | Estate | `Building`, `Room`, `RoomType` |
 | Equipment | `EquipmentTypeDef`, `Equipment` (room-level count breakdown), `EquipmentUnit` (one taggable asset), `EquipmentCondition`, `EquipmentHistoryEvent` |
 | Sensors | `SensorTypeDef` (own `statuses[]` + `actions[]` + `icon` key), `SensorStatusDef`, `SensorAction`, `EnvironmentalSensor` |
@@ -74,9 +76,28 @@ an unlocked door is blue for 30 minutes, then amber), `countOpenRequests` /
 Whether a status counts as an alarm is **not** here — it is the `isAlarm` flag
 on the status's registry entry. **Never re-implement one of these inline.**
 
+**`lib/auth.tsx`** — `useAuth()`, the signed-in identity, and the only module
+that imports `firebase/auth`. `status` is one discriminated field
+(`loading` / `signed-out` / `signed-in` / `no-profile` / `suspended`) because
+being authenticated is not the same as being usable here: no page can render
+until the role resolves. The profile is an `onSnapshot` on `users/{uid}`, so a
+role change or suspension takes effect without a re-login. `endedReason` tells
+a session that was taken away from a deliberate sign-out.
+
+**`lib/firebase.ts`** — the one `initializeApp`. The web config is **not** a
+secret; authorisation is `firestore.rules`. Also exports `provisionerApp()`, the
+second instance account creation runs on (see `lib/users-store.ts`).
+
+**`lib/users-store.ts`** — the only Firestore-backed collection. `useUsers()`
+subscribes; `createUser` / `updateUser` / `setUserStatus` write. Timestamps
+become ISO strings at this boundary and nowhere else.
+
 **`lib/app-state.tsx`** — `useAppState()`, the single client-side store.
-Holds the signed-in role, active building, a 1s `elapsed` tick, notifications, and
-in-memory overrides so an action on one page shows up on every other page.
+Takes the resolved `user` as a required prop and re-exposes `role` /
+`currentUser`, so pages read identity the way they always did. Mounted **inside**
+the auth gate, so signing out unmounts it and discards the session's overrides.
+Holds the active building, notifications, and in-memory overrides so an action
+on one page shows up on every other page.
 It also holds the live sensor type registry (`sensorTypeRegistry` plus
 `addSensorType` / `updateSensorType` / `archiveSensorType` and the status and
 action mutators), which is where the registry's validation is enforced — a type
@@ -88,8 +109,8 @@ walks a request one step through
 `requested → approved → in-progress → resolved → completed`; `declineRequest`
 attaches a reason **without** moving it, `withdrawRequest` drops a staff
 member's own unapproved request out of every list, and `requestVerification`
-flags that its submitter thinks resolved work is done. `resetDemo()` clears
-everything.
+flags that its submitter thinks resolved work is done. There is no `resetDemo()`
+— signing out unmounts the provider, which discards the lot.
 
 It also owns the **Log Book**. `log(draft)` stamps the id, the time and the
 actor from the signed-in role, and `logBook` puts what this session wrote in
@@ -100,7 +121,10 @@ sensor type registry), and a screen holding its own state (Administration's
 buildings, rooms and accounts; the equipment register; reports; the password
 form) calls `log()` itself. A refused registry change writes nothing.
 
-**`lib/permissions.ts`** — `roleRank()` (ceo=1, admin=2, staff=3), `roleLabel`, and
+**`lib/permissions.ts`** — the **affordance** layer; `firestore.rules` is the
+enforcement layer, and they have to say the same thing. `roleRank()` (ceo=1,
+admin=2, staff=3), `roleLabel`, `isActor()` (matches a real uid *or* the
+`legacyUid` the mock corpus was written against), and
 `can*` predicates. Gate on **rank**, never on role equality. Administration is
 split three ways: `canManageEstate` (CEO) vs `canManageAccounts` and
 `canManageSensorTypes` (Admin Manager + CEO), with
@@ -167,7 +191,7 @@ tooltip — it is never hidden.
 
 | Route | Purpose | Shape |
 | --- | --- | --- |
-| `/login` | Sign in + demo account picker | card; `/login/forgot-password`, `/login/first-sign-in`, `/login/session-expired` |
+| `/login` | Real sign-in (email + password) | card; `/login/forgot-password` (sends a reset), `/login/first-sign-in` (the reset link's landing page, reads `oobCode`), `/login/session-expired` (a session taken away, not an idle timeout) |
 | `/dashboard` | Estate overview | KPI tiles, power series, estate table, requests needing a decision, live alerts, log feed |
 | `/equipment` | Asset register | Register/Board toggle, filters, detail drawer with history + 6 actions |
 | `/sensors` | Live device state | grouped by building, one column per registry type, alarm rows break the rhythm |
@@ -193,8 +217,21 @@ tooltip — it is never hidden.
 - Business logic stays in `lib/`; pages read from `useAppState()` and mock data.
 - Biome formats and lints; run `npm run lint` before finishing.
 
-## Demo scaffolding — not for production
+## Auth and authorisation
 
-The role switcher (`shell/role-switcher.tsx`), the demo banner, and the 20-second
-alarm timer in `app-state.tsx` exist so a reviewer can reach every state without a
-backend. They ship behind the demo banner and come out when Firebase lands.
+Three real accounts, one per role — see `README.md` for the addresses and the
+shared development password. There is no role switcher: to see another role,
+sign in as it.
+
+**The route guard (`shell/auth-gate.tsx`) is UX, not security.** A client-only
+SDK has no server-side gate; it exists so nobody lands on a chrome-full
+dashboard while signed out. Authorisation is `firestore.rules`, which run on
+Google's servers. When a `can*` predicate changes, change the matching rule in
+the same commit.
+
+Suspension works *through* the rules: a suspended account's own profile read is
+refused, and `lib/auth.tsx` turns that `permission-denied` into a sign-out. It
+looks like a bug if you do not know that.
+
+`usePersistedState` keys are scoped to the signed-in uid, so two people sharing
+a browser do not share view preferences.

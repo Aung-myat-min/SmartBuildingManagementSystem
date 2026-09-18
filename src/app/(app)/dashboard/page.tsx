@@ -19,10 +19,15 @@ import { formatAge, formatTime } from "@/lib/format";
 import {
   ATTENTION_ITEMS,
   BUILDINGS,
+  buildingName,
   buildingStats,
   EQUIPMENT,
   powerSeries,
+  roomLabel,
   roomsForBuilding,
+  SENSORS,
+  sensorType,
+  statusDef,
 } from "@/lib/mock-data";
 import { canAct } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -51,8 +56,8 @@ export default function DashboardPage() {
     role,
     activeBuildingId,
     setActiveBuildingId,
-    alarmActive,
-    alarmSeconds,
+    sensorStatus,
+    sensorChangedAt,
     scopedRequests,
     moveRequest,
     logBook,
@@ -78,7 +83,18 @@ export default function DashboardPage() {
   const kwhToday =
     Math.round(bars.reduce((a, b) => a + b, 0) / bars.length) * 24;
 
-  const buildingAlarm = activeBuildingId === "b216" && alarmActive;
+  // Derived from real sensor state rather than a scripted timer: whatever is
+  // in an alarm status right now, in the building being looked at.
+  const alarming = SENSORS.filter(
+    (s) =>
+      s.buildingId === activeBuildingId &&
+      (statusDef(s.typeId, sensorStatus(s.id, s.status))?.isAlarm ?? false),
+  );
+  const alarm = alarming[0];
+  const buildingAlarm = alarming.length > 0;
+  const alarmAge = alarm
+    ? formatAge(sensorChangedAt(alarm.id, alarm.updatedAt))
+    : "";
 
   const openRequests = scopedRequests.filter((r) => isRequestOpen(r.status));
   const decisionQueue = [...openRequests]
@@ -139,7 +155,7 @@ export default function DashboardPage() {
                   : "text-success-foreground",
               )}
             >
-              {buildingAlarm ? `ALARM · ${alarmSeconds}s` : "ALL NORMAL"}
+              {buildingAlarm ? `ALARM · ${alarmAge}` : "ALL NORMAL"}
             </span>
           </div>
         </div>
@@ -398,7 +414,7 @@ export default function DashboardPage() {
             </ToneBadge>
           </div>
           <div className="border-border flex flex-col gap-2.5 border-b p-3">
-            {buildingAlarm && (
+            {alarm && (
               <div className="border-danger bg-danger-muted rounded-md border border-l-3 p-3">
                 <div className="flex items-center gap-1.5">
                   <PulseDot tone="danger" pulse />
@@ -407,14 +423,15 @@ export default function DashboardPage() {
                   </span>
                   <span className="flex-1" />
                   <span className="text-muted-foreground font-mono text-[10px]">
-                    {alarmSeconds}s
+                    {alarmAge}
                   </span>
                 </div>
                 <div className="mt-1.5 text-[12.5px] font-medium">
-                  Fire detector triggered
+                  {sensorType(alarm.typeId)?.label ?? "Sensor"} triggered
                 </div>
                 <div className="text-muted-foreground mt-0.5 text-[11px]">
-                  Building 216 / Room 302 · FD-216-14
+                  {buildingName(alarm.buildingId)} / {roomLabel(alarm.roomId)} ·{" "}
+                  {alarm.id}
                 </div>
                 <Button
                   size="sm"

@@ -6,7 +6,6 @@ import {
   buildingName,
   EQUIPMENT_UNITS,
   equipmentUnitLabel,
-  LIVE_ALARM_SENSOR_ID,
   LOG_BOOK,
   MAINTENANCE_REQUESTS,
   REQUEST_NEXT_STATUS,
@@ -122,6 +121,15 @@ export interface Notification {
 
 const BASE_NOTIFICATIONS: Notification[] = [
   {
+    id: "n-alarm-fd-216-14",
+    tone: "danger",
+    title: "Fire alarm triggered",
+    detail: "Building 216 / Room 302 detector — FD-216-14.",
+    time: "now",
+    read: false,
+    pulse: true,
+  },
+  {
     id: "n-req-4192",
     tone: "warning",
     title: "High-priority request opened",
@@ -152,11 +160,6 @@ export interface AppState {
   currentUser: AppUser;
   activeBuildingId: string;
   setActiveBuildingId: (id: string) => void;
-  elapsed: number;
-  resetDemo: () => void;
-  alarmActive: boolean;
-  alarmSeconds: number;
-  liveAlarmSensorId: string;
   notifications: Notification[];
   unreadCount: number;
   markNotificationRead: (id: string) => void;
@@ -264,7 +267,6 @@ export function AppStateProvider({
   const [activeBuildingId, setActiveBuildingIdState] = React.useState(
     () => user.buildingId ?? "b216",
   );
-  const [elapsed, setElapsed] = React.useState(0);
   const [notifications, setNotifications] =
     React.useState<Notification[]>(BASE_NOTIFICATIONS);
   // A request now carries more in-session change than a status: the reason an
@@ -287,40 +289,11 @@ export function AppStateProvider({
   const [sensorTypeRegistry, setSensorTypeRegistry] =
     React.useState<SensorTypeDef[]>(SENSOR_TYPES);
   const [sessionLog, setSessionLog] = React.useState<LogBookEntry[]>([]);
-  const alarmNotifAdded = React.useRef(false);
 
   // mock-data's sensorType/statusDef accessors read through this, so the page
   // sees an edit on the same render that made it. Assigning the current list
   // is idempotent, which is why it can sit in the render body.
   setSensorRegistrySource(sensorTypeRegistry);
-
-  React.useEffect(() => {
-    const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const alarmActive = elapsed >= 20;
-
-  React.useEffect(() => {
-    if (alarmActive && !alarmNotifAdded.current) {
-      alarmNotifAdded.current = true;
-      setNotifications((prev) => [
-        {
-          id: `n-alarm-${Date.now()}`,
-          tone: "danger",
-          title: "Fire alarm triggered",
-          detail: "Building 216 / Room 302 detector — FD-216-14.",
-          time: "now",
-          read: false,
-          pulse: true,
-        },
-        ...prev,
-      ]);
-    }
-    if (!alarmActive) {
-      alarmNotifAdded.current = false;
-    }
-  }, [alarmActive]);
 
   const setActiveBuildingId = React.useCallback(
     (id: string) => {
@@ -329,18 +302,6 @@ export function AppStateProvider({
     },
     [role],
   );
-
-  const resetDemo = React.useCallback(() => {
-    setElapsed(0);
-    alarmNotifAdded.current = false;
-    setNotifications(BASE_NOTIFICATIONS);
-    setRequestPatches({});
-    setCreatedRequests([]);
-    setSensorOverrides({});
-    setEquipmentOverrides({});
-    setSensorTypeRegistry(SENSOR_TYPES);
-    setSessionLog([]);
-  }, []);
 
   const markNotificationRead = React.useCallback((id: string) => {
     setNotifications((prev) =>
@@ -532,12 +493,9 @@ export function AppStateProvider({
     (sensorId: string, fallback: string) => {
       const override = sensorOverrides[sensorId];
       if (override) return override.status;
-      // The scripted alarm trips one detector 20 seconds in. An override wins
-      // over it, which is what makes resetting the alarm stick.
-      if (alarmActive && sensorId === LIVE_ALARM_SENSOR_ID) return "triggered";
       return fallback;
     },
-    [sensorOverrides, alarmActive],
+    [sensorOverrides],
   );
 
   const sensorChangedAt = React.useCallback(
@@ -805,11 +763,6 @@ export function AppStateProvider({
       currentUser: user,
       activeBuildingId,
       setActiveBuildingId,
-      elapsed,
-      resetDemo,
-      alarmActive,
-      alarmSeconds: Math.max(0, elapsed - 20),
-      liveAlarmSensorId: LIVE_ALARM_SENSOR_ID,
       notifications,
       unreadCount: notifications.filter((n) => !n.read).length,
       markNotificationRead,
@@ -847,9 +800,6 @@ export function AppStateProvider({
       user,
       activeBuildingId,
       setActiveBuildingId,
-      elapsed,
-      resetDemo,
-      alarmActive,
       notifications,
       markNotificationRead,
       markAllNotificationsRead,

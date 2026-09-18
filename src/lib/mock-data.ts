@@ -11,7 +11,6 @@ import {
   ESCALATION_WINDOW_HOURS,
 } from "./derive";
 import type {
-  AppUser,
   Building,
   EnvironmentalSensor,
   Equipment,
@@ -21,7 +20,6 @@ import type {
   HistoricalRecord,
   LogBookEntry,
   MaintenanceRequest,
-  ManagedUser,
   Report,
   ReportDetail,
   Room,
@@ -744,9 +742,12 @@ export const SENSORS: EnvironmentalSensor[] = [
     buildingId: "b216",
     roomId: "r-216-302",
     typeId: "fire-alarm",
-    status: "normal",
+    // The one device in alarm. A 20-second timer in app-state used to trip it;
+    // that went with the rest of the demo scaffolding, so the state now lives
+    // in the data where every other sensor's does.
+    status: "triggered",
     linkedEquipmentId: "EQ-216-03",
-    updatedAt: "2026-09-09T20:00:00Z",
+    updatedAt: "2026-09-09T20:38:00Z",
   },
   {
     id: "FD-216-08",
@@ -879,8 +880,6 @@ export const SENSORS: EnvironmentalSensor[] = [
 ];
 
 /** Room 302's fire detector — the sensor the scripted 20s demo alarm drives. */
-export const LIVE_ALARM_SENSOR_ID = "FD-216-14";
-
 // ---- Maintenance requests ---------------------------------------------------
 
 export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [
@@ -1118,102 +1117,6 @@ export const REQUEST_PREV_ACTION: Record<
   resolved: "Reopen work",
   completed: "Reopen",
 };
-
-// ---- Users -------------------------------------------------------------------
-
-export const CURRENT_USERS: Record<AppUser["role"], AppUser> = {
-  "office-staff": {
-    uid: "u-hnin",
-    email: "hnin.nwe@university.edu",
-    name: "Hnin Nwe",
-    role: "office-staff",
-    buildingId: "b216",
-  },
-  "admin-manager": {
-    uid: "u-ko",
-    email: "elysha@university.edu",
-    name: "Elysha",
-    role: "admin-manager",
-  },
-  "ceo-super-admin": {
-    uid: "u-daw",
-    email: "daw.htun@university.edu",
-    name: "Daw Htun",
-    role: "ceo-super-admin",
-  },
-};
-
-export const MANAGED_USERS: ManagedUser[] = [
-  {
-    uid: "u-daw",
-    email: "daw.htun@university.edu",
-    name: "Daw Htun",
-    role: "ceo-super-admin",
-    status: "active",
-    lastActiveAt: "2026-09-09T20:40:00Z",
-  },
-  {
-    uid: "u-ko",
-    email: "elysha@university.edu",
-    name: "Elysha",
-    role: "admin-manager",
-    status: "active",
-    lastActiveAt: "2026-09-09T20:22:00Z",
-  },
-  {
-    uid: "u-su",
-    email: "su.myat@university.edu",
-    name: "Su Myat",
-    role: "admin-manager",
-    status: "active",
-    lastActiveAt: "2026-09-09T18:40:00Z",
-  },
-  {
-    uid: "u-hnin",
-    email: "hnin.nwe@university.edu",
-    name: "Hnin Nwe",
-    role: "office-staff",
-    buildingId: "b216",
-    status: "active",
-    lastActiveAt: "2026-09-09T20:38:00Z",
-  },
-  {
-    uid: "u-zaw",
-    email: "zaw.lin@university.edu",
-    name: "Zaw Lin",
-    role: "office-staff",
-    buildingId: "b216",
-    status: "active",
-    lastActiveAt: "2026-09-09T19:59:00Z",
-  },
-  {
-    uid: "u-thida",
-    email: "thida.win@university.edu",
-    name: "Thida Win",
-    role: "office-staff",
-    buildingId: "b209",
-    status: "active",
-    lastActiveAt: "2026-09-09T19:40:00Z",
-  },
-  {
-    uid: "u-nay",
-    email: "nay.oo@university.edu",
-    name: "Nay Oo",
-    role: "office-staff",
-    buildingId: "jsq",
-    status: "active",
-    lastActiveAt: "2026-09-09T17:40:00Z",
-  },
-  {
-    uid: "u-myo",
-    email: "myo.set@university.edu",
-    name: "Myo Set",
-    role: "office-staff",
-    buildingId: "jsq",
-    status: "suspended",
-    lastActiveAt: "2026-08-28T09:00:00Z",
-  },
-];
 
 // ---- Historical Records (long-range ledger) --------------------------------
 

@@ -1591,33 +1591,46 @@ geometry** (bar heights, grid templates).
 
 ## 11. Status, gaps and the Firebase path
 
-### 11.1 Demo scaffolding — comes out when a backend lands
+### 11.1 What the Firebase phase landed
 
-| Thing | Where |
-| --- | --- |
-| Role switcher | `src/components/shell/role-switcher.tsx`, mounted in the shell header |
-| Demo banner | `src/components/shell/demo-banner.tsx` |
-| The 20-second fire-alarm timer | `alarmActive = elapsed >= 20` in `src/lib/app-state.tsx`, plus the one-shot notification effect |
-| `resetDemo()` | `src/lib/app-state.tsx` |
-| The demo account picker | the lower half of `src/app/login/page.tsx` |
+Authentication is real. `src/lib/auth.tsx` owns the signed-in identity, backed
+by Firebase Auth and a `users/{uid}` document in Firestore; `src/lib/firebase.ts`
+is the one `initializeApp`; `src/lib/users-store.ts` is the only Firestore-backed
+collection. Everything else is still mock data.
 
-These exist so a reviewer can reach every state without a backend. They ship
-behind the demo banner.
+Gone with it: the role switcher, the demo banner, the 20-second alarm timer and
+`resetDemo()`. Three real accounts replace the picker (see `README.md`), the
+fire alarm now lives in the seed data as `FD-216-14`'s status rather than being
+tripped by a clock, and signing out unmounts `AppStateProvider`, which discards
+the session's overrides more thoroughly than `resetDemo()` ever did.
+
+**The route guard is UX, not security.** A client-only SDK has no server-side
+route gate. `firestore.rules` is the enforcement layer, and `permissions.ts` is
+the affordance layer — they have to agree, and a change to one belongs in the
+same commit as the change to the other.
 
 ### 11.2 Known gaps
 
-- **No persistence.** Every mutation is React state: request moves, sensor
-  statuses, equipment conditions, new requests, generated reports, and all of
-  Administration's building/room/user edits. A reload resets everything.
-- **No authentication.** `/login` pushes to `/dashboard` without checking
-  anything. There is no session, no token, no route protection — a signed-out
-  visitor can open any `(app)` route directly.
-- **Administration edits are page-local.** `BuildingsTab` / `UsersTab` hold
-  their own `useState` copies, so an estate edit is not visible on other pages
-  the way a request move is.
+- **No persistence, except accounts.** Request moves, sensor statuses,
+  equipment conditions, new requests, generated reports and Administration's
+  building/room edits are all still React state, and a reload resets them. The
+  `users` collection is the exception: it is in Firestore.
+- **The route guard is not security.** `shell/auth-gate.tsx` keeps a signed-out
+  visitor off the app shell, but a client-only SDK has no server-side gate.
+  Authorisation is `firestore.rules`, and `permissions.ts` only decides what a
+  padlock looks like. **The rules for every collection other than `users` are
+  still the default deny, and the `users` rules must be deployed** —
+  `npx firebase-tools deploy --only firestore:rules`.
+- **Building and room edits are still page-local.** `BuildingsTab` holds its own
+  `useState` copies, so an estate edit is not visible on other pages the way a
+  request move is. `UsersTab` no longer has this problem — it subscribes.
+- **Deleting an account is not possible from the app.** The client SDK cannot
+  remove another user's Auth record; the product suspends instead. A failed
+  provisioning leaves an Auth record with no profile, which signs out with an
+  explanation but needs the console to clear.
 - **Stubs that only toast:** CSV export on `/records`, PDF and CSV on
   `/reports`, sensor *Remove*, equipment photo upload (local object URL only),
-  profile photo, and password change.
+  and profile photo. Password change is real.
 - **No tests, no test runner.** Nothing in `package.json` runs a test.
 - **`README.md` is still `create-next-app` boilerplate.**
 - **Historical Records are PRNG-generated**, not authored — realistic in shape,
