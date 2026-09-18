@@ -114,7 +114,6 @@ export interface EquipmentUnit {
   condition: EquipmentCondition;
   installedAt: string; // ISO date
   nextServiceDue: string; // ISO date
-  openRequestCount: number;
   lastServiceAt?: string; // ISO date
 }
 

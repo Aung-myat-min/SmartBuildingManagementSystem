@@ -12,6 +12,7 @@ import { useAppState } from "@/lib/app-state";
 import {
   countEscalated,
   countOpenRequests,
+  equipmentBreakdown,
   isEscalated,
   isRequestOpen,
 } from "@/lib/derive";
@@ -20,7 +21,7 @@ import {
   ATTENTION_ITEMS,
   buildingName,
   buildingStats,
-  EQUIPMENT,
+  EQUIPMENT_UNITS,
   powerSeries,
   roomLabel,
   roomsForBuilding,
@@ -61,6 +62,7 @@ export default function DashboardPage() {
     scopedRequests,
     moveRequest,
     logBook,
+    equipmentCondition,
   } = useAppState();
   const clock = useLiveClock();
   const staff = !canAct(role);
@@ -69,13 +71,18 @@ export default function DashboardPage() {
     : buildings;
   const rooms = roomsForBuilding(activeBuildingId);
 
-  const eqForBuilding = EQUIPMENT.filter(
-    (e) => e.buildingId === activeBuildingId,
+  // Counted off the register, so marking a unit faulty moves this tile. There
+  // used to be a separate table of these numbers, authored independently of
+  // the units and drifted from them.
+  const eq = equipmentBreakdown(
+    EQUIPMENT_UNITS.filter((u) => u.buildingId === activeBuildingId).map(
+      (u) => ({ condition: equipmentCondition(u.id, u.condition) }),
+    ),
   );
-  const eqRunning = eqForBuilding.reduce((a, e) => a + e.running, 0);
-  const eqMaint = eqForBuilding.reduce((a, e) => a + e.underMaintenance, 0);
-  const eqFaulty = eqForBuilding.reduce((a, e) => a + e.faulty, 0);
-  const eqTotal = Math.max(1, eqRunning + eqMaint + eqFaulty);
+  const eqRunning = eq.running;
+  const eqMaint = eq.underMaintenance;
+  const eqFaulty = eq.faulty;
+  const eqTotal = Math.max(1, eq.total);
 
   const bars = powerSeries(activeBuildingId);
   const maxBar = Math.max(...bars);

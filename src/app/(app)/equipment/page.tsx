@@ -37,6 +37,7 @@ import {
   daysUntilService,
   type EquipmentBoardColumn,
   isDueService,
+  openRequestsForUnit,
 } from "@/lib/derive";
 import { formatDate, formatRelative } from "@/lib/format";
 import {
@@ -97,6 +98,7 @@ export default function EquipmentPage() {
     buildings,
     role,
     activeBuildingId,
+    requests,
     equipmentCondition,
     setEquipmentCondition,
   } = useAppState();
@@ -306,12 +308,12 @@ export default function EquipmentPage() {
                 <span
                   className={cn(
                     "w-20.5 text-right font-mono text-[11px] font-medium",
-                    u.openRequestCount > 0
+                    openRequestsForUnit(requests, u.id) > 0
                       ? "text-warning-foreground"
                       : "text-muted-foreground",
                   )}
                 >
-                  {u.openRequestCount}
+                  {openRequestsForUnit(requests, u.id)}
                 </span>
                 <span className="text-accent-foreground w-18.5 text-right text-[10.5px] font-medium">
                   Open →
@@ -411,6 +413,7 @@ export default function EquipmentPage() {
 
       <EquipmentDrawer
         unit={selected}
+        openRequests={selected ? openRequestsForUnit(requests, selected.id) : 0}
         conditionOf={conditionOf}
         onClose={() => setSelectedId(null)}
         onSetCondition={setEquipmentCondition}
@@ -633,6 +636,7 @@ function ViewButton({
 
 function EquipmentDrawer({
   unit,
+  openRequests,
   conditionOf,
   onClose,
   onSetCondition,
@@ -640,6 +644,7 @@ function EquipmentDrawer({
   canDecommission,
 }: {
   unit: EquipmentUnit | null;
+  openRequests: number;
   conditionOf: (u: EquipmentUnit) => EquipmentCondition;
   onClose: () => void;
   onSetCondition: (unitId: string, condition: EquipmentCondition) => void;
@@ -834,10 +839,8 @@ function EquipmentDrawer({
         />
         <DetailMeta
           label="Open requests"
-          value={String(unit.openRequestCount)}
-          tone={
-            unit.openRequestCount > 0 ? "text-warning-foreground" : undefined
-          }
+          value={String(openRequests)}
+          tone={openRequests > 0 ? "text-warning-foreground" : undefined}
         />
         <DetailMeta
           label="Last service"

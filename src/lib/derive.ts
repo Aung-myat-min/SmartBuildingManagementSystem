@@ -127,6 +127,51 @@ export function boardColumnFor(
   return isDueService(unit, condition, now) ? "due-service" : condition;
 }
 
+/**
+ * The room-level running / faulty / under-maintenance split, counted off the
+ * register rather than stored beside it.
+ *
+ * There used to be a second table holding these numbers, authored separately
+ * from the units, and the two had drifted: it claimed 24 desktop PCs nobody
+ * had registered and an air conditioner in a room with no assets. Counting
+ * makes `running + faulty + underMaintenance === total` true by construction
+ * instead of by maintenance, and means marking a unit faulty moves the tile.
+ */
+export interface EquipmentBreakdown {
+  running: number;
+  faulty: number;
+  underMaintenance: number;
+  total: number;
+}
+
+export function equipmentBreakdown(
+  units: { condition: EquipmentCondition }[],
+): EquipmentBreakdown {
+  // Decommissioned units are off the estate, not a state it can be in.
+  const live = units.filter((u) => u.condition !== "decommissioned");
+  return {
+    running: live.filter((u) => u.condition === "healthy").length,
+    faulty: live.filter((u) => u.condition === "faulty").length,
+    underMaintenance: live.filter((u) => u.condition === "under-maintenance")
+      .length,
+    total: live.length,
+  };
+}
+
+/**
+ * Open requests against one unit. Was a stored `openRequestCount` field — a
+ * third copy of a fact the request list already holds, which every request
+ * move would have had to remember to update.
+ */
+export function openRequestsForUnit(
+  requests: Pick<MaintenanceRequest, "equipmentId" | "status">[],
+  unitId: string,
+): number {
+  return requests.filter(
+    (r) => r.equipmentId === unitId && isRequestOpen(r.status),
+  ).length;
+}
+
 // ---- Sensors ---------------------------------------------------------------
 
 /**
