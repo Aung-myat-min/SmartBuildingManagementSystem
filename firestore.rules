@@ -1,0 +1,96 @@
+rules_version = '2';
+
+// ============================================================================
+// Phase A ships exactly one collection. Everything else is denied by default,
+// so Phase B has to open each collection deliberately rather than inheriting
+// access it was never granted.
+//
+// The rules are the ONLY thing that actually stops anybody. The client-side
+// route guard in src/components/shell/auth-gate.tsx is there so nobody lands
+// on a chrome-full dashboard while signed out — it is not security, because a
+// client-only SDK has no server-side gate.
+//
+// `src/lib/permissions.ts` is the affordance layer and these rules are the
+// enforcement layer. They have to say the same thing; when one changes, change
+// the other in the same commit.
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- Identity -------------------------------------------------------
+    //
+    // THE ONE FUNCTION TO REPLACE if the role ever moves to a custom claim:
+    //   return { 'role': request.auth.token.role, 'status': 'active' };
+    // Every helper below is written against its shape, so nothing else moves,
+    // and the per-request get() cost disappears with it.
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function signedIn()  { return request.auth != null; }
+    function myRole()    { return profile().role; }
+    // A suspended account still holds a valid ID token — the client SDK cannot
+    // disable an Auth record without the Admin SDK. This is what makes
+    // suspension real, and the permission-denied it produces on the user's own
+    // doc is exactly what the client turns into a sign-out. Not a bug.
+    function isActive()  { return signedIn() && profile().status == 'active'; }
+
+    function rank(r) {
+      return r == 'ceo-super-admin' ? 1 : (r == 'admin-manager' ? 2 : 3);
+    }
+    function myRank()             { return rank(myRole()); }
+    function isCeo()              { return myRole() == 'ceo-super-admin'; }
+    function mayManageAccounts()  { return myRank() <= 2; }
+    function isSelf(uid)          { return request.auth.uid == uid; }
+
+    // Mirrors UserDrawer's assignableRoles: a CEO may create Office Staff and
+    // Admin Managers but never another CEO; an Admin Manager, Office Staff only.
+    function mayAssign(r) {
+      return isCeo() ? rank(r) >= 2 : r == 'office-staff';
+    }
+
+    function validUser(d) {
+      return d.role in ['office-staff', 'admin-manager', 'ceo-super-admin']
+        && d.status in ['active', 'suspended']
+        && d.email is string && d.email.size() > 0
+        && d.name is string && d.name.size() > 0
+        && (d.role == 'office-staff' ? d.buildingId is string : d.buildingId == null);
+    }
+
+    match /users/{userId} {
+      // Everyone reads their own doc — that read IS the identity resolution.
+      // Account managers read the whole collection for Administration.
+      allow read: if isActive() && (isSelf(userId) || mayManageAccounts());
+
+      allow create: if isActive()
+        && mayManageAccounts()
+        && mayAssign(request.resource.data.role)
+        && validUser(request.resource.data);
+
+      allow update:
+        // The sign-in stamp. Without this carve-out every sign-in is denied.
+        if (isActive() && isSelf(userId)
+             && request.resource.data.diff(resource.data)
+                  .affectedKeys().hasOnly(['lastActiveAt']))
+        // canEditUser: never yourself; the target's CURRENT role must be one
+        // you may touch, and its NEW role one you may assign — so an Admin
+        // Manager can neither edit an Admin Manager nor promote anyone into it.
+        || (isActive()
+             && mayManageAccounts()
+             && !isSelf(userId)
+             && mayAssign(resource.data.role)
+             && mayAssign(request.resource.data.role)
+             && validUser(request.resource.data));
+
+      // The product suspends; it does not delete. Do not open a door the UI
+      // does not have.
+      allow delete: if false;
+    }
+
+    // Phase B opens these one at a time.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

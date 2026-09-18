@@ -1,0 +1,7 @@
+# pnpm 11 blocks dependency build scripts unless they are listed here.
+# Neither of these is needed for the Firebase *web* SDK: @firebase/util's script
+# is a no-op for consumers, and protobufjs's postinstall generates CLI helpers
+# used by the Node/gRPC transport, not by the browser's WebChannel one.
+allowBuilds:
+  '@firebase/util': false
+  protobufjs: false
