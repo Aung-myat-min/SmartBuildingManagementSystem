@@ -29,6 +29,8 @@ export const COLLECTIONS = {
   rooms: "rooms",
   sensorTypes: "sensorTypes",
   sensors: "sensors",
+  equipmentUnits: "equipmentUnits",
+  equipmentHistory: "equipmentHistory",
 } as const;
 
 /**

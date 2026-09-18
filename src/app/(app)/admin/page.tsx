@@ -25,7 +25,7 @@ import { type RegistryResult, slugify, useAppState } from "@/lib/app-state";
 import { countOpenRequests } from "@/lib/derive";
 import { formatRelative } from "@/lib/format";
 import { SENSOR_ICON_KEYS, sensorIcon } from "@/lib/icons";
-import { BUILDING_META, EQUIPMENT_UNITS } from "@/lib/mock-data";
+import { BUILDING_META } from "@/lib/mock-data";
 import {
   canEditUser,
   canManageAccounts,
@@ -271,6 +271,7 @@ function BuildingsTab({
 }) {
   const {
     log,
+    equipmentUnits,
     addBuilding,
     updateBuilding,
     deleteBuilding,
@@ -293,7 +294,7 @@ function BuildingsTab({
     : [];
 
   const devicesIn = (buildingId: string) =>
-    EQUIPMENT_UNITS.filter((u) => u.buildingId === buildingId).length;
+    equipmentUnits.filter((u) => u.buildingId === buildingId).length;
   const staffIn = (buildingId: string) =>
     users.filter((u) => u.buildingId === buildingId).length;
 
@@ -320,7 +321,7 @@ function BuildingsTab({
   };
 
   const handleRemoveRoom = async (room: Room) => {
-    const devices = EQUIPMENT_UNITS.filter((u) => u.roomId === room.id).length;
+    const devices = equipmentUnits.filter((u) => u.roomId === room.id).length;
     const result = await confirm({
       title: `Remove ${room.roomNumber}?`,
       body: `${room.roomNumber} is removed from ${selected?.name}.`,
@@ -473,7 +474,7 @@ function BuildingsTab({
                 <Stat
                   label="FAULTY"
                   value={
-                    EQUIPMENT_UNITS.filter(
+                    equipmentUnits.filter(
                       (u) =>
                         u.buildingId === selected.id &&
                         u.condition === "faulty",
@@ -516,7 +517,7 @@ function BuildingsTab({
                   {r.floor}
                 </span>
                 <span className="text-neutral-foreground w-22 text-right font-mono text-[11px] font-medium">
-                  {EQUIPMENT_UNITS.filter((u) => u.roomId === r.id).length}
+                  {equipmentUnits.filter((u) => u.roomId === r.id).length}
                 </span>
                 <span className="flex w-30 justify-end gap-1.5">
                   <RowButton

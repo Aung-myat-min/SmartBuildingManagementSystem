@@ -37,7 +37,6 @@ import { sensorIcon } from "@/lib/icons";
 import {
   BUILDING_META,
   buildingName,
-  EQUIPMENT_UNITS,
   equipmentForSensor,
   roomLabel,
   roomsForBuilding,
@@ -702,10 +701,10 @@ const FIELD_SELECT =
   "border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60";
 
 function SensorFields({ f, isEdit }: { f: SensorFieldState; isEdit: boolean }) {
-  const { buildings } = useAppState();
+  const { buildings, equipmentUnits } = useAppState();
   const type = sensorType(f.typeId);
   const rooms = roomsForBuilding(f.buildingId);
-  const linkable = EQUIPMENT_UNITS.filter((u) => u.buildingId === f.buildingId);
+  const linkable = equipmentUnits.filter((u) => u.buildingId === f.buildingId);
 
   return (
     <>

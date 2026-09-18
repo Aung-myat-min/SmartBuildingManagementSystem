@@ -12,6 +12,8 @@ import type { Timestamp } from "firebase/firestore";
 import type {
   Building,
   EnvironmentalSensor,
+  EquipmentHistoryEvent,
+  EquipmentUnit,
   LogBookEntry,
   Room,
   SensorTypeDef,
@@ -109,5 +111,44 @@ export function toSensor(
     linkedEquipmentId: d.linkedEquipmentId,
     statusChangedAt: d.statusChangedAt,
     updatedAt: d.updatedAt ?? new Date().toISOString(),
+  };
+}
+
+export function toEquipmentUnit(
+  id: string,
+  data: Record<string, unknown>,
+): EquipmentUnit {
+  const d = data as Partial<EquipmentUnit>;
+  return {
+    id,
+    // One identifier. The tag is an ordinary editable field, but a unit that
+    // has never been renamed has no separate value for it.
+    tag: d.tag ?? id,
+    buildingId: d.buildingId ?? "",
+    roomId: d.roomId ?? "",
+    typeId: d.typeId ?? "",
+    condition: d.condition ?? "healthy",
+    installedAt: d.installedAt ?? "",
+    nextServiceDue: d.nextServiceDue ?? "",
+    lastServiceAt: d.lastServiceAt,
+    serviceIntervalDays: d.serviceIntervalDays,
+  };
+}
+
+export function toEquipmentHistory(
+  id: string,
+  data: Record<string, unknown>,
+): EquipmentHistoryEvent {
+  const d = data as Partial<EquipmentHistoryEvent>;
+  return {
+    id,
+    equipmentUnitId: d.equipmentUnitId ?? "",
+    type: d.type ?? "service",
+    // An ISO string rather than a Timestamp, unlike the Log Book. Firestore
+    // orders by type before value, so a collection holding both would sort
+    // into two separate blocks — and the seeded rows are already strings.
+    at: d.at ?? "",
+    summary: d.summary ?? "",
+    actorName: d.actorName ?? "System",
   };
 }

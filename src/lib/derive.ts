@@ -119,6 +119,22 @@ export function isDueService(
   );
 }
 
+/**
+ * Where the next service lands after one is recorded. The interval is the
+ * unit's own when it has one; a unit registered before the field existed
+ * falls back to the default both equipment forms offer.
+ */
+export const DEFAULT_SERVICE_INTERVAL_DAYS = 180;
+
+export function nextServiceDate(
+  from: string,
+  intervalDays = DEFAULT_SERVICE_INTERVAL_DAYS,
+): string {
+  const at = new Date(from);
+  at.setUTCDate(at.getUTCDate() + Math.max(1, Math.round(intervalDays)));
+  return at.toISOString();
+}
+
 export function boardColumnFor(
   unit: EquipmentUnit,
   condition: EquipmentCondition = unit.condition,

@@ -29,8 +29,8 @@ import {
 import { formatAge, formatStamp } from "@/lib/format";
 import {
   buildingName,
-  EQUIPMENT_UNITS,
   equipmentUnitLabel,
+  equipmentUnits,
   REQUEST_NEXT_ACTION,
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_ACTION,
@@ -107,7 +107,8 @@ const TONE_BORDER: Record<Tone, string> = {
 };
 
 function equipmentLabel(equipmentId: string) {
-  const unit = EQUIPMENT_UNITS.find((u) => u.tag === equipmentId);
+  // Requests name the unit by id, which is also its document id.
+  const unit = equipmentUnits().find((u) => u.id === equipmentId);
   return unit ? equipmentUnitLabel(unit) : equipmentId;
 }
 
@@ -778,7 +779,7 @@ function NewRequestDrawer({
   }, [open, defaultBuildingId]);
 
   const rooms = roomsForBuilding(buildingId);
-  const units = EQUIPMENT_UNITS.filter((u) => u.roomId === roomId);
+  const units = equipmentUnits().filter((u) => u.roomId === roomId);
 
   return (
     <FormDrawer

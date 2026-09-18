@@ -33,18 +33,20 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import {
   boardColumnFor,
+  DEFAULT_SERVICE_INTERVAL_DAYS,
   DUE_SERVICE_DAYS,
   daysUntilService,
   type EquipmentBoardColumn,
   isDueService,
+  nextServiceDate,
   openRequestsForUnit,
 } from "@/lib/derive";
+import { deletePhoto, readPhoto, writePhoto } from "@/lib/equipment-store";
+import type { WriteResult } from "@/lib/firestore-store";
 import { formatDate, formatRelative } from "@/lib/format";
 import {
   buildingName,
-  EQUIPMENT_HISTORY,
   EQUIPMENT_TYPES,
-  EQUIPMENT_UNITS,
   equipmentUnitLabel,
   roomLabel,
   roomsForBuilding,
@@ -55,6 +57,7 @@ import {
   DECOMMISSION_LOCK_REASON,
   isBuildingLocked,
 } from "@/lib/permissions";
+import { downscaleImage, photoTooLarge } from "@/lib/photo";
 import type { EquipmentCondition, EquipmentUnit } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -99,7 +102,7 @@ export default function EquipmentPage() {
     role,
     activeBuildingId,
     requests,
-    equipmentCondition,
+    equipmentUnits,
     setEquipmentCondition,
   } = useAppState();
   const locked = isBuildingLocked(role);
@@ -122,13 +125,8 @@ export default function EquipmentPage() {
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
 
-  const conditionOf = React.useCallback(
-    (u: EquipmentUnit) => equipmentCondition(u.id, u.condition),
-    [equipmentCondition],
-  );
-
-  const units = EQUIPMENT_UNITS.filter((u) => {
-    const condition = conditionOf(u);
+  const units = equipmentUnits.filter((u) => {
+    const condition = u.condition;
     if (condition === "decommissioned" && !showDecommissioned) return false;
     if (effectiveBuilding !== "all" && u.buildingId !== effectiveBuilding)
       return false;
@@ -142,11 +140,11 @@ export default function EquipmentPage() {
     );
   });
 
-  const faultyCount = units.filter((u) => conditionOf(u) === "faulty").length;
-  const dueCount = units.filter((u) => isDueService(u, conditionOf(u))).length;
+  const faultyCount = units.filter((u) => u.condition === "faulty").length;
+  const dueCount = units.filter((u) => isDueService(u)).length;
 
   const selected = selectedId
-    ? (EQUIPMENT_UNITS.find((u) => u.id === selectedId) ?? null)
+    ? (equipmentUnits.find((u) => u.id === selectedId) ?? null)
     : null;
 
   const boardColumns = [
@@ -267,7 +265,7 @@ export default function EquipmentPage() {
           </div>
 
           {units.map((u) => {
-            const condition = conditionOf(u);
+            const condition = u.condition;
             const due = isDueService(u, condition);
             return (
               <button
@@ -337,9 +335,7 @@ export default function EquipmentPage() {
           }}
         >
           {boardColumns.map((col) => {
-            const items = units.filter(
-              (u) => boardColumnFor(u, conditionOf(u)) === col,
-            );
+            const items = units.filter((u) => boardColumnFor(u) === col);
             const meta = COLUMN_META[col];
             return (
               <div
@@ -414,7 +410,6 @@ export default function EquipmentPage() {
       <EquipmentDrawer
         unit={selected}
         openRequests={selected ? openRequestsForUnit(requests, selected.id) : 0}
-        conditionOf={conditionOf}
         onClose={() => setSelectedId(null)}
         onSetCondition={setEquipmentCondition}
         onGoToSensor={(sensorId) => {
@@ -446,7 +441,7 @@ function NewUnitDrawer({
   onOpenChange: (open: boolean) => void;
   defaultBuildingId: string;
 }) {
-  const { buildings, log } = useAppState();
+  const { buildings, equipmentUnits, addUnit } = useAppState();
   const [tag, setTag] = React.useState("");
   const [typeId, setTypeId] = React.useState(EQUIPMENT_TYPES[0]?.id ?? "");
   const [buildingId, setBuildingId] = React.useState(defaultBuildingId);
@@ -476,26 +471,36 @@ function NewUnitDrawer({
       description="A unit joins the register as healthy. Its first service is scheduled from the install date."
       submitLabel="Add to register"
       error={error}
-      onSubmit={() => {
-        if (tag.trim().length === 0) {
+      onSubmit={async () => {
+        const id = tag.trim().toUpperCase();
+        if (id.length === 0) {
           setError("A unit needs an asset tag.");
           return;
         }
-        if (EQUIPMENT_UNITS.some((u) => u.tag === tag.trim())) {
-          setError(`${tag.trim()} is already on the register.`);
+        // The tag is the document id at registration, so a duplicate would
+        // overwrite the unit already wearing it rather than be refused.
+        if (equipmentUnits.some((u) => u.id === id || u.tag === id)) {
+          setError(`${id} is already on the register.`);
           return;
         }
-        log({
-          source: "equipment",
-          actionType: "equipment-status-changed",
-          title: "Unit added to the register",
-          detail: `${tag.trim()} — ${roomLabel(roomId)}, ${buildingName(buildingId)}.`,
-          targetType: "equipment",
-          targetId: tag.trim(),
+        const interval = Number(serviceInterval);
+        const installedAt = new Date(installed).toISOString();
+        const written = await addUnit({
+          id,
+          tag: id,
+          typeId,
           buildingId,
-          refId: tag.trim(),
+          roomId,
+          condition: "healthy",
+          installedAt,
+          nextServiceDue: nextServiceDate(installedAt, interval),
+          serviceIntervalDays: interval,
         });
-        toast.success(`${tag.trim()} added to the register`);
+        if (!written.ok) {
+          setError(written.message);
+          return;
+        }
+        toast.success(`${id} added to the register`);
         onOpenChange(false);
       }}
     >
@@ -637,7 +642,6 @@ function ViewButton({
 function EquipmentDrawer({
   unit,
   openRequests,
-  conditionOf,
   onClose,
   onSetCondition,
   onGoToSensor,
@@ -645,24 +649,37 @@ function EquipmentDrawer({
 }: {
   unit: EquipmentUnit | null;
   openRequests: number;
-  conditionOf: (u: EquipmentUnit) => EquipmentCondition;
   onClose: () => void;
-  onSetCondition: (unitId: string, condition: EquipmentCondition) => void;
+  onSetCondition: (
+    unitId: string,
+    condition: EquipmentCondition,
+  ) => Promise<WriteResult>;
   onGoToSensor: (sensorId: string) => void;
   canDecommission: boolean;
 }) {
-  const { log } = useAppState();
+  const { equipmentHistory, removeUnit } = useAppState();
   const confirm = useConfirm();
   const [form, setForm] = React.useState<"none" | "service" | "move" | "edit">(
     "none",
   );
   const [photo, setPhoto] = React.useState<string | null>(null);
+  const [photoBusy, setPhotoBusy] = React.useState(false);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: unit id is the reset trigger
+  const unitId = unit?.id;
+  // The photo is a subcollection document, so it is fetched when the drawer
+  // opens rather than riding along on every snapshot of the register.
   React.useEffect(() => {
     setForm("none");
     setPhoto(null);
-  }, [unit?.id]);
+    if (!unitId) return;
+    let live = true;
+    readPhoto(unitId).then((found) => {
+      if (live) setPhoto(found);
+    });
+    return () => {
+      live = false;
+    };
+  }, [unitId]);
 
   // Rendered closed rather than unmounted, so the drawer animates out.
   if (!unit) {
@@ -673,11 +690,9 @@ function EquipmentDrawer({
     );
   }
 
-  const condition = conditionOf(unit);
+  const condition = unit.condition;
   const meta = COLUMN_META[condition];
-  const history = EQUIPMENT_HISTORY.filter(
-    (h) => h.equipmentUnitId === unit.id,
-  );
+  const history = equipmentHistory.filter((h) => h.equipmentUnitId === unit.id);
   const linkedSensor = sensorForEquipment(unit.id);
   const days = daysUntilService(unit);
 
@@ -693,16 +708,11 @@ function EquipmentDrawer({
       requireReason: true,
     });
     if (!result.confirmed) return;
-    log({
-      source: "equipment",
-      actionType: "equipment-status-changed",
-      title: "Unit deleted from the register",
-      detail: `${unit.tag} — ${roomLabel(unit.roomId)}, ${buildingName(unit.buildingId)}.`,
-      targetType: "equipment",
-      targetId: unit.id,
-      buildingId: unit.buildingId,
-      refId: unit.tag,
-    });
+    const written = await removeUnit(unit.id);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     toast.success(`${unit.tag} deleted from the register`);
     onClose();
   };
@@ -723,7 +733,11 @@ function EquipmentDrawer({
       requireReason,
     });
     if (!result.confirmed) return;
-    onSetCondition(unit.id, next);
+    const written = await onSetCondition(unit.id, next);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     toast.success(`${unit.tag} → ${COLUMN_META[next].label}`);
   };
 
@@ -783,21 +797,35 @@ function EquipmentDrawer({
               type="file"
               accept="image/*"
               className="sr-only"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                setPhoto(URL.createObjectURL(file));
-                log({
-                  source: "equipment",
-                  actionType: "equipment-status-changed",
-                  title: "Photo added to a unit",
-                  detail: `${unit.tag} — ${roomLabel(unit.roomId)}.`,
-                  targetType: "equipment",
-                  targetId: unit.id,
-                  buildingId: unit.buildingId,
-                  refId: unit.tag,
-                });
-                toast.success(`Photo added to ${unit.tag}`);
+                setPhotoBusy(true);
+                try {
+                  const dataUrl = await downscaleImage(file);
+                  // The stored photo is a base64 string in a document, and a
+                  // document is capped at 1 MiB — so an oversized one is
+                  // refused with a sentence rather than left to come back as
+                  // an unreadable write error.
+                  if (photoTooLarge(dataUrl)) {
+                    toast.error(
+                      "That photo is too detailed to store. Try a smaller one.",
+                    );
+                    return;
+                  }
+                  const written = await writePhoto(unit.id, dataUrl);
+                  if (!written.ok) {
+                    toast.error(written.message);
+                    return;
+                  }
+                  setPhoto(dataUrl);
+                  toast.success(`Photo added to ${unit.tag}`);
+                } catch {
+                  toast.error("That file could not be read as an image.");
+                } finally {
+                  setPhotoBusy(false);
+                  e.target.value = "";
+                }
               }}
             />
           </label>
@@ -810,12 +838,23 @@ function EquipmentDrawer({
             </div>
             <div className="mt-2 flex items-center gap-2">
               <span className="text-muted-foreground font-mono text-[10.5px]">
-                {photo ? "Photo attached" : "Drop a photo of this unit"}
+                {photoBusy
+                  ? "Resizing…"
+                  : photo
+                    ? "Photo attached"
+                    : "Drop a photo of this unit"}
               </span>
               {photo && (
                 <button
                   type="button"
-                  onClick={() => setPhoto(null)}
+                  onClick={async () => {
+                    const written = await deletePhoto(unit.id);
+                    if (!written.ok) {
+                      toast.error(written.message);
+                      return;
+                    }
+                    setPhoto(null);
+                  }}
                   className="text-danger-foreground cursor-pointer text-[10.5px] font-medium hover:underline"
                 >
                   Remove
@@ -982,33 +1021,37 @@ function EditUnitForm({
   const [installed, setInstalled] = React.useState(
     unit.installedAt.slice(0, 10),
   );
-  const [serviceInterval, setServiceInterval] = React.useState("180");
+  const [serviceInterval, setServiceInterval] = React.useState(
+    String(unit.serviceIntervalDays ?? DEFAULT_SERVICE_INTERVAL_DAYS),
+  );
   const [error, setError] = React.useState<string | null>(null);
-  const { log } = useAppState();
+  const { editUnit } = useAppState();
 
   return (
     <DrawerInlineForm
       title="Edit unit details"
-      description="The tag follows the unit, so changing it renames every record that points at this asset."
+      description="The tag is what is printed on the unit. Changing it renames the label, not the record — every join is on the unit's id."
       submitLabel="Save details"
       error={error}
       onCancel={onDone}
-      onSubmit={() => {
+      onSubmit={async () => {
         if (tag.trim().length === 0) {
           setError("A unit needs an asset tag.");
           return;
         }
-        log({
-          source: "equipment",
-          actionType: "equipment-status-changed",
-          title: "Unit details edited",
-          detail: `${tag.trim()} — registration saved.`,
-          targetType: "equipment",
-          targetId: unit.id,
-          buildingId: unit.buildingId,
-          refId: unit.tag,
+        // The tag is an ordinary field now; the unit's id is the join key and
+        // is not in the patch, so renaming the tag strands nothing.
+        const written = await editUnit(unit.id, {
+          tag: tag.trim().toUpperCase(),
+          typeId,
+          installedAt: new Date(installed).toISOString(),
+          serviceIntervalDays: Number(serviceInterval),
         });
-        toast.success(`${tag.trim()} updated`);
+        if (!written.ok) {
+          setError(written.message);
+          return;
+        }
+        toast.success(`${tag.trim().toUpperCase()} updated`);
         onDone();
       }}
     >
@@ -1064,27 +1107,24 @@ function ServiceForm({
   unit: EquipmentUnit;
   onDone: () => void;
 }) {
-  const { log } = useAppState();
+  const { recordService } = useAppState();
   const [cost, setCost] = React.useState("");
   const [parts, setParts] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
 
   return (
     <DrawerInlineForm
       title="Record a service"
-      description={`The next service date moves on by ${DUE_SERVICE_DAYS * 6} days.`}
+      description={`The next service date moves on by ${unit.serviceIntervalDays ?? DEFAULT_SERVICE_INTERVAL_DAYS} days — this unit's own interval.`}
       submitLabel="Save service"
+      error={error}
       onCancel={onDone}
-      onSubmit={() => {
-        log({
-          source: "equipment",
-          actionType: "equipment-status-changed",
-          title: "Service recorded",
-          detail: `${unit.tag} — ${roomLabel(unit.roomId)}, ${buildingName(unit.buildingId)}.`,
-          targetType: "equipment",
-          targetId: unit.id,
-          buildingId: unit.buildingId,
-          refId: unit.tag,
-        });
+      onSubmit={async () => {
+        const written = await recordService(unit.id, { parts, cost });
+        if (!written.ok) {
+          setError(written.message);
+          return;
+        }
         toast.success(`Service recorded for ${unit.tag}`);
         onDone();
       }}
@@ -1116,9 +1156,10 @@ function MoveForm({
   unit: EquipmentUnit;
   onDone: () => void;
 }) {
-  const { buildings, log } = useAppState();
+  const { buildings, moveUnit } = useAppState();
   const [buildingId, setBuildingId] = React.useState(unit.buildingId);
   const [roomId, setRoomId] = React.useState(unit.roomId);
+  const [error, setError] = React.useState<string | null>(null);
   const rooms = roomsForBuilding(buildingId);
 
   return (
@@ -1126,18 +1167,14 @@ function MoveForm({
       title="Move unit"
       description={`${unit.tag} keeps its tag and its history; only its location changes.`}
       submitLabel="Move unit"
+      error={error}
       onCancel={onDone}
-      onSubmit={() => {
-        log({
-          source: "equipment",
-          actionType: "equipment-status-changed",
-          title: "Unit moved",
-          detail: `${unit.tag} — ${roomLabel(unit.roomId)} → ${roomLabel(roomId)}, ${buildingName(buildingId)}.`,
-          targetType: "equipment",
-          targetId: unit.id,
-          buildingId,
-          refId: unit.tag,
-        });
+      onSubmit={async () => {
+        const written = await moveUnit(unit.id, { buildingId, roomId });
+        if (!written.ok) {
+          setError(written.message);
+          return;
+        }
         toast.success(`${unit.tag} moved to ${roomLabel(roomId)}`);
         onDone();
       }}

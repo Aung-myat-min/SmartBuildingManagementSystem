@@ -1,7 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { countOpenRequests } from "@/lib/derive";
+import { countOpenRequests, nextServiceDate } from "@/lib/derive";
+import {
+  appendHistory,
+  createUnit,
+  deleteUnitWithHistory,
+  moveUnitWrite,
+  recordServiceWrite,
+  updateUnit,
+  useEquipmentHistory,
+  useEquipmentUnits,
+} from "@/lib/equipment-store";
 import { buildingDeletionRefusal, roomsToCascade } from "@/lib/estate-rules";
 import {
   createBuilding,
@@ -17,7 +27,6 @@ import type { WriteResult } from "@/lib/firestore-store";
 import { appendLogEntry, type LogDraft, useLogBook } from "@/lib/logbook-store";
 import {
   buildingName,
-  EQUIPMENT_UNITS,
   equipmentUnitLabel,
   MAINTENANCE_REQUESTS,
   REQUEST_NEXT_STATUS,
@@ -41,6 +50,8 @@ import type {
   Building,
   EnvironmentalSensor,
   EquipmentCondition,
+  EquipmentHistoryEvent,
+  EquipmentUnit,
   LogBookEntry,
   MaintenanceRequest,
   Room,
@@ -278,15 +289,46 @@ export interface AppState {
     typeId: string,
     actionId: string,
   ) => Promise<RegistryResult>;
-  equipmentCondition: (
+  /** The asset register. */
+  equipmentUnits: EquipmentUnit[];
+  /** Every unit's history, newest first — the drawer filters to its own. */
+  equipmentHistory: EquipmentHistoryEvent[];
+  addUnit: (unit: EquipmentUnit) => Promise<WriteResult>;
+  /** Registration only: the id is the join key and never moves. */
+  editUnit: (
     unitId: string,
-    fallback: EquipmentCondition,
-  ) => EquipmentCondition;
+    patch: Partial<Omit<EquipmentUnit, "id">>,
+  ) => Promise<WriteResult>;
+  removeUnit: (unitId: string) => Promise<WriteResult>;
+  /** Stamps the service, advances the next due date, appends the history row. */
+  recordService: (
+    unitId: string,
+    detail: { parts: string; cost: string },
+  ) => Promise<WriteResult>;
+  moveUnit: (
+    unitId: string,
+    to: { buildingId: string; roomId: string },
+  ) => Promise<WriteResult>;
   setEquipmentCondition: (
     unitId: string,
     condition: EquipmentCondition,
-  ) => void;
+  ) => Promise<WriteResult>;
 }
+
+/**
+ * A condition change is a history event too. `under-maintenance` has no event
+ * of its own in the vocabulary — it is the start of a service, and reads as
+ * one on the timeline.
+ */
+const HISTORY_TYPE_FOR_CONDITION: Record<
+  EquipmentCondition,
+  EquipmentHistoryEvent["type"]
+> = {
+  healthy: "returned-to-service",
+  faulty: "fault-reported",
+  "under-maintenance": "service",
+  decommissioned: "decommissioned",
+};
 
 const AppStateContext = React.createContext<AppState | null>(null);
 
@@ -321,9 +363,6 @@ export function AppStateProvider({
   const [createdRequests, setCreatedRequests] = React.useState<
     MaintenanceRequest[]
   >([]);
-  const [equipmentOverrides, setEquipmentOverrides] = React.useState<
-    Record<string, EquipmentCondition>
-  >({});
   // The registry is a collection now. Archiving is still the product's
   // "delete", so an archived type keeps resolving labels on the records that
   // name it — the subscription carries archived rows and the pages filter them.
@@ -551,12 +590,18 @@ export function AppStateProvider({
     loading: sensorsLoading,
     error: sensorsError,
   } = useSensors();
+  const {
+    items: equipmentUnits,
+    loading: unitsLoading,
+    error: unitsError,
+  } = useEquipmentUnits();
+  const { items: equipmentHistory } = useEquipmentHistory();
 
   // The third holder, beside the estate and the sensor registry:
   // sensorForEquipment / equipmentForSensor / buildingStats are module
   // functions that would otherwise close over the frozen seed arrays and keep
   // answering for them after everything else went live.
-  setAssetSource({ units: EQUIPMENT_UNITS, sensors });
+  setAssetSource({ units: equipmentUnits, sensors });
 
   const setSensorStatus = React.useCallback(
     async (sensorId: string, status: string) => {
@@ -811,7 +856,7 @@ export function AppStateProvider({
   const deleteBuilding = React.useCallback(
     async (buildingId: string) => {
       const refusal = buildingDeletionRefusal(buildingId, {
-        units: EQUIPMENT_UNITS,
+        units: equipmentUnits,
         sensors,
         requests,
       });
@@ -821,7 +866,7 @@ export function AppStateProvider({
         roomsToCascade(buildingId, estateRooms).map((r) => r.id),
       );
     },
-    [sensors, requests, estateRooms],
+    [equipmentUnits, sensors, requests, estateRooms],
   );
 
   const addRoom = React.useCallback((room: Room) => createRoom(room), []);
@@ -897,16 +942,165 @@ export function AppStateProvider({
     [log, sensors],
   );
 
-  const equipmentCondition = React.useCallback(
-    (unitId: string, fallback: EquipmentCondition) =>
-      equipmentOverrides[unitId] ?? fallback,
-    [equipmentOverrides],
+  // ---- The asset register --------------------------------------------------
+  //
+  // Every write below that changes what happened to a unit also appends the
+  // history row that says so, in one batch. A register whose dates moved
+  // without a row is the drawer quietly lying about what was done to it.
+
+  const actorName = user.name;
+
+  const addUnit = React.useCallback(
+    async (unit: EquipmentUnit) => {
+      const written = await createUnit(unit);
+      if (!written.ok) return written;
+      await appendHistory({
+        equipmentUnitId: unit.id,
+        type: "installed",
+        at: new Date().toISOString(),
+        summary: `Added to the register in ${roomLabel(unit.roomId)}`,
+        actorName,
+      });
+      log({
+        source: "equipment",
+        actionType: "equipment-status-changed",
+        title: "Unit added to the register",
+        detail: `${unit.tag} — ${roomLabel(unit.roomId)}, ${buildingName(unit.buildingId)}.`,
+        targetType: "equipment",
+        targetId: unit.id,
+        buildingId: unit.buildingId,
+        refId: unit.tag,
+      });
+      return written;
+    },
+    [actorName, log],
+  );
+
+  const editUnit = React.useCallback(
+    async (unitId: string, patch: Partial<Omit<EquipmentUnit, "id">>) => {
+      const written = await updateUnit(unitId, patch);
+      if (!written.ok) return written;
+      const next = { ...equipmentUnits.find((u) => u.id === unitId), ...patch };
+      log({
+        source: "equipment",
+        actionType: "equipment-status-changed",
+        title: "Unit details edited",
+        detail: `${next.tag ?? unitId} — registration saved.`,
+        targetType: "equipment",
+        targetId: unitId,
+        buildingId: next.buildingId,
+        refId: next.tag ?? unitId,
+      });
+      return written;
+    },
+    [equipmentUnits, log],
+  );
+
+  const removeUnit = React.useCallback(
+    async (unitId: string) => {
+      const unit = equipmentUnits.find((u) => u.id === unitId);
+      const written = await deleteUnitWithHistory(unitId);
+      if (!written.ok) return written;
+      log({
+        source: "equipment",
+        actionType: "equipment-status-changed",
+        title: "Unit deleted from the register",
+        detail: unit
+          ? `${unit.tag} — ${roomLabel(unit.roomId)}, ${buildingName(unit.buildingId)}.`
+          : unitId,
+        targetType: "equipment",
+        targetId: unitId,
+        buildingId: unit?.buildingId,
+        refId: unit?.tag ?? unitId,
+      });
+      return written;
+    },
+    [equipmentUnits, log],
+  );
+
+  const recordService = React.useCallback(
+    async (unitId: string, detail: { parts: string; cost: string }) => {
+      const unit = equipmentUnits.find((u) => u.id === unitId);
+      if (!unit) return { ok: false as const, message: "No such unit." };
+      const at = new Date().toISOString();
+      const summary = [
+        detail.parts.trim() || "Service carried out",
+        detail.cost.trim(),
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const written = await recordServiceWrite(
+        unitId,
+        {
+          lastServiceAt: at,
+          nextServiceDue: nextServiceDate(at, unit.serviceIntervalDays),
+        },
+        {
+          equipmentUnitId: unitId,
+          type: "service",
+          at,
+          summary,
+          actorName,
+        },
+      );
+      if (!written.ok) return written;
+      log({
+        source: "equipment",
+        actionType: "equipment-status-changed",
+        title: "Service recorded",
+        detail: `${unit.tag} — ${roomLabel(unit.roomId)}, ${buildingName(unit.buildingId)}.`,
+        targetType: "equipment",
+        targetId: unitId,
+        buildingId: unit.buildingId,
+        refId: unit.tag,
+      });
+      return written;
+    },
+    [actorName, equipmentUnits, log],
+  );
+
+  const moveUnit = React.useCallback(
+    async (unitId: string, to: { buildingId: string; roomId: string }) => {
+      const unit = equipmentUnits.find((u) => u.id === unitId);
+      if (!unit) return { ok: false as const, message: "No such unit." };
+      const from = unit.roomId;
+      const written = await moveUnitWrite(unitId, to, {
+        equipmentUnitId: unitId,
+        type: "moved",
+        at: new Date().toISOString(),
+        summary: `${roomLabel(from)} → ${roomLabel(to.roomId)}`,
+        actorName,
+      });
+      if (!written.ok) return written;
+      log({
+        source: "equipment",
+        actionType: "equipment-status-changed",
+        title: "Unit moved",
+        detail: `${unit.tag} — ${roomLabel(from)} → ${roomLabel(to.roomId)}, ${buildingName(to.buildingId)}.`,
+        targetType: "equipment",
+        targetId: unitId,
+        buildingId: to.buildingId,
+        refId: unit.tag,
+      });
+      return written;
+    },
+    [actorName, equipmentUnits, log],
   );
 
   const setEquipmentCondition = React.useCallback(
-    (unitId: string, condition: EquipmentCondition) => {
-      setEquipmentOverrides((prev) => ({ ...prev, [unitId]: condition }));
-      const unit = EQUIPMENT_UNITS.find((u) => u.id === unitId);
+    async (unitId: string, condition: EquipmentCondition) => {
+      const unit = equipmentUnits.find((u) => u.id === unitId);
+      const written = await updateUnit(unitId, { condition });
+      if (!written.ok) return written;
+      // A condition change is part of the asset's story, not only the estate's,
+      // so it lands in the unit's own history as well as the Log Book.
+      await appendHistory({
+        equipmentUnitId: unitId,
+        type: HISTORY_TYPE_FOR_CONDITION[condition],
+        at: new Date().toISOString(),
+        summary: `Marked ${condition.replace("-", " ")}`,
+        actorName,
+      });
       log({
         source: "equipment",
         actionType: "equipment-status-changed",
@@ -919,8 +1113,9 @@ export function AppStateProvider({
         buildingId: unit?.buildingId,
         refId: unit?.tag ?? unitId,
       });
+      return written;
     },
-    [log],
+    [actorName, equipmentUnits, log],
   );
 
   const value = React.useMemo<AppState>(
@@ -961,12 +1156,14 @@ export function AppStateProvider({
         buildingsLoading ||
         roomsLoading ||
         sensorTypesLoading ||
-        sensorsLoading,
+        sensorsLoading ||
+        unitsLoading,
       dataError:
         buildingsError ??
         roomsError ??
         sensorTypesError ??
         sensorsError ??
+        unitsError ??
         logBookError,
       log,
       sensorTypeRegistry,
@@ -980,7 +1177,13 @@ export function AppStateProvider({
       addSensorAction,
       updateSensorAction,
       removeSensorAction,
-      equipmentCondition,
+      equipmentUnits,
+      equipmentHistory,
+      addUnit,
+      editUnit,
+      removeUnit,
+      recordService,
+      moveUnit,
       setEquipmentCondition,
     }),
     [
@@ -1021,6 +1224,8 @@ export function AppStateProvider({
       sensorTypesError,
       sensorsLoading,
       sensorsError,
+      unitsLoading,
+      unitsError,
       buildingsError,
       roomsLoading,
       roomsError,
@@ -1036,7 +1241,13 @@ export function AppStateProvider({
       addSensorAction,
       updateSensorAction,
       removeSensorAction,
-      equipmentCondition,
+      equipmentUnits,
+      equipmentHistory,
+      addUnit,
+      editUnit,
+      removeUnit,
+      recordService,
+      moveUnit,
       setEquipmentCondition,
     ],
   );

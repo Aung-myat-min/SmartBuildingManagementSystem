@@ -29,8 +29,11 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
+import { DEFAULT_SERVICE_INTERVAL_DAYS } from "../src/lib/derive";
 import {
   BUILDINGS,
+  EQUIPMENT_HISTORY,
+  EQUIPMENT_UNITS,
   LOG_BOOK,
   ROOMS,
   SENSOR_TYPES,
@@ -118,6 +121,8 @@ async function main(): Promise<void> {
     await clear("rooms");
     await clear("sensorTypes");
     await clear("sensors");
+    await clear("equipmentUnits");
+    await clear("equipmentHistory");
     console.log("");
   }
 
@@ -160,6 +165,24 @@ async function main(): Promise<void> {
       id,
       data: { ...data, statusChangedAt: data.updatedAt },
     })),
+  );
+
+  // The document id is the tag. Every join — the sensor link, a request's
+  // equipmentId, a history row, a log entry's refId — holds this string.
+  await writeAll(
+    "equipmentUnits",
+    EQUIPMENT_UNITS.map(({ id, ...data }) => ({
+      id,
+      data: { ...data, serviceIntervalDays: DEFAULT_SERVICE_INTERVAL_DAYS },
+    })),
+  );
+
+  // `at` stays an ISO string rather than a Timestamp: Firestore orders by
+  // type before value, so a collection holding both would sort into two
+  // blocks and the drawer's timeline would come back interleaved wrongly.
+  await writeAll(
+    "equipmentHistory",
+    EQUIPMENT_HISTORY.map(({ id, ...data }) => ({ id, data })),
   );
 
   await signOut(auth);

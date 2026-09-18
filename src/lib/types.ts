@@ -115,6 +115,12 @@ export interface EquipmentUnit {
   installedAt: string; // ISO date
   nextServiceDue: string; // ISO date
   lastServiceAt?: string; // ISO date
+  /**
+   * How far `nextServiceDue` moves when a service is recorded. Both equipment
+   * forms have always collected it; without it recording a service would have
+   * to guess how far ahead to schedule the next one.
+   */
+  serviceIntervalDays?: number;
 }
 
 export type EquipmentHistoryEventType =

@@ -7,6 +7,7 @@ import {
   isSensorOffline,
   kpiPasses,
   nextSequentialId,
+  nextServiceDate,
   openRequestsForUnit,
   statusTone,
 } from "./derive";
@@ -229,5 +230,26 @@ describe("openRequestsForUnit", () => {
   it("does not count another unit's work", () => {
     expect(openRequestsForUnit(rows, "EQ-2")).toBe(1);
     expect(openRequestsForUnit(rows, "EQ-3")).toBe(0);
+  });
+});
+
+describe("nextServiceDate", () => {
+  it("moves the due date on by the unit's own interval", () => {
+    expect(nextServiceDate("2026-09-18T00:00:00.000Z", 90)).toBe(
+      "2026-12-17T00:00:00.000Z",
+    );
+  });
+
+  it("falls back to the default for a unit registered without one", () => {
+    // 180 days, the middle option both equipment forms offer.
+    expect(nextServiceDate("2026-01-01T00:00:00.000Z")).toBe(
+      "2026-06-30T00:00:00.000Z",
+    );
+  });
+
+  it("never schedules the next service in the past", () => {
+    expect(
+      new Date(nextServiceDate("2026-09-18T00:00:00.000Z", 0)).getTime(),
+    ).toBeGreaterThan(new Date("2026-09-18T00:00:00.000Z").getTime());
   });
 });

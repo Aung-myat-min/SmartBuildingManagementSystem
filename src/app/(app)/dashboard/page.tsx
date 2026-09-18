@@ -21,7 +21,6 @@ import {
   ATTENTION_ITEMS,
   buildingName,
   buildingStats,
-  EQUIPMENT_UNITS,
   powerSeries,
   roomLabel,
   roomsForBuilding,
@@ -60,7 +59,7 @@ export default function DashboardPage() {
     scopedRequests,
     moveRequest,
     logBook,
-    equipmentCondition,
+    equipmentUnits,
   } = useAppState();
   const clock = useLiveClock();
   const staff = !canAct(role);
@@ -73,9 +72,7 @@ export default function DashboardPage() {
   // used to be a separate table of these numbers, authored independently of
   // the units and drifted from them.
   const eq = equipmentBreakdown(
-    EQUIPMENT_UNITS.filter((u) => u.buildingId === activeBuildingId).map(
-      (u) => ({ condition: equipmentCondition(u.id, u.condition) }),
-    ),
+    equipmentUnits.filter((u) => u.buildingId === activeBuildingId),
   );
   const eqRunning = eq.running;
   const eqMaint = eq.underMaintenance;
