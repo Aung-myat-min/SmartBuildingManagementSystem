@@ -27,6 +27,7 @@ export const COLLECTIONS = {
   logBook: "logBook",
   buildings: "buildings",
   rooms: "rooms",
+  sensorTypes: "sensorTypes",
 } as const;
 
 /**

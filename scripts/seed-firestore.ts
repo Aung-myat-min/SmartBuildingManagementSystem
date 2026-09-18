@@ -29,7 +29,7 @@ import {
   Timestamp,
   writeBatch,
 } from "firebase/firestore";
-import { BUILDINGS, LOG_BOOK, ROOMS } from "../src/lib/mock-data";
+import { BUILDINGS, LOG_BOOK, ROOMS, SENSOR_TYPES } from "../src/lib/mock-data";
 import { ACCOUNTS, DEV_PASSWORD } from "./accounts.mjs";
 
 const DRY_RUN = process.argv.includes("--dry-run");
@@ -110,6 +110,7 @@ async function main(): Promise<void> {
     await clear("logBook");
     await clear("buildings");
     await clear("rooms");
+    await clear("sensorTypes");
     console.log("");
   }
 
@@ -134,6 +135,13 @@ async function main(): Promise<void> {
   await writeAll(
     "rooms",
     ROOMS.map(({ id, ...data }) => ({ id, data })),
+  );
+
+  // Statuses and actions ride along as nested arrays — one document per type,
+  // which is the unit the registry's validation works in.
+  await writeAll(
+    "sensorTypes",
+    SENSOR_TYPES.map(({ id, ...data }) => ({ id, data })),
   );
 
   await signOut(auth);

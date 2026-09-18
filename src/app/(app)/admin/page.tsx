@@ -1313,7 +1313,7 @@ function SensorTypesTab({ confirm }: { confirm: ConfirmFn }) {
       confirmLabel: "Archive type",
     });
     if (!result.confirmed) return;
-    const outcome = archiveSensorType(type.id);
+    const outcome = await archiveSensorType(type.id);
     if (!outcome.ok) {
       toast.error(outcome.error);
       return;
@@ -1413,8 +1413,12 @@ function SensorTypesTab({ confirm }: { confirm: ConfirmFn }) {
                 {type.archived ? (
                   <RowButton
                     title="Bring this type back into the registry"
-                    onClick={() => {
-                      restoreSensorType(type.id);
+                    onClick={async () => {
+                      const outcome = await restoreSensorType(type.id);
+                      if (!outcome.ok) {
+                        toast.error(outcome.error);
+                        return;
+                      }
                       toast.success(`${type.label} restored`);
                     }}
                   >
@@ -1455,14 +1459,14 @@ function SensorTypesTab({ confirm }: { confirm: ConfirmFn }) {
         open={Boolean(editing)}
         editing={editing}
         onOpenChange={(o) => !o && setEditingId(null)}
-        onRemoveStatus={(statusId) =>
+        onRemoveStatus={async (statusId) =>
           editing
-            ? removeSensorStatus(editing.id, statusId)
+            ? await removeSensorStatus(editing.id, statusId)
             : { ok: false, error: "No type open." }
         }
-        onSubmit={(draft) =>
+        onSubmit={async (draft) =>
           editing
-            ? updateSensorType(editing.id, draft)
+            ? await updateSensorType(editing.id, draft)
             : { ok: false, error: "No type open." }
         }
       />
@@ -1484,8 +1488,8 @@ function SensorTypeDrawer({
   open: boolean;
   editing: SensorTypeDef | null;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (draft: Omit<SensorTypeDef, "id">) => RegistryResult;
-  onRemoveStatus?: (statusId: string) => RegistryResult;
+  onSubmit: (draft: Omit<SensorTypeDef, "id">) => Promise<RegistryResult>;
+  onRemoveStatus?: (statusId: string) => Promise<RegistryResult>;
 }) {
   const [label, setLabel] = React.useState("");
   const [icon, setIcon] = React.useState<SensorIconKey>("activity");
@@ -1536,11 +1540,11 @@ function SensorTypeDrawer({
     ]);
   };
 
-  const dropStatus = (status: StatusDraft) => {
+  const dropStatus = async (status: StatusDraft) => {
     // An existing status is the provider's call, not this form's — something
     // may be sitting in it right now.
     if (!status.isNew && onRemoveStatus) {
-      const outcome = onRemoveStatus(status.id);
+      const outcome = await onRemoveStatus(status.id);
       if (!outcome.ok) {
         setError(outcome.error);
         // The drawer's error line sits below a long list, so a refusal
@@ -1575,7 +1579,7 @@ function SensorTypeDrawer({
       }
       submitLabel={editing ? "Save changes" : "Create type"}
       error={error}
-      onSubmit={() => {
+      onSubmit={async () => {
         // A freshly named status gets its slug now, and anything pointing at
         // its placeholder id has to follow it across.
         const cleaned = dedupeStatusIds(
@@ -1588,7 +1592,7 @@ function SensorTypeDrawer({
         const remap = new Map(
           statuses.map((st, i) => [st.id, cleaned[i]?.id ?? st.id]),
         );
-        const outcome = onSubmit({
+        const outcome = await onSubmit({
           label: label.trim(),
           icon,
           statuses: cleaned,

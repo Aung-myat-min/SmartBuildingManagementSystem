@@ -9,7 +9,7 @@
 // ============================================================================
 
 import type { Timestamp } from "firebase/firestore";
-import type { Building, LogBookEntry, Room } from "@/lib/types";
+import type { Building, LogBookEntry, Room, SensorTypeDef } from "@/lib/types";
 
 /**
  * A Firestore `Timestamp` as an ISO string. ISO everywhere above this line —
@@ -66,5 +66,25 @@ export function toRoom(id: string, data: Record<string, unknown>): Room {
     roomNumber: d.roomNumber ?? id,
     type: d.type ?? "common",
     floor: d.floor ?? "G",
+  };
+}
+
+export function toSensorType(
+  id: string,
+  data: Record<string, unknown>,
+): SensorTypeDef {
+  const d = data as Partial<SensorTypeDef>;
+  return {
+    id,
+    label: d.label ?? id,
+    icon: d.icon ?? "activity",
+    // A type with no statuses cannot render a sensor at all, so a malformed
+    // document falls back to something the UI can draw rather than crashing
+    // the page that reads it.
+    statuses: d.statuses?.length
+      ? d.statuses
+      : [{ id: "unknown", label: "Unknown", tone: "neutral", isAlarm: false }],
+    actions: d.actions ?? [],
+    archived: d.archived ?? false,
   };
 }

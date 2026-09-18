@@ -23,13 +23,13 @@ import {
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_STATUS,
   roomLabel,
-  SENSOR_TYPES,
   SENSORS,
   sensorType,
   setAssetSource,
   setEstateSource,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
+import { useSensorTypes, writeSensorType } from "@/lib/sensor-types-store";
 import type {
   AppUser,
   Building,
@@ -239,34 +239,40 @@ export interface AppState {
   sensorTypeRegistry: SensorTypeDef[];
   addSensorType: (
     draft: Omit<SensorTypeDef, "id">,
-  ) => RegistryResult & { id?: string };
+  ) => Promise<RegistryResult & { id?: string }>;
   /** Everything but the id, which is frozen at creation. */
   updateSensorType: (
     typeId: string,
     patch: Partial<Omit<SensorTypeDef, "id">>,
-  ) => RegistryResult;
-  archiveSensorType: (typeId: string) => RegistryResult;
-  restoreSensorType: (typeId: string) => RegistryResult;
+  ) => Promise<RegistryResult>;
+  archiveSensorType: (typeId: string) => Promise<RegistryResult>;
+  restoreSensorType: (typeId: string) => Promise<RegistryResult>;
   addSensorStatus: (
     typeId: string,
     draft: Omit<SensorStatusDef, "id">,
-  ) => RegistryResult;
+  ) => Promise<RegistryResult>;
   updateSensorStatus: (
     typeId: string,
     statusId: string,
     patch: Partial<Omit<SensorStatusDef, "id">>,
-  ) => RegistryResult;
-  removeSensorStatus: (typeId: string, statusId: string) => RegistryResult;
+  ) => Promise<RegistryResult>;
+  removeSensorStatus: (
+    typeId: string,
+    statusId: string,
+  ) => Promise<RegistryResult>;
   addSensorAction: (
     typeId: string,
     draft: Omit<SensorAction, "id">,
-  ) => RegistryResult;
+  ) => Promise<RegistryResult>;
   updateSensorAction: (
     typeId: string,
     actionId: string,
     patch: Partial<Omit<SensorAction, "id">>,
-  ) => RegistryResult;
-  removeSensorAction: (typeId: string, actionId: string) => RegistryResult;
+  ) => Promise<RegistryResult>;
+  removeSensorAction: (
+    typeId: string,
+    actionId: string,
+  ) => Promise<RegistryResult>;
   equipmentCondition: (
     unitId: string,
     fallback: EquipmentCondition,
@@ -318,8 +324,14 @@ export function AppStateProvider({
   const [equipmentOverrides, setEquipmentOverrides] = React.useState<
     Record<string, EquipmentCondition>
   >({});
-  const [sensorTypeRegistry, setSensorTypeRegistry] =
-    React.useState<SensorTypeDef[]>(SENSOR_TYPES);
+  // The registry is a collection now. Archiving is still the product's
+  // "delete", so an archived type keeps resolving labels on the records that
+  // name it — the subscription carries archived rows and the pages filter them.
+  const {
+    items: sensorTypeRegistry,
+    loading: sensorTypesLoading,
+    error: sensorTypesError,
+  } = useSensorTypes();
   // The Log Book is the first collection to leave memory. Nothing merges a
   // seed list in front of it any more — the seeded entries are documents.
   const {
@@ -605,19 +617,21 @@ export function AppStateProvider({
   // Validation has to answer the caller now, not on the next render, so the
   // next list is built from the current one here rather than in an updater.
   const patchType = React.useCallback(
-    (
+    async (
       typeId: string,
       change: (type: SensorTypeDef) => SensorTypeDef,
       entry?: Pick<LogDraft, "actionType" | "title" | "detail">,
-    ) => {
+    ): Promise<RegistryResult> => {
       const current = sensorTypeRegistry.find((t) => t.id === typeId);
       if (!current) return fail("No sensor type with that id.");
       const next = change(current);
       const check = validateType(next);
       if (!check.ok) return check;
-      setSensorTypeRegistry((prev) =>
-        prev.map((t) => (t.id === typeId ? next : t)),
-      );
+      // The type is written whole. Its statuses and actions are nested arrays
+      // on the one document precisely so a change to any of them is one write
+      // that either lands or does not — the same unit validateType judges.
+      const written = await writeSensorType(next);
+      if (!written.ok) return fail(written.message);
       // Every accepted change writes one entry — a refused one writes none,
       // which is why this sits after the validation rather than before it.
       log({
@@ -636,7 +650,7 @@ export function AppStateProvider({
   );
 
   const addSensorType = React.useCallback(
-    (draft: Omit<SensorTypeDef, "id">) => {
+    async (draft: Omit<SensorTypeDef, "id">) => {
       const id = uniqueId(
         slugify(draft.label),
         sensorTypeRegistry.map((t) => t.id),
@@ -644,7 +658,8 @@ export function AppStateProvider({
       const next = { ...draft, id };
       const check = validateType(next);
       if (!check.ok) return check;
-      setSensorTypeRegistry((prev) => [...prev, next]);
+      const written = await writeSensorType(next);
+      if (!written.ok) return fail(written.message);
       log({
         source: "admin",
         actionType: "sensor-type-added",
@@ -665,7 +680,7 @@ export function AppStateProvider({
   );
 
   const archiveSensorType = React.useCallback(
-    (typeId: string) => {
+    async (typeId: string): Promise<RegistryResult> => {
       const inUse = sensors.filter((s) => s.typeId === typeId).length;
       if (inUse > 0) {
         const type = sensorTypeRegistry.find((t) => t.id === typeId);
@@ -727,7 +742,7 @@ export function AppStateProvider({
   );
 
   const removeSensorStatus = React.useCallback(
-    (typeId: string, statusId: string) => {
+    async (typeId: string, statusId: string): Promise<RegistryResult> => {
       const occupied = sensorsInStatus(typeId, statusId);
       if (occupied > 0) {
         const label =
@@ -911,8 +926,9 @@ export function AppStateProvider({
       setSensorStatus,
       logBook,
       logBookLoading,
-      dataLoading: buildingsLoading || roomsLoading,
-      dataError: buildingsError ?? roomsError ?? logBookError,
+      dataLoading: buildingsLoading || roomsLoading || sensorTypesLoading,
+      dataError:
+        buildingsError ?? roomsError ?? sensorTypesError ?? logBookError,
       log,
       sensorTypeRegistry,
       addSensorType,
@@ -962,6 +978,8 @@ export function AppStateProvider({
       logBookLoading,
       logBookError,
       buildingsLoading,
+      sensorTypesLoading,
+      sensorTypesError,
       buildingsError,
       roomsLoading,
       roomsError,

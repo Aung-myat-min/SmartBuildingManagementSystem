@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toLogEntry } from "./store-mappers";
+import { toLogEntry, toSensorType } from "./store-mappers";
 
 /** A Firestore Timestamp, duck-typed — the mapper only ever calls toDate(). */
 const stamp = (iso: string) => ({ toDate: () => new Date(iso) });
@@ -48,5 +48,38 @@ describe("toLogEntry", () => {
     expect(entry.buildingId).toBe("b216");
     expect(entry.refId).toBe("REQ-4192");
     expect(entry.actorRole).toBe("admin-manager");
+  });
+});
+
+describe("toSensorType", () => {
+  it("round-trips a type written whole", () => {
+    const type = toSensorType("fire-alarm", {
+      label: "Fire alarm",
+      icon: "flame",
+      statuses: [{ id: "normal", label: "Normal", tone: "success" }],
+      actions: [
+        { id: "reset", label: "Reset", caption: "", resultStatus: "normal" },
+      ],
+      archived: false,
+    });
+    expect(type.id).toBe("fire-alarm");
+    expect(type.statuses[0].id).toBe("normal");
+    expect(type.actions).toHaveLength(1);
+  });
+
+  it("gives a type with no statuses one the UI can draw", () => {
+    // A type with an empty vocabulary cannot render a sensor at all, and the
+    // Sensors page groups by type — so a malformed document would blank a
+    // whole column rather than one cell.
+    const type = toSensorType("broken", { label: "Broken", statuses: [] });
+    expect(type.statuses).toHaveLength(1);
+    expect(type.statuses[0].tone).toBe("neutral");
+  });
+
+  it("defaults the icon and the archive flag", () => {
+    const type = toSensorType("bare", {});
+    expect(type.icon).toBe("activity");
+    expect(type.archived).toBe(false);
+    expect(type.label).toBe("bare");
   });
 });
