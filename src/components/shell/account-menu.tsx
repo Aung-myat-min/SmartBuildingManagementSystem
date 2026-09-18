@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAppState } from "@/lib/app-state";
+import { useAuth } from "@/lib/auth";
 import { roleLabel } from "@/lib/permissions";
 
 function initials(name: string) {
@@ -25,6 +26,7 @@ function initials(name: string) {
 
 export function AccountMenu() {
   const { currentUser } = useAppState();
+  const { signOutNow } = useAuth();
   const router = useRouter();
 
   return (
@@ -63,7 +65,7 @@ export function AccountMenu() {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
-          onClick={() => router.push("/login")}
+          onClick={() => void signOutNow()}
         >
           <LogOut className="size-3.5" /> Sign out
         </DropdownMenuItem>

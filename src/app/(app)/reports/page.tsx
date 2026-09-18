@@ -86,7 +86,7 @@ const KIND_TONE: Record<ReportKind, Tone> = {
 };
 
 export default function ReportsPage() {
-  const { role, setRole, log } = useAppState();
+  const { role, log } = useAppState();
 
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState("all");
@@ -106,8 +106,6 @@ export default function ReportsPage() {
             the CEO. Your role is <strong>{roleLabel[role]}</strong>.
           </>
         }
-        actionLabel="Switch to Admin Manager for this demo"
-        onAction={() => setRole("admin-manager")}
       />
     );
   }

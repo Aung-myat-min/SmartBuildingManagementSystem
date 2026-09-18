@@ -4,7 +4,6 @@ import * as React from "react";
 import { countOpenRequests } from "@/lib/derive";
 import {
   buildingName,
-  CURRENT_USERS,
   EQUIPMENT_UNITS,
   equipmentUnitLabel,
   LIVE_ALARM_SENSOR_ID,
@@ -150,7 +149,6 @@ const BASE_NOTIFICATIONS: Notification[] = [
 
 export interface AppState {
   role: UserRole;
-  setRole: (role: UserRole) => void;
   currentUser: AppUser;
   activeBuildingId: string;
   setActiveBuildingId: (id: string) => void;
@@ -246,9 +244,26 @@ export interface AppState {
 
 const AppStateContext = React.createContext<AppState | null>(null);
 
-export function AppStateProvider({ children }: { children: React.ReactNode }) {
-  const [role, setRoleState] = React.useState<UserRole>("admin-manager");
-  const [activeBuildingId, setActiveBuildingIdState] = React.useState("b216");
+/**
+ * Mounted inside the auth gate, below a resolved identity — which is why
+ * `user` is required rather than nullable, and why signing out unmounts this
+ * whole tree and takes every override map and the session log with it. That
+ * unmount is what stops one person's work leaking into the next person's
+ * session in the same tab.
+ */
+export function AppStateProvider({
+  user,
+  children,
+}: {
+  user: AppUser;
+  children: React.ReactNode;
+}) {
+  const role = user.role;
+  // Lazily initialised, not set in an effect: an effect would give Office
+  // Staff one render scoped to the wrong building.
+  const [activeBuildingId, setActiveBuildingIdState] = React.useState(
+    () => user.buildingId ?? "b216",
+  );
   const [elapsed, setElapsed] = React.useState(0);
   const [notifications, setNotifications] =
     React.useState<Notification[]>(BASE_NOTIFICATIONS);
@@ -307,15 +322,6 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [alarmActive]);
 
-  const setRole = React.useCallback((next: UserRole) => {
-    setRoleState(next);
-    if (next === "office-staff") {
-      setActiveBuildingIdState(
-        CURRENT_USERS["office-staff"].buildingId ?? "b216",
-      );
-    }
-  }, []);
-
   const setActiveBuildingId = React.useCallback(
     (id: string) => {
       if (role === "office-staff") return;
@@ -348,7 +354,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
 
   const log = React.useCallback(
     (draft: LogDraft) => {
-      const actor = CURRENT_USERS[role];
+      const actor = user;
       setSessionLog((prev) => [
         {
           ...draft,
@@ -356,12 +362,12 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
           timestamp: new Date().toISOString(),
           actorUid: draft.actorName ? undefined : actor.uid,
           actorName: draft.actorName ?? actor.name,
-          actorRole: draft.actorName ? undefined : role,
+          actorRole: draft.actorName ? undefined : user.role,
         },
         ...prev,
       ]);
     },
-    [role],
+    [user],
   );
 
   // What this session wrote sits in front of the seed book, newest first —
@@ -796,11 +802,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
   const value = React.useMemo<AppState>(
     () => ({
       role,
-      setRole,
-      currentUser: {
-        ...CURRENT_USERS[role],
-        buildingId: role === "office-staff" ? activeBuildingId : undefined,
-      },
+      currentUser: user,
       activeBuildingId,
       setActiveBuildingId,
       elapsed,
@@ -842,7 +844,7 @@ export function AppStateProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       role,
-      setRole,
+      user,
       activeBuildingId,
       setActiveBuildingId,
       elapsed,

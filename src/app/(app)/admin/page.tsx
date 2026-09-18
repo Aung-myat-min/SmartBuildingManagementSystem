@@ -90,7 +90,7 @@ function initials(name: string) {
 }
 
 export default function AdministrationPage() {
-  const { role, setRole, requests, sensorTypeRegistry } = useAppState();
+  const { role, requests, sensorTypeRegistry } = useAppState();
   const confirm = useConfirm();
 
   const mayEstate = canManageEstate(role);
@@ -132,8 +132,6 @@ export default function AdministrationPage() {
             <span className="font-mono">{roleLabel[role]}</span>.
           </>
         }
-        actionLabel="Switch to CEO for this demo"
-        onAction={() => setRole("ceo-super-admin")}
       />
     );
   }
@@ -220,8 +218,6 @@ export default function AdministrationPage() {
               <span className="font-mono">{roleLabel[role]}</span>.
             </>
           }
-          actionLabel="Switch to Admin Manager for this demo"
-          onAction={() => setRole("admin-manager")}
         />
       )}
     </div>

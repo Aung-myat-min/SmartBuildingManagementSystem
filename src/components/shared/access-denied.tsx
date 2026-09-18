@@ -1,17 +1,16 @@
 import { Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
+/**
+ * A role-locked page. It states the role and who to ask — it no longer offers
+ * to switch role, because with real accounts there is nothing to switch to.
+ */
 export function AccessDenied({
   title,
   body,
-  actionLabel,
-  onAction,
 }: {
   title: string;
   body: React.ReactNode;
-  actionLabel?: string;
-  onAction?: () => void;
 }) {
   return (
     <div className="flex flex-1 items-center justify-center py-16">
@@ -21,11 +20,6 @@ export function AccessDenied({
         <p className="text-muted-foreground text-[12.5px] leading-relaxed">
           {body}
         </p>
-        {actionLabel && onAction && (
-          <Button variant="outline" onClick={onAction} className="mt-1 w-full">
-            {actionLabel}
-          </Button>
-        )}
       </Card>
     </div>
   );

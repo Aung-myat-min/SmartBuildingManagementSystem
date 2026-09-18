@@ -1,4 +1,9 @@
-import type { MaintenanceRequest, RequestStatus, UserRole } from "./types";
+import type {
+  AppUser,
+  MaintenanceRequest,
+  RequestStatus,
+  UserRole,
+} from "./types";
 
 // Lower rank = more privileged. Gate on rank, never on role equality, so a
 // new role slots into the ladder without rewriting every check:
@@ -31,15 +36,29 @@ export function canApproveRequest(role: UserRole): boolean {
 }
 
 /**
+ * Whether a stored uid refers to the signed-in person. Seeded records were
+ * written against the mock corpus's ids, so a real account matches either its
+ * own Firebase uid or the legacy one it carries.
+ */
+export function isActor(
+  user: Pick<AppUser, "uid" | "legacyUid">,
+  uid: string,
+): boolean {
+  return (
+    uid === user.uid || (user.legacyUid !== undefined && uid === user.legacyUid)
+  );
+}
+
+/**
  * A request is its submitter's only up to the moment it is approved. After
  * that it is committed work and they can no longer pull it back.
  */
 export function canWithdrawRequest(
   request: Pick<MaintenanceRequest, "submittedBy">,
   status: RequestStatus,
-  actorUid: string,
+  actor: Pick<AppUser, "uid" | "legacyUid">,
 ): boolean {
-  return status === "requested" && request.submittedBy === actorUid;
+  return status === "requested" && isActor(actor, request.submittedBy);
 }
 
 /**
@@ -50,11 +69,11 @@ export function canWithdrawRequest(
 export function canRequestVerification(
   request: Pick<MaintenanceRequest, "submittedBy" | "verificationRequested">,
   status: RequestStatus,
-  actorUid: string,
+  actor: Pick<AppUser, "uid" | "legacyUid">,
 ): boolean {
   return (
     status === "resolved" &&
-    request.submittedBy === actorUid &&
+    isActor(actor, request.submittedBy) &&
     !request.verificationRequested
   );
 }

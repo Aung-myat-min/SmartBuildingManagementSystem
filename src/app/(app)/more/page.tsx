@@ -2,9 +2,9 @@
 
 import { Lock } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ToneBadge } from "@/components/shared/tone-badge";
 import { useAppState } from "@/lib/app-state";
+import { useAuth } from "@/lib/auth";
 import { MORE_ITEMS } from "@/lib/nav";
 import { roleLabel, roleRank } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,7 @@ function initials(name: string) {
  */
 export default function MorePage() {
   const { currentUser, role, openRequestCount } = useAppState();
-  const router = useRouter();
+  const { signOutNow } = useAuth();
   const rank = roleRank(role);
 
   const reachable = MORE_ITEMS.filter((item) => rank <= item.minRank);
@@ -95,7 +95,7 @@ export default function MorePage() {
 
       <button
         type="button"
-        onClick={() => router.push("/login")}
+        onClick={() => void signOutNow()}
         className={cn(
           "border-danger/40 text-danger-foreground bg-card hover:bg-danger-muted",
           "cursor-pointer rounded-[5px] border px-4 py-3 text-[12px] font-medium",

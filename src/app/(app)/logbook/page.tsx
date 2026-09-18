@@ -70,7 +70,7 @@ function dayLabel(iso: string) {
 }
 
 export default function LogBookPage() {
-  const { role, activeBuildingId, setRole, logBook } = useAppState();
+  const { role, activeBuildingId, logBook } = useAppState();
   const clock = useLiveClock();
   const [paused, setPaused] = React.useState(false);
   const [query, setQuery] = React.useState("");
@@ -185,8 +185,6 @@ export default function LogBookPage() {
             role is <strong>{roleLabel[role]}</strong>.
           </>
         }
-        actionLabel="Switch to Admin Manager for this demo"
-        onAction={() => setRole("admin-manager")}
       />
     );
   }

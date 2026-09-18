@@ -28,6 +28,14 @@ export interface AppUser {
   role: UserRole;
   /** Office Staff are scoped to one building. Admin Manager & CEO see all. */
   buildingId?: string;
+  /**
+   * The mock corpus's id for this person, e.g. "u-hnin". Seeded records carry
+   * it in `submittedBy` and `actorUid`, and a real Firebase uid never matches
+   * one — without this join, no seeded request would be withdrawable or
+   * verifiable by whoever raised it. Only the ownership predicates read it,
+   * and it goes when the data migrates.
+   */
+  legacyUid?: string;
 }
 
 // Administration > User Accounts. Superset of AppUser with the fields the

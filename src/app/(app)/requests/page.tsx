@@ -43,6 +43,7 @@ import {
   REQUEST_ADVANCE_LOCK_REASON,
 } from "@/lib/permissions";
 import type {
+  AppUser,
   MaintenanceRequest,
   RequestPriority,
   RequestStatus,
@@ -78,7 +79,8 @@ const STATUS_LABEL: Record<RequestStatus, string> = {
 /** What either view can do to a request, gathered once and passed down. */
 interface RequestActions {
   mayAdvance: boolean;
-  uid: string;
+  /** The signed-in person, for the two ownership checks. */
+  actor: AppUser;
   onMove: (r: MaintenanceRequest, d: "next" | "prev") => void;
   onDecline: (r: MaintenanceRequest) => void;
   onWithdraw: (r: MaintenanceRequest) => void;
@@ -227,7 +229,7 @@ export default function RequestsPage() {
 
   const actions: RequestActions = {
     mayAdvance,
-    uid: currentUser.uid,
+    actor: currentUser,
     onMove: move,
     onDecline: decline,
     onWithdraw: withdraw,
@@ -569,12 +571,13 @@ function MoveButtons({
   request: MaintenanceRequest;
   actions: RequestActions;
 }) {
-  const { mayAdvance, uid, onMove, onDecline, onWithdraw, onVerify } = actions;
+  const { mayAdvance, actor, onMove, onDecline, onWithdraw, onVerify } =
+    actions;
   const nextLabel = REQUEST_NEXT_ACTION[request.status];
   const backLabel = REQUEST_PREV_ACTION[request.status];
   const canBack = Boolean(REQUEST_PREV_STATUS[request.status]) && mayAdvance;
-  const mayWithdraw = canWithdrawRequest(request, request.status, uid);
-  const mayVerify = canRequestVerification(request, request.status, uid);
+  const mayWithdraw = canWithdrawRequest(request, request.status, actor);
+  const mayVerify = canRequestVerification(request, request.status, actor);
 
   return (
     <>

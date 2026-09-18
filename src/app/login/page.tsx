@@ -1,44 +1,67 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { useAppState } from "@/lib/app-state";
-import { CURRENT_USERS } from "@/lib/mock-data";
-import { roleLabel } from "@/lib/permissions";
-import type { UserRole } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 
-const DEMO_ACCOUNTS: { role: UserRole; blurb: string; emailPrefix: string }[] =
-  [
-    {
-      role: "office-staff",
-      blurb: "Office Staff — Building 216 only",
-      emailPrefix: "staff@",
-    },
-    {
-      role: "admin-manager",
-      blurb: "Admin Manager — all buildings",
-      emailPrefix: "admin@",
-    },
-    {
-      role: "ceo-super-admin",
-      blurb: "CEO / Super Admin — full control",
-      emailPrefix: "ceo@",
-    },
-  ];
+/** Why the gate sent someone back here, if it did. */
+const REASONS: Record<string, string> = {
+  suspended:
+    "This account has been suspended. Ask an Admin Manager to restore it.",
+  "no-profile":
+    "This account has no profile yet. Ask an Admin Manager to finish setting it up.",
+  "signed-out": "You have been signed out.",
+};
 
+// useSearchParams opts the subtree into client rendering, so the reason read
+// sits behind its own boundary rather than failing the route's prerender.
 export default function LoginPage() {
-  const { role, setRole } = useAppState();
-  const router = useRouter();
+  return (
+    <React.Suspense fallback={null}>
+      <LoginView />
+    </React.Suspense>
+  );
+}
 
-  const handleSignIn = (e: React.FormEvent) => {
+function LoginView() {
+  const { status, signIn } = useAuth();
+  const router = useRouter();
+  const params = useSearchParams();
+
+  const [email, setEmail] = React.useState("");
+  const [password, setPassword] = React.useState("");
+  const [keepSignedIn, setKeepSignedIn] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, setPending] = React.useState(false);
+
+  const reason = params.get("reason");
+  const notice = reason ? REASONS[reason] : null;
+
+  // Routing on status rather than from the submit handler: signing in resolves
+  // the profile asynchronously, and navigating before that lands in the gate
+  // while it still reads "loading", which bounces straight back here.
+  React.useEffect(() => {
+    if (status === "signed-in") router.replace("/dashboard");
+  }, [status, router]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    router.push("/dashboard");
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    const result = await signIn(email, password, keepSignedIn);
+    if (!result.ok) {
+      setError(result.message);
+      setPending(false);
+    }
+    // On success the effect above navigates; leaving `pending` set keeps the
+    // button from being pressed twice while the profile resolves.
   };
 
   return (
@@ -49,7 +72,7 @@ export default function LoginPage() {
             <span className="bg-primary absolute inset-1.5 opacity-55" />
           </span>
           <div>
-            <div className="text-[15px] font-semibold leading-tight">
+            <div className="text-[15px] leading-tight font-semibold">
               Smart Building Monitoring
             </div>
             <div className="text-muted-foreground mt-0.5 font-mono text-[10.5px] tracking-wider">
@@ -65,37 +88,48 @@ export default function LoginPage() {
           Use your university account. Access is scoped by role.
         </p>
 
+        {notice && (
+          <p className="bg-warning-muted text-warning-foreground mt-4 rounded-md px-3 py-2.5 text-[11.5px] leading-relaxed">
+            {notice}
+          </p>
+        )}
+
         <form onSubmit={handleSignIn} className="mt-5 flex flex-col gap-3.5">
           <div className="flex flex-col gap-1.5">
-            <Label className="font-mono text-[11px] tracking-wider text-foreground/70 uppercase">
+            <Label className="text-foreground/70 font-mono text-[11px] tracking-wider uppercase">
               Email
             </Label>
             <Input
               type="email"
+              autoComplete="username"
               placeholder="name@university.edu"
-              defaultValue={CURRENT_USERS[role].email}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="focus-visible:border-primary focus-visible:ring-primary/20"
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label className="font-mono text-[11px] tracking-wider text-foreground/70 uppercase">
+            <Label className="text-foreground/70 font-mono text-[11px] tracking-wider uppercase">
               Password
             </Label>
             <Input
               type="password"
+              autoComplete="current-password"
               placeholder="••••••••••"
-              defaultValue="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="focus-visible:border-primary focus-visible:ring-primary/20"
             />
           </div>
           <div className="flex items-center justify-between">
             <label
               htmlFor="keep-signed-in"
-              className="flex items-center gap-1.5 text-[12px] text-foreground/80"
+              className="text-foreground/80 flex items-center gap-1.5 text-[12px]"
             >
               <Checkbox
                 id="keep-signed-in"
-                defaultChecked
+                checked={keepSignedIn}
+                onCheckedChange={(checked) => setKeepSignedIn(checked === true)}
                 className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
               />
               Keep me signed in
@@ -107,71 +141,26 @@ export default function LoginPage() {
               Forgot password
             </Link>
           </div>
+
+          {error && (
+            <p className="text-danger-foreground text-[11.5px] leading-relaxed">
+              {error}
+            </p>
+          )}
+
           <Button
             type="submit"
+            disabled={pending}
             className="bg-primary hover:bg-primary/90 mt-1 w-full"
           >
-            Sign in
+            {pending ? "Signing in…" : "Sign in"}
           </Button>
         </form>
 
-        <Separator className="mt-6 mb-4" />
-
-        <div className="text-muted-foreground mb-2.5 font-mono text-[10.5px] tracking-wider uppercase">
-          Demo accounts
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {DEMO_ACCOUNTS.map((acct) => (
-            <button
-              key={acct.role}
-              type="button"
-              onClick={() => setRole(acct.role)}
-              className={cn(
-                "hover:border-primary hover:bg-accent/60 flex cursor-pointer items-center gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors",
-                role === acct.role
-                  ? "border-primary bg-accent/40"
-                  : "border-border",
-              )}
-            >
-              <span
-                className={cn(
-                  "size-1.5 shrink-0 rounded-full",
-                  role === acct.role ? "bg-primary" : "bg-muted-foreground/40",
-                )}
-              />
-              <span className="flex-1 text-[12px] font-[450]">
-                {acct.blurb}
-              </span>
-              <span className="text-muted-foreground font-mono text-[10.5px]">
-                {acct.emailPrefix}
-              </span>
-            </button>
-          ))}
-        </div>
-        <p className="text-muted-foreground mt-4 text-center text-[11px] leading-relaxed">
-          Currently previewing as{" "}
-          <span className="font-medium">{roleLabel[role]}</span>. Picking an
-          account changes which dashboard you land on.
+        <p className="text-muted-foreground mt-5 text-center text-[11px] leading-relaxed">
+          Accounts are created by an Admin Manager. If you have not set a
+          password yet, use the link in your invitation email.
         </p>
-
-        <div className="text-muted-foreground mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[10.5px]">
-          <span className="font-mono tracking-wider uppercase">
-            Also preview
-          </span>
-          <Link
-            href="/login/first-sign-in"
-            className="hover:text-primary hover:underline"
-          >
-            First sign-in
-          </Link>
-          <span>·</span>
-          <Link
-            href="/login/session-expired"
-            className="hover:text-primary hover:underline"
-          >
-            Session expired
-          </Link>
-        </div>
       </div>
     </div>
   );

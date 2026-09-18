@@ -3,11 +3,10 @@
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/shell/account-menu";
 import { AppSidebar } from "@/components/shell/app-sidebar";
+import { AuthGate } from "@/components/shell/auth-gate";
 import { DemoBanner } from "@/components/shell/demo-banner";
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
 import { NotificationsMenu } from "@/components/shell/notifications-menu";
-import { RoleSwitcher } from "@/components/shell/role-switcher";
-import { Separator } from "@/components/ui/separator";
 import { useAppState } from "@/lib/app-state";
 import { BUILDINGS } from "@/lib/mock-data";
 import { MOBILE_TABS, MORE_ITEMS, NAV_ITEMS } from "@/lib/nav";
@@ -15,6 +14,16 @@ import { MOBILE_TABS, MORE_ITEMS, NAV_ITEMS } from "@/lib/nav";
 const TITLES = [...NAV_ITEMS, ...MORE_ITEMS, ...MOBILE_TABS];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  // Everything below needs a resolved identity, so the gate wraps the shell
+  // rather than each page.
+  return (
+    <AuthGate>
+      <AppShell>{children}</AppShell>
+    </AuthGate>
+  );
+}
+
+function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { role, activeBuildingId } = useAppState();
 
@@ -49,10 +58,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex-1" />
-          <div className="hidden lg:block">
-            <RoleSwitcher />
-          </div>
-          <Separator orientation="vertical" className="hidden h-5! lg:block" />
           <NotificationsMenu />
           <AccountMenu />
         </header>
