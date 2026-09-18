@@ -23,41 +23,40 @@ prints before the prerender step that can still fail.
 Authentication and the `users` collection are real; every other collection is
 still mock data in `src/lib/mock-data.ts`.
 
-### Local — the emulator suite
+### Setup
 
-Needs Java (the Firestore emulator is a JVM process) and the Firebase CLI
-(`npx firebase-tools`, or install it globally).
+Copy `.env.example` to `.env.local` and fill in the six `NEXT_PUBLIC_FIREBASE_*`
+values from the Firebase console (Project settings → General → Your apps).
+
+**These values are not secrets.** They ship in the client bundle by design and
+identify the project rather than granting access to it. Authorisation lives in
+`firestore.rules` and the console's authorised-domains list.
+
+### Bootstrapping a project, once
+
+The rules cannot bootstrap themselves: `allow create` on `/users` reads the
+actor's own `/users` document to find their role, and before the first CEO
+document exists there is no role to find. So the first documents go in while the
+rules are still permissive, and the rules are published immediately after.
 
 ```bash
-pnpm emulators      # auth :9099 · firestore :8080 · UI :4000
-pnpm seed           # three sign-in accounts + eight profile documents
+pnpm bootstrap        # three sign-in accounts + eight profile documents
+pnpm rules:deploy     # lock it down — do not skip this
 ```
 
-Then point the app at them by putting this in `.env.local`:
+Run those the other way round and the bootstrap gets `PERMISSION_DENIED`; skip
+the second and the database is open to the internet. `pnpm rules:deploy` needs
+`npx firebase-tools login` first, or paste `firestore.rules` into the console
+under Firestore → Rules → Publish.
 
-```
-NEXT_PUBLIC_FIREBASE_EMULATORS=1
-```
-
-No project config is needed in emulator mode. The seed script is idempotent —
-re-running reuses existing accounts rather than failing.
-
-Seeded accounts, all with the password `Password!2026`:
+Seeded accounts, all with the password `Password!2026` — change them before
+anything real depends on this:
 
 | Email | Role |
 | --- | --- |
 | `hnin.nwe@university.edu` | Office Staff (Building 216) |
 | `elysha@university.edu` | Admin Manager |
 | `daw.htun@university.edu` | CEO / Super Admin |
-
-### A real project
-
-Copy `.env.example` to `.env.local` and fill in the six `NEXT_PUBLIC_FIREBASE_*`
-values from the Firebase console, with `NEXT_PUBLIC_FIREBASE_EMULATORS=0`.
-
-**These values are not secrets.** They ship in the client bundle by design and
-identify the project rather than granting access to it. Authorisation lives in
-`firestore.rules` and the console's authorised-domains list.
 
 Two console steps that are easy to miss:
 
@@ -67,9 +66,15 @@ Two console steps that are easy to miss:
    `https://<host>/login/first-sign-in`, or password-reset links land on
    Firebase's generic page instead of this app's screen.
 
-The security rules cannot bootstrap themselves — `allow create` on `/users`
-reads the actor's own `/users` document to find their role, and before the first
-CEO document exists there is no role to find. For a real project, create the
-three accounts and their documents by hand in the console the first time.
+### Local — the emulator suite, optional
 
-Deploy the rules with `npx firebase-tools deploy --only firestore:rules`.
+Needs Java (the Firestore emulator is a JVM process). Useful for working on the
+rules without touching the live project.
+
+```bash
+pnpm emulators        # auth :9099 · firestore :8080 · UI :4000
+pnpm seed             # the same accounts, via the Admin SDK
+```
+
+Point the app at them with `NEXT_PUBLIC_FIREBASE_EMULATORS=1` in `.env.local`;
+no project config is needed in that mode.

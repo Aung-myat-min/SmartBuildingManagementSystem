@@ -1,8 +1,10 @@
 // ============================================================================
 // Seeds the three sign-in accounts and the eight user profile documents.
 //
-// The demo account picker is gone, so three real accounts are the only way to
-// reach all three roles. Run this against the emulator suite:
+// This is the EMULATOR path (Admin SDK, no credentials needed). For a live
+// project use scripts/bootstrap-live.mjs instead.
+//
+// Run it against the emulator suite:
 //
 //   npx firebase-tools emulators:start --only auth,firestore
 //   node scripts/seed-users.mjs
@@ -22,6 +24,7 @@
 import { cert, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
+import { ACCOUNTS, DEV_PASSWORD, PROFILES_ONLY, userDoc } from "./accounts.mjs";
 
 const PROJECT_ID =
   process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "smart-building-monitoring";
@@ -37,76 +40,6 @@ if (usingEmulators) {
   process.env.FIREBASE_AUTH_EMULATOR_HOST ??= "127.0.0.1:9099";
   process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 }
-
-const DEV_PASSWORD = process.env.SEED_PASSWORD ?? "Password!2026";
-
-/** The three that can sign in. */
-const ACCOUNTS = [
-  {
-    email: "hnin.nwe@university.edu",
-    name: "Hnin Nwe",
-    role: "office-staff",
-    buildingId: "b216",
-    legacyUid: "u-hnin",
-  },
-  {
-    email: "elysha@university.edu",
-    name: "Elysha",
-    role: "admin-manager",
-    buildingId: null,
-    legacyUid: "u-ko",
-  },
-  {
-    email: "daw.htun@university.edu",
-    name: "Daw Htun",
-    role: "ceo-super-admin",
-    buildingId: null,
-    legacyUid: "u-daw",
-  },
-];
-
-/**
- * The rest of Administration's account list. These get a profile document but
- * no Auth record — they are people to administer, not people who sign in
- * during the demo. Suspended so the table never implies they can.
- */
-const PROFILES_ONLY = [
-  {
-    email: "su.myat@university.edu",
-    name: "Su Myat",
-    role: "admin-manager",
-    buildingId: null,
-    legacyUid: "u-su",
-  },
-  {
-    email: "zaw.lin@university.edu",
-    name: "Zaw Lin",
-    role: "office-staff",
-    buildingId: "b216",
-    legacyUid: "u-zaw",
-  },
-  {
-    email: "thida.win@university.edu",
-    name: "Thida Win",
-    role: "office-staff",
-    buildingId: "b209",
-    legacyUid: "u-thida",
-  },
-  {
-    email: "nay.oo@university.edu",
-    name: "Nay Oo",
-    role: "office-staff",
-    buildingId: "jsq",
-    legacyUid: "u-nay",
-  },
-  {
-    email: "myo.set@university.edu",
-    name: "Myo Set",
-    role: "office-staff",
-    buildingId: "jsq",
-    legacyUid: "u-myo",
-  },
-];
 
 /**
  * Against the emulators the Admin SDK needs no credential — but the key has to
@@ -146,37 +79,33 @@ async function main() {
       console.log(`  + ${account.email} created (${user.uid})`);
     }
 
-    await db.collection("users").doc(user.uid).set(
-      {
-        email: account.email,
-        name: account.name,
-        role: account.role,
-        buildingId: account.buildingId,
-        legacyUid: account.legacyUid,
-        status: "active",
-        lastActiveAt: FieldValue.serverTimestamp(),
-        createdAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
+    await db
+      .collection("users")
+      .doc(user.uid)
+      .set(
+        {
+          ...userDoc(account, { status: "active" }),
+          lastActiveAt: FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
   }
 
   for (const person of PROFILES_ONLY) {
     // Keyed by legacyUid: there is no Auth uid to key on, and the id has to be
     // stable across re-runs.
-    await db.collection("users").doc(person.legacyUid).set(
-      {
-        email: person.email,
-        name: person.name,
-        role: person.role,
-        buildingId: person.buildingId,
-        legacyUid: person.legacyUid,
-        status: "suspended",
-        lastActiveAt: FieldValue.serverTimestamp(),
-        createdAt: FieldValue.serverTimestamp(),
-      },
-      { merge: true },
-    );
+    await db
+      .collection("users")
+      .doc(person.legacyUid)
+      .set(
+        {
+          ...userDoc(person, { status: "suspended" }),
+          lastActiveAt: FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
     console.log(`  · ${person.email} profile only (no sign-in)`);
   }
 

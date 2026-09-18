@@ -8,8 +8,10 @@
     "start": "next start",
     "lint": "biome check",
     "format": "biome format --write",
-    "emulators": "firebase emulators:start --only auth,firestore --project smart-building-monitoring",
-    "seed": "NEXT_PUBLIC_FIREBASE_EMULATORS=1 node scripts/seed-users.mjs"
+    "emulators": "firebase emulators:start --only auth,firestore",
+    "seed": "NEXT_PUBLIC_FIREBASE_EMULATORS=1 node scripts/seed-users.mjs",
+    "bootstrap": "node scripts/bootstrap-live.mjs",
+    "rules:deploy": "firebase deploy --only firestore:rules"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
