@@ -29,7 +29,6 @@ import {
   BUILDING_META,
   BUILDINGS,
   EQUIPMENT_UNITS,
-  MANAGED_USERS,
   ROOMS,
   SENSORS,
 } from "@/lib/mock-data";
@@ -53,6 +52,12 @@ import type {
   SensorTypeDef,
   UserRole,
 } from "@/lib/types";
+import {
+  createUser,
+  setUserStatus,
+  updateUser,
+  useUsers,
+} from "@/lib/users-store";
 import { cn } from "@/lib/utils";
 
 const ROOM_TYPE_LABEL: Record<RoomType, string> = {
@@ -90,7 +95,7 @@ function initials(name: string) {
 }
 
 export default function AdministrationPage() {
-  const { role, requests, sensorTypeRegistry } = useAppState();
+  const { role, currentUser, requests, sensorTypeRegistry } = useAppState();
   const confirm = useConfirm();
 
   const mayEstate = canManageEstate(role);
@@ -116,7 +121,9 @@ export default function AdministrationPage() {
     })),
   );
   const [rooms, setRooms] = React.useState<Room[]>(ROOMS);
-  const [users, setUsers] = React.useState<ManagedUser[]>(MANAGED_USERS);
+  // Live, not a copy: a role change here reaches that person's own session
+  // through the subscription in lib/auth.tsx, without a reload.
+  const { users, loading: usersLoading, error: usersError } = useUsers();
   const [selectedBuildingId, setSelectedBuildingId] = React.useState(
     BUILDINGS[0]?.id ?? "",
   );
@@ -201,8 +208,10 @@ export default function AdministrationPage() {
       ) : tab === "users" ? (
         <UsersTab
           actorRole={role}
+          selfUid={currentUser.uid}
           users={users}
-          setUsers={setUsers}
+          loading={usersLoading}
+          loadError={usersError}
           buildings={buildings}
           confirm={confirm}
         />
@@ -871,14 +880,19 @@ function EditRoomDrawer({
 
 function UsersTab({
   actorRole,
+  selfUid,
   users,
-  setUsers,
+  loading,
+  loadError,
   buildings,
   confirm,
 }: {
   actorRole: UserRole;
+  /** The signed-in account, so "you cannot edit yourself" is a comparison. */
+  selfUid: string;
   users: ManagedUser[];
-  setUsers: React.Dispatch<React.SetStateAction<ManagedUser[]>>;
+  loading: boolean;
+  loadError: string | null;
   buildings: LocalBuilding[];
   confirm: ConfirmFn;
 }) {
@@ -914,13 +928,14 @@ function UsersTab({
       confirmLabel: suspending ? "Suspend account" : "Restore account",
     });
     if (!result.confirmed) return;
-    setUsers((prev) =>
-      prev.map((x) =>
-        x.uid === u.uid
-          ? { ...x, status: suspending ? "suspended" : "active" }
-          : x,
-      ),
+    const written = await setUserStatus(
+      u.uid,
+      suspending ? "suspended" : "active",
     );
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
     log({
       source: "admin",
       actionType: "user-status-changed",
@@ -983,8 +998,9 @@ function UsersTab({
         </div>
 
         {filtered.map((u) => {
-          const editable = canEditUser(actorRole, u.role, u.isSelf);
-          const lockReason = u.isSelf
+          const isSelf = u.uid === selfUid;
+          const editable = canEditUser(actorRole, u.role, isSelf);
+          const lockReason = isSelf
             ? "Every estate needs at least one Super Admin — this account cannot edit itself."
             : userEditLockReason(actorRole, u.role);
           return (
@@ -1050,7 +1066,19 @@ function UsersTab({
           );
         })}
 
-        {filtered.length === 0 && (
+        {loading && (
+          <div className="text-muted-foreground px-4 py-10 text-center text-[12px]">
+            Loading accounts…
+          </div>
+        )}
+
+        {!loading && loadError && (
+          <div className="text-warning-foreground px-4 py-10 text-center text-[12px]">
+            {loadError}
+          </div>
+        )}
+
+        {!loading && !loadError && filtered.length === 0 && (
           <div className="text-muted-foreground px-4 py-10 text-center text-[12px]">
             No accounts match this search.
           </div>
@@ -1063,18 +1091,20 @@ function UsersTab({
         editing={null}
         buildings={buildings}
         onOpenChange={setNewOpen}
-        onSave={(u) => {
-          setUsers((prev) => [...prev, u]);
+        onSave={async (draft) => {
+          const written = await createUser(draft);
+          if (!written.ok) return written;
           log({
             source: "admin",
             actionType: "user-added",
             title: "Account created",
-            detail: `${u.name} — ${roleLabel[u.role]}${u.buildingId ? `, scoped to ${buildings.find((b) => b.id === u.buildingId)?.name ?? u.buildingId}` : ", all buildings"}.`,
+            detail: `${draft.name} — ${roleLabel[draft.role]}${draft.buildingId ? `, scoped to ${buildings.find((b) => b.id === draft.buildingId)?.name ?? draft.buildingId}` : ", all buildings"}.`,
             targetType: "user",
-            targetId: u.uid,
-            buildingId: u.buildingId,
+            targetId: written.uid ?? draft.email,
+            buildingId: draft.buildingId,
           });
-          toast.success(`${u.name} can now sign in`);
+          toast.success(`${draft.name} has been sent a first sign-in link`);
+          return written;
         }}
       />
       <UserDrawer
@@ -1083,31 +1113,41 @@ function UsersTab({
         editing={editing}
         buildings={buildings}
         onOpenChange={(o) => !o && setEditing(null)}
-        onSave={(u) => {
-          setUsers((prev) => prev.map((x) => (x.uid === u.uid ? u : x)));
+        onSave={async (draft) => {
+          if (!editing)
+            return { ok: false as const, message: "No account open." };
+          const written = await updateUser(editing.uid, draft);
+          if (!written.ok) return written;
           log({
             source: "admin",
             actionType:
-              editing && editing.role !== u.role
-                ? "user-role-changed"
-                : "user-edited",
+              editing.role !== draft.role ? "user-role-changed" : "user-edited",
             title:
-              editing && editing.role !== u.role
+              editing.role !== draft.role
                 ? "Account role changed"
                 : "Account edited",
             detail:
-              editing && editing.role !== u.role
-                ? `${u.name} — ${roleLabel[editing.role]} → ${roleLabel[u.role]}.`
-                : `${u.name} — ${roleLabel[u.role]}.`,
+              editing.role !== draft.role
+                ? `${draft.name} — ${roleLabel[editing.role]} → ${roleLabel[draft.role]}.`
+                : `${draft.name} — ${roleLabel[draft.role]}.`,
             targetType: "user",
-            targetId: u.uid,
-            buildingId: u.buildingId,
+            targetId: editing.uid,
+            buildingId: draft.buildingId,
           });
-          toast.success(`${u.name} updated`);
+          toast.success(`${draft.name} updated`);
+          return written;
         }}
       />
     </div>
   );
+}
+
+/** What the account form collects. Everything else about a user is derived. */
+interface UserDraft {
+  name: string;
+  email: string;
+  role: UserRole;
+  buildingId?: string;
 }
 
 function UserDrawer({
@@ -1123,13 +1163,18 @@ function UserDrawer({
   editing: ManagedUser | null;
   buildings: LocalBuilding[];
   onOpenChange: (open: boolean) => void;
-  onSave: (user: ManagedUser) => void;
+  /**
+   * Resolves once the write has been attempted, so the drawer can hold the
+   * error rather than closing over it.
+   */
+  onSave: (draft: UserDraft) => Promise<{ ok: boolean; message?: string }>;
 }) {
   const [name, setName] = React.useState("");
   const [email, setEmail] = React.useState("");
   const [role, setRoleValue] = React.useState<UserRole>("office-staff");
   const [buildingId, setBuildingId] = React.useState(buildings[0]?.id ?? "");
   const [error, setError] = React.useState<string | null>(null);
+  const [saving, setSaving] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -1159,9 +1204,13 @@ function UserDrawer({
           ? "Role and building scope take effect the next time they sign in."
           : "The account is created with a first sign-in link; they choose their own password."
       }
-      submitLabel={editing ? "Save changes" : "Create account"}
+      submitLabel={
+        saving ? "Saving…" : editing ? "Save changes" : "Create account"
+      }
+      submitDisabled={saving}
       error={error}
-      onSubmit={() => {
+      onSubmit={async () => {
+        if (saving) return;
         if (name.trim().length === 0) {
           setError("An account needs a name.");
           return;
@@ -1170,16 +1219,20 @@ function UserDrawer({
           setError("Enter the university address for this account.");
           return;
         }
-        onSave({
-          uid: editing?.uid ?? `u-${Date.now()}`,
+        setSaving(true);
+        const written = await onSave({
           name: name.trim(),
           email: email.trim(),
           role,
           buildingId: buildingLocked ? undefined : buildingId,
-          status: editing?.status ?? "active",
-          lastActiveAt: editing?.lastActiveAt ?? new Date().toISOString(),
-          isSelf: editing?.isSelf,
         });
+        setSaving(false);
+        // An email already in use, or a role the actor may not assign, has to
+        // stay on screen rather than vanish with the drawer.
+        if (!written.ok) {
+          setError(written.message ?? "Could not save.");
+          return;
+        }
         onOpenChange(false);
       }}
     >

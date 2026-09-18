@@ -1151,7 +1151,6 @@ export const MANAGED_USERS: ManagedUser[] = [
     role: "ceo-super-admin",
     status: "active",
     lastActiveAt: "2026-09-09T20:40:00Z",
-    isSelf: true,
   },
   {
     uid: "u-ko",

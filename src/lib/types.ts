@@ -39,12 +39,13 @@ export interface AppUser {
 }
 
 // Administration > User Accounts. Superset of AppUser with the fields the
-// account-management table needs. The CEO account (self) can't be edited
-// or suspended from the UI — every estate needs at least one Super Admin.
+// account-management table needs. "Is this me?" is a comparison against the
+// signed-in uid, never a stored flag — an estate always needs at least one
+// Super Admin, and the account doing the editing is the one that must not be
+// able to demote or suspend itself.
 export interface ManagedUser extends AppUser {
   status: "active" | "suspended";
   lastActiveAt: string; // ISO timestamp
-  isSelf?: boolean;
 }
 
 // ---- Buildings & Rooms -----------------------------------------------------

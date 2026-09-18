@@ -1,0 +1,203 @@
+"use client";
+
+// ============================================================================
+// The `users` collection — the one thing in this app that is not mock data.
+//
+// Administration reads it live rather than holding a copy, which also closes
+// the documented gap that account edits used to be page-local: a role change
+// here reaches the signed-in person's own session through the subscription in
+// lib/auth.tsx, without a reload.
+// ============================================================================
+
+import { deleteApp, type FirebaseApp } from "firebase/app";
+import {
+  createUserWithEmailAndPassword,
+  getAuth,
+  inMemoryPersistence,
+  sendPasswordResetEmail,
+  setPersistence,
+  signOut,
+} from "firebase/auth";
+import {
+  collection,
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  type Timestamp,
+  updateDoc,
+} from "firebase/firestore";
+import * as React from "react";
+import { authErrorMessage } from "@/lib/auth-errors";
+import { auth, db, provisionerApp } from "@/lib/firebase";
+import type { ManagedUser, UserRole } from "@/lib/types";
+
+export type UserResult = { ok: true } | { ok: false; message: string };
+
+interface UserDocData {
+  email?: string;
+  name?: string;
+  role?: UserRole;
+  buildingId?: string | null;
+  legacyUid?: string | null;
+  status?: "active" | "suspended";
+  lastActiveAt?: Timestamp;
+}
+
+/** ISO at the boundary, so no screen ever handles a Firestore Timestamp. */
+function toManagedUser(id: string, data: UserDocData): ManagedUser {
+  return {
+    uid: id,
+    email: data.email ?? "",
+    name: data.name ?? "",
+    role: data.role ?? "office-staff",
+    buildingId: data.buildingId ?? undefined,
+    legacyUid: data.legacyUid ?? undefined,
+    status: data.status ?? "active",
+    lastActiveAt: data.lastActiveAt?.toDate().toISOString() ?? "",
+  };
+}
+
+export function useUsers(): {
+  users: ManagedUser[];
+  loading: boolean;
+  error: string | null;
+} {
+  const [users, setUsers] = React.useState<ManagedUser[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, "users"),
+      (snap) => {
+        setUsers(
+          snap.docs
+            .map((d) => toManagedUser(d.id, d.data() as UserDocData))
+            // Newest-looking first is meaningless here; name order is what an
+            // administrator scans by.
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        );
+        setLoading(false);
+        setError(null);
+      },
+      (cause) => {
+        setLoading(false);
+        setError(
+          cause.code === "permission-denied"
+            ? "You do not have access to the account list."
+            : "Could not load accounts. Check your connection.",
+        );
+      },
+    );
+    return unsubscribe;
+  }, []);
+
+  return { users, loading, error };
+}
+
+export async function updateUser(
+  uid: string,
+  patch: Partial<Pick<ManagedUser, "name" | "role" | "buildingId" | "status">>,
+): Promise<UserResult> {
+  try {
+    await updateDoc(doc(db, "users", uid), {
+      ...patch,
+      // Office Staff are the only role scoped to a building; anything else
+      // must clear it, or a promotion would leave a stale scope behind.
+      ...(patch.role !== undefined
+        ? {
+            buildingId:
+              patch.role === "office-staff" ? (patch.buildingId ?? null) : null,
+          }
+        : {}),
+    });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: writeError(error) };
+  }
+}
+
+export function setUserStatus(
+  uid: string,
+  status: ManagedUser["status"],
+): Promise<UserResult> {
+  return updateUser(uid, { status });
+}
+
+/**
+ * Creates the Auth record and its profile without disturbing the signed-in
+ * administrator.
+ *
+ * createUserWithEmailAndPassword signs you in as whoever it just created, so
+ * it runs on a second, isolated app instance where nothing is watching. The
+ * profile document is then written through the PRIMARY instance, so the write
+ * carries the administrator's token and the rules authorise it as an admin
+ * action — through the secondary one they would see a brand-new account
+ * writing its own role, which is exactly what they must refuse.
+ *
+ * The generated password is never shown to anyone: the account is activated by
+ * the reset link, which is what the drawer already promises.
+ */
+export async function createUser(input: {
+  email: string;
+  name: string;
+  role: UserRole;
+  buildingId?: string;
+}): Promise<UserResult & { uid?: string }> {
+  let secondary: FirebaseApp | undefined;
+  try {
+    secondary = provisionerApp();
+    const secondaryAuth = getAuth(secondary);
+    // A named app already uses its own storage key; in-memory makes it
+    // impossible for the provisioning credential to reach IndexedDB at all.
+    await setPersistence(secondaryAuth, inMemoryPersistence);
+
+    const cred = await createUserWithEmailAndPassword(
+      secondaryAuth,
+      input.email.trim(),
+      throwawayPassword(),
+    );
+
+    await setDoc(doc(db, "users", cred.user.uid), {
+      email: input.email.trim(),
+      name: input.name.trim(),
+      role: input.role,
+      buildingId:
+        input.role === "office-staff" ? (input.buildingId ?? null) : null,
+      legacyUid: null,
+      status: "active",
+      lastActiveAt: serverTimestamp(),
+      createdAt: serverTimestamp(),
+    });
+
+    await sendPasswordResetEmail(auth, input.email.trim());
+    return { ok: true, uid: cred.user.uid };
+  } catch (error) {
+    return { ok: false, message: writeError(error) };
+  } finally {
+    if (secondary) {
+      await signOut(getAuth(secondary)).catch(() => {});
+      await deleteApp(secondary).catch(() => {});
+    }
+  }
+}
+
+/** Long, random, and discarded — the reset link is the way in. */
+function throwawayPassword(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return `Aa1${Array.from(bytes, (b) => b.toString(36)).join("")}`;
+}
+
+function writeError(error: unknown): string {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "";
+  if (code === "permission-denied") {
+    return "Your role does not allow that change.";
+  }
+  if (code.startsWith("auth/")) return authErrorMessage(error);
+  return "Could not save. Check your connection and try again.";
+}
