@@ -40,6 +40,7 @@ interface UserDocData {
   name?: string;
   role?: UserRole;
   buildingId?: string | null;
+  phone?: string | null;
   legacyUid?: string | null;
   status?: "active" | "suspended";
   lastActiveAt?: Timestamp;
@@ -53,6 +54,7 @@ function toManagedUser(id: string, data: UserDocData): ManagedUser {
     name: data.name ?? "",
     role: data.role ?? "office-staff",
     buildingId: data.buildingId ?? undefined,
+    phone: data.phone ?? undefined,
     legacyUid: data.legacyUid ?? undefined,
     status: data.status ?? "active",
     lastActiveAt: data.lastActiveAt?.toDate().toISOString() ?? "",
@@ -99,7 +101,9 @@ export function useUsers(): {
 
 export async function updateUser(
   uid: string,
-  patch: Partial<Pick<ManagedUser, "name" | "role" | "buildingId" | "status">>,
+  patch: Partial<
+    Pick<ManagedUser, "name" | "phone" | "role" | "buildingId" | "status">
+  >,
 ): Promise<UserResult> {
   try {
     await updateDoc(doc(db, "users", uid), {

@@ -1,8 +1,9 @@
 # Smart Building Monitoring — codebase map
 
 Facilities-operations dashboard for a 3-building estate (CET333). Firebase Auth
-is real and the `users` collection lives in Firestore; every other collection is
-still in-memory mock data.
+is real and **eight collections live in Firestore**, each behind a live
+`onSnapshot`. What is left in `mock-data.ts` is the seed corpus and the things
+that are generated on purpose — reports, historical records, the power series.
 
 Full reference — build status, every exported function, page-by-page behaviour
 and the known gaps — lives in [`docs/PROJECT-STATE.md`](docs/PROJECT-STATE.md).
@@ -31,7 +32,8 @@ src/
     ui/                   shadcn primitives
     providers.tsx         ThemeProvider + AuthProvider + ConfirmProvider
                           (AppStateProvider lives inside the auth gate, below)
-  lib/                    types, mock data, app state, permissions, formatting, nav
+  lib/                    types, seed corpus, Firestore stores, app state,
+                          permissions, formatting, nav
 ```
 
 ## Data layer
@@ -90,27 +92,71 @@ until the role resolves. The profile is an `onSnapshot` on `users/{uid}`, so a
 role change or suspension takes effect without a re-login. `endedReason` tells
 a session that was taken away from a deliberate sign-out.
 
-**`lib/firebase.ts`** — the one `initializeApp`. The web config is **not** a
-secret; authorisation is `firestore.rules`. Also exports `provisionerApp()`, the
-second instance account creation runs on (see `lib/users-store.ts`).
+**`lib/firebase.ts`** — the one `initializeApp`, with
+`ignoreUndefinedProperties` (the domain is full of optionals). The web config is
+**not** a secret; authorisation is `firestore.rules`. Also exports
+`provisionerApp()`, the second instance account creation runs on.
 
-**`lib/users-store.ts`** — the only Firestore-backed collection. `useUsers()`
-subscribes; `createUser` / `updateUser` / `setUserStatus` write. Timestamps
-become ISO strings at this boundary and nowhere else.
+**`lib/firestore-store.ts`** — the mechanical half of a collection:
+`useLiveCollection<T>(query, map, sort?)`, `COLLECTIONS`, `WriteResult`,
+`readError` / `writeError`. Queries stay single-collection and
+single-field-ordered, so `firestore.indexes.json` stays empty — do not add a
+`where` here without the composite index it will then need.
 
-**`lib/app-state.tsx`** — `useAppState()`, the single client-side store.
+**`lib/store-mappers.ts`** — every document → domain mapper, pure, importing
+only types. Separate from the store modules because those import
+`@/lib/firebase`, which throws without a configured project and would make them
+untestable. Timestamps become ISO strings here and nowhere else.
+
+**The store modules**, one per domain, each a `useX()` plus writes returning
+`WriteResult`:
+
+| Module | Collections | Notes |
+| --- | --- | --- |
+| `users-store.ts` | `users` | `createUser` runs on the provisioner app so it does not swap the admin's session. |
+| `logbook-store.ts` | `logBook` | Append-only, `serverTimestamp()`, `limit(200)`. |
+| `estate-store.ts` | `buildings`, `rooms` | Deleting a building batches its rooms with it. |
+| `sensor-types-store.ts` | `sensorTypes` | Statuses and actions are nested arrays — the unit the validation judges. |
+| `sensors-store.ts` | `sensors` | `writeSensorStatus` writes status **and** `statusChangedAt` together. |
+| `equipment-store.ts` | `equipmentUnits`, `equipmentHistory` | Every write that changes what happened to a unit batches the history row with it. Photos at `equipmentUnits/{id}/media/photo`. |
+| `requests-store.ts` | `requests` | Exports `CLEAR` (`deleteField()`) — `undefined` is *ignored*, not cleared. |
+
+The human id is the document id everywhere one exists (`b216`, `FD-216-14`,
+`EQ-216-01`, `REQ-4192`), because every cross-reference already holds that
+string. `logBook` and `equipmentHistory` take auto-ids.
+
+**`lib/photo.ts`** — `fitWithin` / `dataUrlBytes` / `photoTooLarge` (pure,
+tested) and `downscaleImage` (canvas, browser only). There is no Storage
+bucket, so a photo is a 640px q0.7 JPEG data URL in a document, refused over
+700 KB because a document is capped at 1 MiB.
+
+**`lib/estate-rules.ts`** — `buildingDeletionRefusal` / `roomsToCascade`. Pure,
+so the "what may be deleted" question is testable without Firestore.
+
+**`scripts/seed-firestore.ts`** — `npx vite-node scripts/seed-firestore.ts`,
+`--dry-run`, `--reset`. Imports the corpus directly rather than duplicating it.
+Seeded rows are rewritten on every run; rows made in the app are untouched.
+
+**`lib/app-state.tsx`** — `useAppState()`, the one place the subscriptions are
+resolved and re-exposed under the names every page already used.
 Takes the resolved `user` as a required prop and re-exposes `role` /
 `currentUser`, so pages read identity the way they always did. Mounted **inside**
-the auth gate, so signing out unmounts it and discards the session's overrides.
-Holds the active building, notifications, and in-memory overrides so an action
-on one page shows up on every other page.
+the auth gate, so it is never asked to render without an identity.
+Holds the active building and notifications — the only two things still in
+memory, because they are session-scoped UI state, not domain data.
 It holds the **estate** (`buildings`, `rooms`, plus `addBuilding` /
 `updateBuilding` / `deleteBuilding` — which takes the building's rooms with it —
 and `addRoom` / `updateRoom` / `removeRoom`), and the resolved device list
-`sensors` with `removeSensor`. Both are single resolved lists for the same
+`sensors` with `addSensor` / `editSensor` / `removeSensor` / `setSensorStatus`.
+Both are single resolved lists for the same
 reason `requests` is: the Sensors page, the building device counts and the
 sensor type registry's archive guard all read the one list, so they cannot
 disagree about what exists.
+It holds the **asset register** (`equipmentUnits`, `equipmentHistory`, plus
+`addUnit` / `editUnit` / `removeUnit` / `recordService` / `moveUnit` /
+`setEquipmentCondition`). Every one of those that changes what happened to a
+unit also appends the history row that says so, in one batch — a register whose
+dates moved without a row is the drawer lying about what was done.
 It also holds the live sensor type registry (`sensorTypeRegistry` plus
 `addSensorType` / `updateSensorType` / `archiveSensorType` and the status and
 action mutators), which is where the registry's validation is enforced — a type
@@ -122,13 +168,17 @@ walks a request one step through
 `requested → approved → in-progress → resolved → completed`; `declineRequest`
 attaches a reason **without** moving it, `withdrawRequest` drops a staff
 member's own unapproved request out of every list, and `requestVerification`
-flags that its submitter thinks resolved work is done. There is no `resetDemo()`
-— signing out unmounts the provider, which discards the lot.
+flags that its submitter thinks resolved work is done — all four are writes
+returning `WriteResult`, and `requestIds` is every id in the collection
+(withdrawn included) so a new one cannot collide. There is no `resetDemo()`, and **signing out no longer discards
+anything**: the overrides are gone, and a write by one person is there for the
+next. `dataLoading` / `dataError` aggregate every subscription, and the shell
+renders `<ShellSkeleton>` until the first snapshots land.
 
 It also owns the **Log Book**. `log(draft)` stamps the id, the time and the
-actor from the signed-in role, and `logBook` puts what this session wrote in
-front of the seed entries — the Log Book page and the dashboard rail both read
-it, so they cannot disagree. Every action in the app writes one entry: the
+actor from the signed-in role, and appends it to the `logBook` collection —
+the Log Book page and the dashboard rail both read the one subscription, so
+they cannot disagree. Every action in the app writes one entry: the
 provider logs what it owns (requests, sensor status, equipment condition, the
 sensor type registry), and a screen holding its own state (Administration's
 buildings, rooms and accounts; the equipment register; reports; the password
@@ -228,7 +278,8 @@ tooltip — it is never hidden.
 - Verify a build with its **exit code** — "✓ Compiled successfully" prints before
   the prerender step that can still fail.
 - Tailwind arbitrary values carry the design's exact sizes (`text-[12.5px]`, `size-3.5`).
-- Business logic stays in `lib/`; pages read from `useAppState()` and mock data.
+- Business logic stays in `lib/`; pages read from `useAppState()`, never from
+  a store module's `useX()` directly and never from the seed arrays.
 - Biome formats and lints; run `npm run lint` before finishing.
 - `npm test` runs Vitest over `src/**/*.test.ts` — the pure rules in `lib/` and
   the export shaping. Firebase and the browser are out of scope there; mocking
@@ -251,4 +302,5 @@ refused, and `lib/auth.tsx` turns that `permission-denied` into a sign-out. It
 looks like a bug if you do not know that.
 
 `usePersistedState` keys are scoped to the signed-in uid, so two people sharing
-a browser do not share view preferences.
+a browser do not share view preferences. That is now the only per-session state
+there is — everything else is in Firestore and outlives the sign-out.

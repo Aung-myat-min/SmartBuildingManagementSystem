@@ -29,6 +29,12 @@ export interface AppUser {
   /** Office Staff are scoped to one building. Admin Manager & CEO see all. */
   buildingId?: string;
   /**
+   * A contact number, theirs to set from Settings. Optional because the three
+   * seeded accounts were provisioned without one and a facilities contact is
+   * not something an administrator should invent on someone's behalf.
+   */
+  phone?: string;
+  /**
    * The mock corpus's id for this person, e.g. "u-hnin". Seeded records carry
    * it in `submittedBy` and `actorUid`, and a real Firebase uid never matches
    * one — without this join, no seeded request would be withdrawable or

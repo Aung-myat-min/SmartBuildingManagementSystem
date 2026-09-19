@@ -764,11 +764,6 @@ export function statusDef(
   return sensorType(typeId)?.statuses.find((st) => st.id === statusId);
 }
 
-/** Every type, archived included — what the Administration table lists. */
-export function allSensorTypes(): SensorTypeDef[] {
-  return registrySource;
-}
-
 export const SENSORS: EnvironmentalSensor[] = [
   {
     id: "FD-216-14",

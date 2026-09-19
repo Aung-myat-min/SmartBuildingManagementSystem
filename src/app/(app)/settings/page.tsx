@@ -14,6 +14,7 @@ import { useAuth } from "@/lib/auth";
 import { formatRelative } from "@/lib/format";
 import { roleLabel } from "@/lib/permissions";
 import type { UserRole } from "@/lib/types";
+import { updateUser } from "@/lib/users-store";
 import { cn } from "@/lib/utils";
 
 type SectionId = "profile" | "appearance" | "security";
@@ -161,8 +162,43 @@ function ProfileSection({
   role: UserRole;
   scopeValue: string;
 }) {
+  const { currentUser, log } = useAppState();
   const [fullName, setFullName] = React.useState(name);
-  const [phone, setPhone] = React.useState("");
+  const [phone, setPhone] = React.useState(currentUser.phone ?? "");
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, setPending] = React.useState(false);
+
+  const save = async () => {
+    if (pending) return;
+    if (fullName.trim().length === 0) {
+      setError(
+        "Your name cannot be blank — it is what every record you touch is signed with.",
+      );
+      return;
+    }
+    setPending(true);
+    setError(null);
+    // Through the accounts store, the same write Administration makes: there
+    // is one users collection and one place that writes to it.
+    const result = await updateUser(currentUser.uid, {
+      name: fullName.trim(),
+      phone: phone.trim(),
+    });
+    setPending(false);
+    if (!result.ok) {
+      setError(result.message);
+      return;
+    }
+    log({
+      source: "admin",
+      actionType: "user-edited",
+      title: "Profile updated",
+      detail: `${fullName.trim()} changed their own name or contact number.`,
+      targetType: "user",
+      targetId: currentUser.uid,
+    });
+    toast.success("Profile saved.");
+  };
 
   return (
     <SectionCard
@@ -213,9 +249,15 @@ function ProfileSection({
         </div>
       </div>
 
+      {error && (
+        <p className="text-danger-foreground mt-3 text-[11.5px] leading-snug">
+          {error}
+        </p>
+      )}
+
       <div className="mt-4.5 flex items-center gap-3">
-        <Button onClick={() => toast.success("Profile saved.")}>
-          Save changes
+        <Button disabled={pending} onClick={save}>
+          {pending ? "Saving…" : "Save changes"}
         </Button>
         <span className="text-muted-foreground text-[11px]">
           Last signed in{" "}
@@ -344,10 +386,10 @@ function AppearanceSection() {
         </div>
       </div>
 
+      {/* There is no Save here on purpose: picking a swatch applies the theme
+          through next-themes immediately, so a button would only ever have
+          confirmed something that had already happened. */}
       <div className="mt-4.5 flex flex-wrap items-center gap-3">
-        <Button onClick={() => toast.success("Appearance saved.")}>
-          Save appearance
-        </Button>
         <Button variant="outline" onClick={() => setTheme("system")}>
           Reset to default
         </Button>

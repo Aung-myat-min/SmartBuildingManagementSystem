@@ -98,14 +98,14 @@ There is **no test script and no test runner installed**.
 | Historical Records | **Built** | Range/building/type filters, daily grouping, CSV export. Data is PRNG-generated. |
 | Log Book | **Built** | Live feed, source filters, pause. Admin Manager + CEO only. |
 | Reports | **Built** | Library + full report view, generate sheet, PDF/CSV buttons. |
-| Administration | **Built** | Buildings tab (CEO) and User Accounts tab (Admin + CEO), each separately gated. |
-| Settings | **Built** | Your account, Appearance (working theme picker), Password & sessions. |
+| Administration | **Built** | Buildings (CEO), User Accounts and Sensor Types (Admin + CEO), each separately gated. |
+| Settings | **Built** | Your account (writes to `users`), Appearance (working theme picker, no Save — the swatch applies it), Password & sessions. |
 | More (phone overflow) | **Built** | Lists the pages the tab bar has no room for. |
 | Theming (light/dark) | **Built** | `next-themes` is mounted; `/settings` switches it. |
-| Persistence | **Not started** | Everything is in-memory; a reload resets the session. |
-| Authentication | **Not started** | No credential check anywhere. |
-| Firebase backend | **Not started** | Seams exist (see §11); no Firebase dependency is installed. |
-| Tests | **Not started** | No runner, no test files. |
+| Persistence | **Built** | Eight collections in Firestore, live `onSnapshot` on every one. Reports, Historical Records and the power series stay generated. |
+| Authentication | **Built** | Firebase Auth, three real accounts, no role switcher. |
+| Firebase backend | **Built** | Client SDK only; `firestore.rules` are **not deployed** — see §11.2. |
+| Tests | **Built** | Vitest over `src/**/*.test.ts` — the pure rules, the mappers and the export shaping. |
 
 Recent commit history (newest first) shows where the effort has been:
 
@@ -915,7 +915,7 @@ padded with a lock rather than hidden.
 
 Every page is `"use client"`, and its sub-components are **colocated in the same
 file** rather than split out. Business logic stays in `lib/`; pages read from
-`useAppState()` and mock data.
+`useAppState()`, which resolves the Firestore subscriptions.
 
 ### 8.1 `/login` and the account-access screens
 
@@ -1565,7 +1565,7 @@ geometry** (bar heights, grid templates).
 
 - `"use client"` at the top of every page; sub-components colocated in the same
   file rather than split into a directory.
-- Business logic lives in `lib/`. Pages read from `useAppState()` and mock data;
+- Business logic lives in `lib/`. Pages read from `useAppState()`;
   they do not re-derive rules. **Never re-implement a `derive.ts` helper inline.**
 - Gate on **rank** (`roleRank(role) <= n`), never on role equality.
 - A control a role may not use is **padlocked with a tooltip, never hidden**.
@@ -1591,86 +1591,118 @@ geometry** (bar heights, grid templates).
 
 ## 11. Status, gaps and the Firebase path
 
-### 11.1 What the Firebase phase landed
+### 11.1 What is in Firestore
 
-Authentication is real. `src/lib/auth.tsx` owns the signed-in identity, backed
-by Firebase Auth and a `users/{uid}` document in Firestore; `src/lib/firebase.ts`
-is the one `initializeApp`; `src/lib/users-store.ts` is the only Firestore-backed
-collection. Everything else is still mock data.
+Eight collections, each with a store module in `src/lib/` and a live
+`onSnapshot` resolved by `AppStateProvider`:
 
-Gone with it: the role switcher, the demo banner, the 20-second alarm timer and
-`resetDemo()`. Three real accounts replace the picker (see `README.md`), the
-fire alarm now lives in the seed data as `FD-216-14`'s status rather than being
-tripped by a clock, and signing out unmounts `AppStateProvider`, which discards
-the session's overrides more thoroughly than `resetDemo()` ever did.
+| Collection | Store module | Document id |
+| --- | --- | --- |
+| `users` | `users-store.ts` | Firebase uid |
+| `logBook` | `logbook-store.ts` | auto |
+| `buildings` / `rooms` | `estate-store.ts` | `b216`, `r-216-302` |
+| `sensorTypes` | `sensor-types-store.ts` | `fire-alarm` |
+| `sensors` | `sensors-store.ts` | `FD-216-14` |
+| `equipmentUnits` / `equipmentHistory` | `equipment-store.ts` | `EQ-216-01` / auto |
+| `requests` | `requests-store.ts` | `REQ-4192` |
 
-**The route guard is UX, not security.** A client-only SDK has no server-side
-route gate. `firestore.rules` is the enforcement layer, and `permissions.ts` is
-the affordance layer — they have to agree, and a change to one belongs in the
-same commit as the change to the other.
+The human id **is** the document id everywhere it exists, because
+`request.equipmentId`, `sensor.linkedEquipmentId`, `room.buildingId` and every
+log entry's `refId` already hold those strings; auto-ids would have forced a
+second lookup at every cross-reference. `logBook` and `equipmentHistory` are
+append-only and take auto-ids, and both are queried with a `limit(200)`.
+
+`src/lib/firestore-store.ts` holds the mechanical half — `useLiveCollection`,
+`readError`, `writeError`, `COLLECTIONS` — so each store module carries only
+what is about its domain. `src/lib/store-mappers.ts` holds the document →
+domain mappers, extracted because the store modules import `@/lib/firebase`,
+which throws without a configured project and would make them untestable.
+
+Every query is single-collection and single-field-ordered, so
+`firestore.indexes.json` stays empty and nothing here needs an index deploy.
+
+**Still generated, deliberately:** `powerSeries()`, `reportDetail()`,
+`HISTORICAL_RECORDS`, `REPORTS`, `BUILDING_META`, `EQUIPMENT_TYPES`. Persisting
+invented data buys nothing. Report generation stays page-local, which is why
+its toast still says "visible in this session only" — and that is now the one
+place in the app where that sentence is true.
+
+**Notifications stay in memory** — session-scoped UI state, not domain data.
+
+Three seams in `mock-data.ts` make the module-level helpers keep working:
+`setEstateSource`, `setSensorRegistrySource` and `setAssetSource` are fed from
+the subscriptions in the provider's render body, so `roomLabel`,
+`buildingName`, `roomsForBuilding`, `sensorType`, `statusDef`,
+`equipmentForSensor`, `sensorForEquipment` and `buildingStats` all resolve
+against live data without any caller knowing.
 
 ### 11.2 Known gaps
 
-- **No persistence, except accounts.** Request moves, sensor statuses,
-  equipment conditions, new requests, generated reports and Administration's
-  building/room edits are all still React state, and a reload resets them. The
-  `users` collection is the exception: it is in Firestore.
-- **The route guard is not security.** `shell/auth-gate.tsx` keeps a signed-out
-  visitor off the app shell, but a client-only SDK has no server-side gate.
-  Authorisation is `firestore.rules`, and `permissions.ts` only decides what a
-  padlock looks like. **The rules for every collection other than `users` are
-  still the default deny, and the `users` rules must be deployed** —
-  `npx firebase-tools deploy --only firestore:rules`.
-- Estate and account edits both reach the rest of the app now: the estate lives
-  in `AppStateProvider` behind `setEstateSource()`, and accounts are a Firestore
-  subscription. Neither is page-local any more.
+- **The security rules are at the wide-open default and are not deployed.**
+  Everything above is world-readable and world-writable by anyone holding the
+  API key, which is public and in the bundle. This is a deliberate decision
+  for the coursework, not an oversight, but it is the single largest gap: the
+  route guard in `shell/auth-gate.tsx` is UX, and `permissions.ts` only
+  decides what a padlock looks like. `firestore.rules` is the enforcement
+  layer, and it is not enforcing.
 - **Deleting an account is not possible from the app.** The client SDK cannot
   remove another user's Auth record; the product suspends instead. A failed
   provisioning leaves an Auth record with no profile, which signs out with an
   explanation but needs the console to clear.
-- **Stubs that only toast:** the equipment photo upload, which is a local
-  object URL and needs Firebase Storage to be real. CSV, PDF, sensor *Remove*
-  and the password change all do what they say; the profile photo button was
-  removed rather than left apologising.
-- **Test coverage is narrow.** `npm test` runs 60 Vitest cases over the pure
-  modules. Nothing covers the components, and nothing covers the security
-  rules — `@firebase/rules-unit-testing` against the emulator is the gap that
-  matters most, since a rule that allows too much is invisible until it bites.
+- **Photos are documents, not files.** There is no Storage bucket, so a unit
+  photo is a 640px JPEG data URL at `equipmentUnits/{id}/media/photo`, fetched
+  when the drawer opens and refused over 700 KB. At 28 units this is fine; at a
+  few hundred it wants its own collection or a real bucket.
+- **Test coverage is narrow.** `npm test` runs Vitest over the pure modules,
+  the mappers and the export shaping. Nothing covers the components, and
+  nothing covers Firestore itself — that needs the emulator, and mocking the
+  SDK would test the mock.
 - **`README.md` is still `create-next-app` boilerplate.**
 - **Historical Records are PRNG-generated**, not authored — realistic in shape,
-  arbitrary in detail.
+  arbitrary in detail, and their `refId`s resolve to nothing.
 - **Room numbers for Building 209 and Junction Square are provisional** — a
   comment in `src/lib/types.ts` records that only 216's are confirmed.
-- The `Equipment` count-breakdown records and the `EquipmentUnit` register are
-  seeded independently; nothing enforces that they agree with each other.
+- **`legacyUid` is still load-bearing.** Seeded requests carry
+  `submittedBy: "u-hnin"`, and a Firebase uid never matches one, so
+  `isActor()` matches either. It goes when the seed corpus does.
 
-### 11.3 The Firebase path
+### 11.3 What changed when the data became writable
 
-No Firebase dependency is installed and no migration has begun. What exists is a
-set of seams that make one tractable:
+Worth knowing, because several of these are not visible in a diff:
 
-1. **`src/lib/derive.ts` imports no data.** Escalation, due-service, offline,
-   alarm, counts and KPI pass/fail survive the backend change untouched. Keep it
-   that way — it is the reason the rules cannot drift.
-2. **`src/lib/mock-data.ts`'s exports are exactly the surface a data layer must
-   replace.** Every page imports from there and nowhere else. Swapping it for
-   Firestore reads means keeping the same names and shapes (`BUILDINGS`,
-   `SENSORS`, `MAINTENANCE_REQUESTS`, `buildingStats()`, `reportDetail()`, …),
-   most likely behind hooks that return the same values.
-3. **`src/lib/app-state.tsx`'s override maps are where optimistic writes become
-   real ones.** `setSensorStatus`, `setEquipmentCondition`, `moveRequest` and
-   `addRequest` are already the only mutation entry points; each becomes a write
-   plus a subscription rather than a `setState`.
-4. **Every timestamp is already an ISO string**, so Firestore `Timestamp`
-   conversion happens at one boundary rather than throughout the UI.
-5. **Roles and permissions are already modelled as ranks**, which maps cleanly
-   onto custom claims and security rules; `canEditUser` and the `canManage*`
-   split are the rules that would need mirroring server-side.
-6. **`ManagedUser` vs `AppUser`** already separates the account-management view
-   from the signed-in identity, which is the split Firebase Auth + a `users`
-   collection would want.
+- **Signing out no longer discards anything.** It used to unmount
+  `AppStateProvider` and take the session's overrides with it. The overrides
+  are gone; a write by one person is there for the next. Both this document
+  and `CLAUDE.md` used to present that unmount as the mechanism keeping one
+  person's work out of another's session, and it is no longer true.
+- **Nine controls started writing.** Add to register, Save details, Delete,
+  Save service, Move unit, the unit photo, Register sensor, the sensor inline
+  Save changes and the Settings profile save had only ever logged and toasted.
+  The Appearance Save button was deleted instead: the swatch already applies
+  the theme, so it could only ever have confirmed something already done.
+- **Two joins were ambiguous and are not any more.** `EquipmentUnit.tag` is an
+  ordinary editable field; the document id is the join key. A sensor's id is
+  frozen, and the field is padlocked with the reason, because the unit it
+  shares a body with points at it by name.
+- **`declineNote` needs `deleteField()`, not `undefined`.** Firestore runs with
+  `ignoreUndefinedProperties`, so `undefined` skips a field rather than
+  clearing it. `requests-store.ts` exports `CLEAR` for this.
+- **The request id generator mints against every id**, withdrawn ones included.
+  It used to mint against the scoped list, so an Office Staff member could have
+  overwritten another building's request.
+- **`equipmentHistory.at` is an ISO string, not a Timestamp**, unlike the Log
+  Book: Firestore orders by type before value, so a collection holding both
+  would sort into two separate blocks.
 
-What a migration still has to invent: authentication and route protection,
-server-side write authorisation, real Log Book and Historical Records writes
-(today nothing appends to them — the drawers *say* an action writes a Log Book
-entry, and no code does), and real CSV/PDF generation.
+### 11.4 Seeding
+
+`scripts/seed-firestore.ts`, run with `npx vite-node`. It imports
+`src/lib/mock-data.ts` directly — TypeScript, behind the `@/` alias — rather
+than duplicating the corpus into a `.mjs` sibling, which would guarantee drift.
+
+Seeded documents keep their corpus ids and are written with merge, so a re-run
+refreshes them. Rows created in the app have generated ids and are never
+touched — which does mean an edit made in the app **to a seeded row** is
+overwritten on the next run. The script prints that asymmetry every time.
+
+`--dry-run` says what it would write; `--reset` clears each collection first.
