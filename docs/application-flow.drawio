@@ -1,0 +1,472 @@
+<mxfile host="app.diagrams.net" agent="Smart Building Monitoring — CET333" version="24.7.17">
+  <diagram id="sess" name="1 · Session &amp; navigation">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="sess_t1" value="Session and navigation flow" style="text;html=1;align=left;verticalAlign=top;fontSize=17;fontStyle=1;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="600" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_t1s" value="UML state machine. &lt;b&gt;AuthStatus&lt;/b&gt; is one discriminated field in src/lib/auth.tsx; the redirect is src/components/shell/auth-gate.tsx. Nothing renders until the role resolves." style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#6b7280" vertex="1" parent="1">
+          <mxGeometry x="40" y="52" width="660" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_start" value="" style="ellipse;html=1;fillColor=#1f2430;strokeColor=none" vertex="1" parent="1">
+          <mxGeometry x="80" y="160" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_loading" value="loading" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#eef2fd;strokeColor=#4169e1;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="240" width="120" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_sOut" value="signed-out" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#ffffff;strokeColor=#4169e1;fontSize=13;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="260" y="140" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_sNoP" value="no-profile" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#fdeeee;strokeColor=#c0392b;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="260" y="200" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_sSusp" value="suspended" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#fdeeee;strokeColor=#c0392b;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="260" y="260" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_sIn" value="signed-in" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#eef2fd;strokeColor=#4169e1;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="260" y="360" width="150" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_rLogin" value="/login" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4f5f7;strokeColor=#6b7280;fontSize=12;fontFamily=Courier New" vertex="1" parent="1">
+          <mxGeometry x="490" y="170" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_rExp" value="/login/session-expired" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f4f5f7;strokeColor=#6b7280;fontSize=12;fontFamily=Courier New" vertex="1" parent="1">
+          <mxGeometry x="490" y="260" width="200" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_gate" value="AuthGate passes&lt;br&gt;&lt;b&gt;AppStateProvider&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#ffffff;strokeColor=#4169e1;fontSize=13;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="490" y="355" width="200" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_fork" value="roleRank(role)" style="rhombus;whiteSpace=wrap;html=1;fillColor=#fff8e6;strokeColor=#b8860b;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="760" y="350" width="150" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_r3" value="&lt;b&gt;rank 3 — Office Staff&lt;/b&gt;&lt;hr size=&#x27;1&#x27;&gt;Dashboard · Equipment · Sensors&lt;br&gt;Maintenance Requests · Historical Records&lt;br&gt;&lt;br&gt;&lt;i&gt;isBuildingLocked: scoped to one building.&lt;br&gt;The filter is disabled, not hidden.&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=10;fillColor=#ffffff;strokeColor=#d8dbe1;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="970" y="130" width="340" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_r2" value="&lt;b&gt;rank 2 — Admin Manager&lt;/b&gt;&lt;hr size=&#x27;1&#x27;&gt;everything above, plus&lt;br&gt;Log Book · Reports · Administration&lt;br&gt;(User Accounts, Sensor Types)&lt;br&gt;&lt;br&gt;&lt;i&gt;Buildings tab is padlocked.&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=10;fillColor=#ffffff;strokeColor=#d8dbe1;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="970" y="300" width="340" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_r1" value="&lt;b&gt;rank 1 — CEO / Super Admin&lt;/b&gt;&lt;hr size=&#x27;1&#x27;&gt;everything above, plus&lt;br&gt;Administration › Buildings &amp; Rooms" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=10;fillColor=#ffffff;strokeColor=#d8dbe1;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="970" y="470" width="340" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_pwd" value="&lt;b&gt;Password routes&lt;/b&gt;&lt;hr size=&#x27;1&#x27;&gt;/login/forgot-password → sends a reset email&lt;br&gt;/login/first-sign-in → the link&#x27;s landing page, reads &lt;i&gt;oobCode&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=10;fillColor=#ffffff;strokeColor=#d8dbe1;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="40" y="440" width="400" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_noteSusp" value="Suspension works &lt;i&gt;through the rules&lt;/i&gt;: a suspended account&#x27;s own profile read is refused, and auth.tsx turns that permission-denied into a sign-out. It looks like a bug if you do not know that." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff8e6;strokeColor=#b8860b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="500" y="470" width="380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_start" target="sess_loading">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e1" value="no credential" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_loading" target="sess_sOut">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e2" value="auth record,&lt;br&gt;no users/{uid}" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_loading" target="sess_sNoP">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e3" value="profile read&lt;br&gt;refused" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_loading" target="sess_sSusp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e4" value="profile resolved" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_loading" target="sess_sIn">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e5" value="[endedReason = none]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_sOut" target="sess_rLogin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_sNoP" target="sess_rLogin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e7" value="[endedReason]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_sSusp" target="sess_rExp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e8" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_sIn" target="sess_gate">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_gate" target="sess_fork">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e10" value="rank = 3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_fork" target="sess_r3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e11" value="rank ≤ 2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_fork" target="sess_r2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e12" value="rank = 1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="sess_fork" target="sess_r1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e13" value="signIn()" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff;verticalAlign=top" edge="1" parent="1" source="sess_rLogin" target="sess_loading">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="sess_e14" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="sess_noteSusp" target="sess_sSusp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="req" name="2 · Maintenance request lifecycle">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="req_t2" value="Maintenance request lifecycle" style="text;html=1;align=left;verticalAlign=top;fontSize=17;fontStyle=1;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="600" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="req_t2s" value="UML state machine. Transitions are REQUEST_NEXT_STATUS / REQUEST_PREV_STATUS in src/lib/mock-data.ts; the labels are REQUEST_NEXT_ACTION / REQUEST_PREV_ACTION. Guards in [brackets] name the predicate in src/lib/permissions.ts." style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#6b7280" vertex="1" parent="1">
+          <mxGeometry x="40" y="52" width="860" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="req_q0" value="" style="ellipse;html=1;fillColor=#1f2430;strokeColor=none" vertex="1" parent="1">
+          <mxGeometry x="60" y="285" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="req_qReq" value="requested" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#eef2fd;strokeColor=#4169e1;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="140" y="275" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="req_qApp" value="approved" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#ffffff;strokeColor=#4169e1;fontSize=13;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="380" y="275" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="req_qProg" value="in-progress" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#ffffff;strokeColor=#4169e1;fontSize=13;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="620" y="275" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="req_qRes" value="resolved" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#ffffff;strokeColor=#4169e1;fontSize=13;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="860" y="275" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="req_qDone" value="completed" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#eef2fd;strokeColor=#4169e1;fontSize=13;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1100" y="275" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="req_q1" value="" style="ellipse;html=1;shape=endState;fillColor=#1f2430;strokeColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="1310" y="285" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="req_qWith" value="withdrawn" style="rounded=1;whiteSpace=wrap;html=1;arcSize=24;fillColor=#fdeeee;strokeColor=#c0392b;fontSize=13" vertex="1" parent="1">
+          <mxGeometry x="140" y="500" width="150" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="req_q2" value="" style="ellipse;html=1;shape=endState;fillColor=#1f2430;strokeColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="360" y="510" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="req_nDecline" value="&lt;b&gt;Decline is not a transition.&lt;/b&gt;&lt;br&gt;declineRequest attaches a reason and the status &lt;i&gt;holds&lt;/i&gt; at requested, so its submitter can read what was wrong and raise a corrected one. Approving clears the note." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff8e6;strokeColor=#b8860b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="100" y="120" width="340" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="req_nVerify" value="&lt;b&gt;Verification is a flag, not a state.&lt;/b&gt;&lt;br&gt;canRequestVerification: the submitter only, at resolved only, once. It &lt;i&gt;asks&lt;/i&gt; for close-out — an approver still presses it. Requests with no Office Staff behind them never carry it." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff8e6;strokeColor=#b8860b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="800" y="120" width="380" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="req_nWith" value="canWithdrawRequest: the submitter only, and only while &lt;b&gt;requested&lt;/b&gt;. After approval it is committed work and cannot be pulled back." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff8e6;strokeColor=#b8860b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="380" y="610" width="360" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="req_legend" value="&lt;b&gt;Guards&lt;/b&gt;&lt;hr size=&#x27;1&#x27;&gt;&lt;b&gt;canAdvanceRequest&lt;/b&gt; — role ≠ Office Staff.&lt;br&gt;Every forward and backward step is this one gate: whoever moves a request along is who decides it belongs there.&lt;br&gt;&lt;br&gt;&lt;b&gt;Office Staff&lt;/b&gt; may raise, withdraw and verify their own. Nothing else.&lt;br&gt;&lt;i&gt;REQUEST_ADVANCE_LOCK_REASON&lt;/i&gt; is the padlock tooltip." style="rounded=1;whiteSpace=wrap;html=1;align=left;verticalAlign=top;spacing=10;fillColor=#ffffff;strokeColor=#d8dbe1;fontSize=12" vertex="1" parent="1">
+          <mxGeometry x="860" y="430" width="400" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e0" value="raise [any role]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="req_q0" target="req_qReq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e1" value="Approve&lt;br&gt;[canAdvanceRequest]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0" edge="1" parent="1" source="req_qReq" target="req_qApp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e2" value="Start work&lt;br&gt;[canAdvanceRequest]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0" edge="1" parent="1" source="req_qApp" target="req_qProg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e3" value="Mark resolved&lt;br&gt;[canAdvanceRequest]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0" edge="1" parent="1" source="req_qProg" target="req_qRes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e4" value="Close out&lt;br&gt;[canAdvanceRequest]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0" edge="1" parent="1" source="req_qRes" target="req_qDone">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="req_qDone" target="req_q1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e6" value="Withdraw approval" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff;verticalAlign=top;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0" edge="1" parent="1" source="req_qApp" target="req_qReq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e7" value="Back to approved" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff;verticalAlign=top;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0" edge="1" parent="1" source="req_qProg" target="req_qApp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e8" value="Reopen work" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff;verticalAlign=top;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0" edge="1" parent="1" source="req_qRes" target="req_qProg">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e9" value="Reopen" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff;verticalAlign=top;exitX=0;exitY=0.75;exitDx=0;exitDy=0;entryX=1;entryY=0.75;entryDx=0;entryDy=0" edge="1" parent="1" source="req_qDone" target="req_qRes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e10" value="Withdraw&lt;br&gt;[canWithdrawRequest]" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff;verticalAlign=top" edge="1" parent="1" source="req_qReq" target="req_qWith">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="req_qWith" target="req_q2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e12" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="req_nDecline" target="req_qReq">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e13" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="req_nVerify" target="req_qRes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="req_e14" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="req_nWith" target="req_qWith">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="uc" name="3 · Use cases by role">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="uc_t3" value="Use cases, by role" style="text;html=1;align=left;verticalAlign=top;fontSize=17;fontStyle=1;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="600" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_t3s" value="UML use-case diagram. Generalisation runs up the rank ladder in src/lib/permissions.ts (roleRank: CEO 1, Admin Manager 2, Office Staff 3), so an inherited capability is drawn once and each actor also holds every use case above it." style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#6b7280" vertex="1" parent="1">
+          <mxGeometry x="40" y="52" width="880" height="48" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_sys" value="Smart Building Monitoring" style="rounded=0;whiteSpace=wrap;html=1;fillColor=none;strokeColor=#1f2430;verticalAlign=top;align=center;fontSize=13;fontStyle=1;spacing=6" vertex="1" parent="1">
+          <mxGeometry x="300" y="120" width="640" height="1030" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_bandA" value="available to every role  (rank 3)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafbfc;strokeColor=#d8dbe1;dashed=1;verticalAlign=top;align=left;spacing=8;fontSize=11;fontColor=#6b7280" vertex="1" parent="1">
+          <mxGeometry x="320" y="160" width="600" height="400" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_bandB" value="Admin Manager and above  (rank ≤ 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafbfc;strokeColor=#d8dbe1;dashed=1;verticalAlign=top;align=left;spacing=8;fontSize=11;fontColor=#6b7280" vertex="1" parent="1">
+          <mxGeometry x="320" y="590" width="600" height="330" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_bandC" value="CEO / Super Admin only  (rank 1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fafbfc;strokeColor=#d8dbe1;dashed=1;verticalAlign=top;align=left;spacing=8;fontSize=11;fontColor=#6b7280" vertex="1" parent="1">
+          <mxGeometry x="320" y="950" width="600" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_aStaff" value="Office Staff" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="120" y="260" width="50" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_aAdmin" value="Admin Manager" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="120" y="680" width="50" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_aCeo" value="CEO / Super&lt;br&gt;Admin" style="shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="120" y="960" width="50" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u1" value="Sign in" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="200" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u2" value="View dashboard &amp; estate" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="200" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u3" value="Raise maintenance request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="274" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u4" value="Withdraw own request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="274" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u5" value="Request verification" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="348" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u6" value="Browse equipment register" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="348" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u7" value="Service / move a unit" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="422" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u8" value="Set unit condition" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="422" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u9" value="View sensors (read-only)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="496" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u10" value="Search historical records" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="496" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u11" value="Approve / advance request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="630" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u12" value="Decline request" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="630" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u13" value="Act on a sensor" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="704" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u14" value="Decommission / delete unit" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="704" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u15" value="Read the Log Book" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="778" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u16" value="Generate reports" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="778" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u17" value="Manage user accounts" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="852" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u18" value="Manage sensor types" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="640" y="852" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_u19" value="Manage buildings &amp; rooms" style="ellipse;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#4169e1;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="350" y="976" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_uLog" value="Write a Log Book entry" style="ellipse;whiteSpace=wrap;html=1;fillColor=#eef2fd;strokeColor=#4169e1;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="495" y="1075" width="250" height="54" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_nInc" value="&lt;b&gt;«include» applies to every use case that writes.&lt;/b&gt;&lt;br&gt;Four are drawn to keep the diagram readable. app-state.tsx logs what it owns; a screen holding its own state calls log() itself. A &lt;i&gt;refused&lt;/i&gt; change writes nothing." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff8e6;strokeColor=#b8860b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="990" y="1060" width="380" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_nEdit" value="&lt;b&gt;Generalisation cannot express this.&lt;/b&gt;&lt;br&gt;canEditUser: an Admin Manager may edit &lt;b&gt;Office Staff rows only&lt;/b&gt; — not another Admin Manager, not the CEO. And &lt;b&gt;nobody may edit their own row&lt;/b&gt;, the CEO included. Changing your own name and phone is Settings, not Administration." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fdeeee;strokeColor=#c0392b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="990" y="640" width="380" height="130" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_nSensor" value="Sensors are read-only for Office Staff: they see every state, and every action carries a padlock with SENSOR_LOCK_REASON in its tooltip. Equipment is the one place staff act on assets — only decommission and delete are closed to them." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff8e6;strokeColor=#b8860b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="990" y="200" width="380" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_nScope" value="Office Staff are building-locked everywhere (isBuildingLocked), so &amp;quot;view&amp;quot; and &amp;quot;search&amp;quot; mean &lt;i&gt;their&lt;/i&gt; building. Admin Manager and CEO see the whole estate." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff8e6;strokeColor=#b8860b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="990" y="340" width="380" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e0" value="«generalisation»" style="endArrow=block;endFill=0;html=1;strokeColor=#1f2430;strokeWidth=1.5;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_aAdmin" target="uc_aStaff">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e1" value="«generalisation»" style="endArrow=block;endFill=0;html=1;strokeColor=#1f2430;strokeWidth=1.5;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_aCeo" target="uc_aAdmin">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e2" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e3" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e4" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e5" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e6" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u5">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e7" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u6">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e8" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e9" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e10" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e11" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aStaff" target="uc_u10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e12" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aAdmin" target="uc_u11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e13" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aAdmin" target="uc_u12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e14" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aAdmin" target="uc_u13">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e15" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aAdmin" target="uc_u14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e16" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aAdmin" target="uc_u15">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e17" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aAdmin" target="uc_u16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e18" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aAdmin" target="uc_u17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e19" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aAdmin" target="uc_u18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e20" value="" style="endArrow=none;html=1;strokeColor=#6b7280;fontSize=10" edge="1" parent="1" source="uc_aCeo" target="uc_u19">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e21" value="«extend»" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_u4" target="uc_u3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e22" value="«extend»" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_u5" target="uc_u3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e23" value="«extend»" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_u12" target="uc_u11">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e24" value="«include»" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_u3" target="uc_uLog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e25" value="«include»" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_u11" target="uc_uLog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e26" value="«include»" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_u13" target="uc_uLog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e27" value="«include»" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="uc_u19" target="uc_uLog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e28" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="uc_nInc" target="uc_uLog">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e29" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="uc_nEdit" target="uc_u17">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="uc_e30" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="uc_nSensor" target="uc_u9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="layers" name="4 · Affordance vs enforcement">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="layers_t4" value="Where a rule is decided, and where it is enforced" style="text;html=1;align=left;verticalAlign=top;fontSize=17;fontStyle=1;fontColor=#1f2430" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="700" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_t4s" value="The two are different layers and they have to agree. When a can* predicate changes, the matching rule belongs in the same commit." style="text;html=1;align=left;verticalAlign=top;fontSize=11;fontColor=#6b7280" vertex="1" parent="1">
+          <mxGeometry x="40" y="52" width="760" height="32" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_lPages" value="&lt;b&gt;Pages&lt;/b&gt;  &lt;i&gt;src/app/(app)/*&lt;/i&gt;&lt;hr size=&#x27;1&#x27;&gt;9 routes. Read through useAppState(), never from a store hook directly and never from the seed arrays. A control a role may not use stays on screen under a padlock." style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#ffffff;strokeColor=#4169e1;fontSize=12;align=left;verticalAlign=top;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="340" y="130" width="380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_lState" value="&lt;b&gt;useAppState()&lt;/b&gt;  &lt;i&gt;src/lib/app-state.tsx&lt;/i&gt;&lt;hr size=&#x27;1&#x27;&gt;Resolves every subscription into one list per domain, so the sidebar badge, the toolbar chips and the dashboard tiles cannot disagree. Holds the mutators." style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#ffffff;strokeColor=#4169e1;fontSize=12;align=left;verticalAlign=top;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="340" y="270" width="380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_lStores" value="&lt;b&gt;Store modules&lt;/b&gt;  &lt;i&gt;src/lib/*-store.ts&lt;/i&gt;&lt;hr size=&#x27;1&#x27;&gt;users · logBook · estate · sensor-types · sensors · equipment · requests&lt;br&gt;useLiveCollection + writes returning WriteResult. Timestamps become ISO strings in store-mappers.ts and nowhere else." style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#ffffff;strokeColor=#4169e1;fontSize=12;align=left;verticalAlign=top;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="340" y="410" width="380" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_lDb" value="&lt;b&gt;Firestore&lt;/b&gt;&lt;hr size=&#x27;1&#x27;&gt;9 collections, live onSnapshot. Human ids are document ids. Every query is single-collection and single-field-ordered, so firestore.indexes.json stays empty." style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#eef2fd;strokeColor=#2f4fb8;fontSize=12;align=left;verticalAlign=top;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="340" y="570" width="380" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_lPure" value="&lt;b&gt;Pure rules&lt;/b&gt;&lt;hr size=&#x27;1&#x27;&gt;derive.ts — escalation, due-service, offline, statusTone, counts, KPI&lt;br&gt;format.ts · estate-rules.ts · photo.ts&lt;hr size=&#x27;1&#x27;&gt;&lt;i&gt;Import no data. Change a threshold here, not in a migration.&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#eefaf1;strokeColor=#2e7d4f;fontSize=12;align=left;verticalAlign=top;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="40" y="330" width="260" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_lPerm" value="&lt;b&gt;Affordance layer&lt;/b&gt;&lt;br&gt;&lt;i&gt;src/lib/permissions.ts&lt;/i&gt;&lt;hr size=&#x27;1&#x27;&gt;Decides what a padlock looks like and which nav items render. Gates on &lt;b&gt;rank&lt;/b&gt;, never on role equality.&lt;hr size=&#x27;1&#x27;&gt;&lt;i&gt;Runs in the browser. Stops nothing.&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#ffffff;strokeColor=#4169e1;fontSize=12;align=left;verticalAlign=top;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="780" y="250" width="340" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_lRules" value="&lt;b&gt;Enforcement layer&lt;/b&gt;&lt;br&gt;&lt;i&gt;firestore.rules&lt;/i&gt;&lt;hr size=&#x27;1&#x27;&gt;The only thing that can actually refuse a write, because it runs on Google&#x27;s servers.&lt;hr size=&#x27;1&#x27;&gt;&lt;b&gt;Not deployed. At the wide-open default.&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=12;fillColor=#fdeeee;strokeColor=#c0392b;fontSize=12;align=left;verticalAlign=top;spacing=8" vertex="1" parent="1">
+          <mxGeometry x="780" y="500" width="340" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_nGate" value="The route guard in shell/auth-gate.tsx is &lt;b&gt;UX, not security&lt;/b&gt;. A client-only SDK has no server-side gate; it exists so nobody lands on a chrome-full dashboard while signed out." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fff8e6;strokeColor=#b8860b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="780" y="90" width="340" height="100" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_nRules" value="&lt;b&gt;What this means for the report.&lt;/b&gt;&lt;br&gt;Every constraint on pages 1–3 is real, and every one of them is a &lt;i&gt;client-side&lt;/i&gt; constraint. Anyone holding the API key — which is public and in the bundle — can read and write all nine collections directly. This was a deliberate scope decision, not an oversight, and it is the single largest gap in the build." style="shape=note;whiteSpace=wrap;html=1;size=14;fillColor=#fdeeee;strokeColor=#c0392b;align=left;verticalAlign=top;spacing=8;fontSize=11" vertex="1" parent="1">
+          <mxGeometry x="40" y="560" width="260" height="230" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e0" value="reads / calls" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="layers_lPages" target="layers_lState">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e1" value="useX() + writes" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="layers_lState" target="layers_lStores">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e2" value="onSnapshot · setDoc · writeBatch" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;strokeColor=#4169e1;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="layers_lStores" target="layers_lDb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e3" value="" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="layers_lPure" target="layers_lState">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e4" value="gates the UI" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="layers_lPerm" target="layers_lPages">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e5" value="would gate the data" style="endArrow=open;dashed=1;html=1;strokeColor=#6b7280;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="layers_lRules" target="layers_lDb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e6" value="must say the same thing" style="endArrow=block;startArrow=block;endFill=1;startFill=1;dashed=1;html=1;strokeColor=#c0392b;strokeWidth=1.5;fontSize=10;labelBackgroundColor=#ffffff" edge="1" parent="1" source="layers_lPerm" target="layers_lRules">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e7" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="layers_nGate" target="layers_lPages">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="layers_e8" value="" style="endArrow=none;dashed=1;html=1;strokeColor=#b8860b" edge="1" parent="1" source="layers_nRules" target="layers_lRules">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,12 +1,15 @@
 # Smart Building Monitoring — codebase map
 
 Facilities-operations dashboard for a 3-building estate (CET333). Firebase Auth
-is real and **eight collections live in Firestore**, each behind a live
+is real and **nine collections live in Firestore**, each behind a live
 `onSnapshot`. What is left in `mock-data.ts` is the seed corpus and the things
 that are generated on purpose — reports, historical records, the power series.
 
 Full reference — build status, every exported function, page-by-page behaviour
 and the known gaps — lives in [`docs/PROJECT-STATE.md`](docs/PROJECT-STATE.md).
+**What each role may do, and the request lifecycle**, live in
+[`docs/APPLICATION-FLOW.md`](docs/APPLICATION-FLOW.md) with UML diagrams beside
+it in `docs/application-flow.drawio`.
 
 ## Stack
 

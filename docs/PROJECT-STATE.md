@@ -21,11 +21,20 @@ fire/door sensors, raise and progress maintenance requests, read the historical
 ledger and the live log book, and (for senior roles) manage buildings, rooms,
 user accounts and generated reports.
 
-**The single most important fact: this is a frontend only.** There is no
-backend, no database and no authentication. Every record lives in
-`src/lib/mock-data.ts` as a TypeScript literal, and every mutation lives in
-React state that dies on reload. Firebase is the intended backend and **has not
-been started**.
+**How someone moves through it, and what each role is allowed to do**, is
+[`APPLICATION-FLOW.md`](./APPLICATION-FLOW.md) — a capability matrix traced to
+the predicates that enforce it, with four UML pages in
+[`application-flow.drawio`](./application-flow.drawio). This document covers
+what is built; that one covers how it behaves.
+
+**The single most important fact: the data is real and the rules are not.**
+Firebase Auth is live, nine collections are in Firestore behind live
+`onSnapshot` subscriptions, and a change made by one person persists for the
+next. What `src/lib/mock-data.ts` still holds is the seed corpus and the things
+generated on purpose — reports, historical records, the power series. But
+`firestore.rules` is at the wide-open default and **is not deployed**, so every
+role constraint in this document is enforced in the browser and nowhere else.
+See §11.2.
 
 ### The three roles
 
@@ -102,7 +111,7 @@ There is **no test script and no test runner installed**.
 | Settings | **Built** | Your account (writes to `users`), Appearance (working theme picker, no Save — the swatch applies it), Password & sessions. |
 | More (phone overflow) | **Built** | Lists the pages the tab bar has no room for. |
 | Theming (light/dark) | **Built** | `next-themes` is mounted; `/settings` switches it. |
-| Persistence | **Built** | Eight collections in Firestore, live `onSnapshot` on every one. Reports, Historical Records and the power series stay generated. |
+| Persistence | **Built** | Nine collections in Firestore, live `onSnapshot` on every one. Reports, Historical Records and the power series stay generated. |
 | Authentication | **Built** | Firebase Auth, three real accounts, no role switcher. |
 | Firebase backend | **Built** | Client SDK only; `firestore.rules` are **not deployed** — see §11.2. |
 | Tests | **Built** | Vitest over `src/**/*.test.ts` — the pure rules, the mappers and the export shaping. |
@@ -1593,7 +1602,7 @@ geometry** (bar heights, grid templates).
 
 ### 11.1 What is in Firestore
 
-Eight collections, each with a store module in `src/lib/` and a live
+Nine collections, each with a store module in `src/lib/` and a live
 `onSnapshot` resolved by `AppStateProvider`:
 
 | Collection | Store module | Document id |
