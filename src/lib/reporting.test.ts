@@ -248,10 +248,9 @@ describe("buildCostReport", () => {
     expect(f.spentMmk).toBe(1144999);
   });
 
-  it("measures coverage against resolved requests", () => {
+  it("counts priced requests against the resolved ones", () => {
     // A and B carry a cost, C does not. D is not resolved, so it is not owed one.
     const f = buildCostReport(scope({ requests }));
-    expect(kpi(f, "Cost coverage")).toBe(67);
     expect(kpi(f, "Priced requests")).toBe(2);
     expect(f.notes).toContain("1 of 3 resolved");
   });
@@ -260,7 +259,7 @@ describe("buildCostReport", () => {
     const f = buildCostReport(
       scope({ requests: [req("B", { status: "resolved", costMmk: 0 })] }),
     );
-    expect(kpi(f, "Cost coverage")).toBe(100);
+    expect(kpi(f, "Priced requests")).toBe(1);
     expect(f.notes).toContain("Every resolved request");
   });
 

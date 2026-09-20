@@ -442,14 +442,6 @@ export function buildCostReport(scope: ReportScope): ReportFigures {
       targetLabel: "Across priced requests",
     },
     {
-      label: "Cost coverage",
-      value: pct(priced.length, finished.length),
-      unit: "%",
-      target: 100,
-      compare: "gte",
-      targetLabel: "Target 100%",
-    },
-    {
       label: "Priced requests",
       value: priced.length,
       unit: "",

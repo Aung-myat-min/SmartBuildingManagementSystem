@@ -417,12 +417,11 @@ export default function EquipmentPage() {
             const items = units.filter((u) => boardColumnFor(u) === col);
             const meta = COLUMN_META[col];
             return (
-              // A labelled group rather than a bare div: dragging is a
+              // A labelled section rather than a bare div: dragging is a
               // pointer-only accelerator, and every condition it can set is
               // also a button in the unit's detail drawer.
-              <div
+              <section
                 key={col}
-                role="group"
                 aria-label={`${meta.label} — ${items.length} units`}
                 onDragOver={(e) => {
                   if (!dragId) return;
@@ -512,7 +511,7 @@ export default function EquipmentPage() {
                     </div>
                   )}
                 </div>
-              </div>
+              </section>
             );
           })}
         </div>
