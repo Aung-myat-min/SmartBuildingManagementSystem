@@ -18,37 +18,34 @@ import type {
 } from "./types";
 
 export const BUILDINGS: Building[] = [
-  { id: "b216", name: "Building 216", code: "SITE 216" },
-  { id: "b209", name: "Building 209", code: "SITE 209" },
-  { id: "jsq", name: "Junction Square", code: "SITE JSQ" },
-];
-
-export const BUILDING_META: Record<
-  string,
-  { code: string; address: string; description: string; photoHint: string }
-> = {
-  b216: {
+  {
+    id: "b216",
+    name: "Building 216",
     code: "SITE 216",
+    floors: 3,
     address: "216 University Avenue",
     description:
-      "The main teaching block — lecture theatres, two teaching labs and the estate's oldest plant room. Highest device density of the three sites, and the building most often referenced: its Room 302 fire detector is the one currently in alarm.",
-    photoHint: "Drop a photo of Building 216",
+      "The main teaching block — lecture theatres, two teaching labs and the estate's oldest plant room. Highest device density of the three sites.",
   },
-  b209: {
+  {
+    id: "b209",
+    name: "Building 209",
     code: "SITE 209",
+    floors: 2,
     address: "209 University Avenue",
     description:
-      "Workshops and the loading bay. Smaller footprint than 216 but heavier equipment — the workshop's tool inventory and the atrium's AC plant are the two things that generate the most maintenance requests here.",
-    photoHint: "Drop a photo of Building 209",
+      "Workshops and the loading bay. Smaller footprint than 216 but heavier equipment — the workshop's tool inventory and the atrium's AC plant generate the most maintenance requests here.",
   },
-  jsq: {
+  {
+    id: "jsq",
+    name: "Junction Square",
     code: "SITE JSQ",
+    floors: 3,
     address: "Junction Square, Level 1-3",
     description:
-      "Mixed-use block: reception, a server room and three lecture rooms across three levels. The server room's cooling load is watched closely — it's the site with the highest continuous power draw per room.",
-    photoHint: "Drop a photo of Junction Square",
+      "Mixed-use block: reception, a server room and three lecture rooms across three levels. The server room's cooling load is watched closely — the highest continuous power draw per room on the estate.",
   },
-};
+];
 
 export const ROOMS: Room[] = [
   {
@@ -267,10 +264,39 @@ export const EQUIPMENT_TYPES: EquipmentTypeDef[] = [
   { id: "desktop-pc", label: "Desktop PC" },
   { id: "whiteboard-display", label: "Whiteboard display" },
   { id: "ceiling-lights", label: "Ceiling lights" },
+  // Furniture. A facilities register that cannot record a table is not one.
+  { id: "table", label: "Table" },
+  { id: "chair", label: "Chair" },
+  { id: "desk", label: "Desk" },
+  { id: "cabinet", label: "Cabinet" },
+  { id: "projector-screen", label: "Projector screen" },
+  { id: "whiteboard", label: "Whiteboard" },
 ];
 
+// EQUIPMENT_TYPES above is the seed. The registry is editable from the
+// Equipment page, so the live list lives in AppStateProvider and it pushes it
+// here — the same shim the sensor registry and the estate use. typeLabel() is
+// read by the register, the reliability report's fault grouping and the cost
+// report's spend grouping, so this is what keeps a renamed type consistent
+// across all three.
+let equipmentTypeSource: EquipmentTypeDef[] = EQUIPMENT_TYPES;
+
+export function setEquipmentTypeSource(next: EquipmentTypeDef[]): void {
+  equipmentTypeSource = next;
+}
+
+/** Every type, archived included — what the registry table lists. */
+export function allEquipmentTypes(): EquipmentTypeDef[] {
+  return equipmentTypeSource;
+}
+
+/** The types a new unit may be given. */
+export function equipmentTypes(): EquipmentTypeDef[] {
+  return equipmentTypeSource.filter((t) => !t.archived);
+}
+
 export function typeLabel(typeId: string): string {
-  return EQUIPMENT_TYPES.find((t) => t.id === typeId)?.label ?? typeId;
+  return equipmentTypeSource.find((t) => t.id === typeId)?.label ?? typeId;
 }
 
 // Equipment units (asset register)

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildingDeletionRefusal, roomsToCascade } from "./estate-rules";
+import {
+  buildingDeletionRefusal,
+  floorsFor,
+  roomsToCascade,
+} from "./estate-rules";
 import type { Room } from "./types";
 
 const estate = (
@@ -95,5 +99,23 @@ describe("roomsToCascade", () => {
 
   it("returns nothing for a building with no rooms", () => {
     expect(roomsToCascade("jsq", rooms)).toEqual([]);
+  });
+});
+
+describe("floorsFor", () => {
+  it("offers ground plus one option per storey", () => {
+    expect(floorsFor(3)).toEqual(["G", "1", "2", "3"]);
+  });
+
+  it("gives a single-storey building only the ground floor", () => {
+    // The room form used to offer G/1/2/3 whatever the building, so a
+    // two-storey block accepted a Floor 3 room.
+    expect(floorsFor(1)).toEqual(["G", "1"]);
+    expect(floorsFor(0)).toEqual(["G"]);
+  });
+
+  it("never returns a fractional or negative floor", () => {
+    expect(floorsFor(2.7)).toEqual(["G", "1", "2"]);
+    expect(floorsFor(-4)).toEqual(["G"]);
   });
 });

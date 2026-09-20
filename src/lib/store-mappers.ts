@@ -9,6 +9,7 @@ import type {
   Building,
   EnvironmentalSensor,
   EquipmentHistoryEvent,
+  EquipmentTypeDef,
   EquipmentUnit,
   LogBookEntry,
   MaintenanceRequest,
@@ -51,6 +52,14 @@ export function toLogEntry(
   };
 }
 
+export function toEquipmentType(
+  id: string,
+  data: Record<string, unknown>,
+): EquipmentTypeDef {
+  const d = data as Partial<EquipmentTypeDef>;
+  return { id, label: d.label ?? id, archived: d.archived ?? false };
+}
+
 export function toBuilding(
   id: string,
   data: Record<string, unknown>,
@@ -60,6 +69,11 @@ export function toBuilding(
     id,
     name: d.name ?? id,
     code: d.code ?? "",
+    // A building written before floors existed still has to render a room
+    // form, so it falls back to a single storey rather than NaN.
+    floors: typeof d.floors === "number" && d.floors > 0 ? d.floors : 1,
+    address: d.address,
+    description: d.description,
   };
 }
 

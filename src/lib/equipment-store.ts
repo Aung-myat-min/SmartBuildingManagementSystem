@@ -13,9 +13,7 @@
 import {
   addDoc,
   collection,
-  deleteDoc,
   doc,
-  getDoc,
   getDocs,
   limit,
   orderBy,
@@ -32,6 +30,12 @@ import {
   type WriteResult,
   writeError,
 } from "@/lib/firestore-store";
+import {
+  deletePhoto as deleteMedia,
+  photoRef,
+  readPhoto as readMedia,
+  writePhoto as writeMedia,
+} from "@/lib/media-store";
 import { toEquipmentHistory, toEquipmentUnit } from "@/lib/store-mappers";
 import type { EquipmentHistoryEvent, EquipmentUnit } from "@/lib/types";
 
@@ -100,7 +104,7 @@ export async function deleteUnitWithHistory(
     const batch = writeBatch(db);
     batch.delete(doc(db, COLLECTIONS.equipmentUnits, unitId));
     for (const row of rows.docs) batch.delete(row.ref);
-    batch.delete(photoRef(unitId));
+    batch.delete(photoRef(COLLECTIONS.equipmentUnits, unitId));
     await batch.commit();
     return { ok: true };
   } catch (error) {
@@ -155,40 +159,11 @@ export async function moveUnitWrite(
     return { ok: false, message: writeError(error) };
   }
 }
+// Photos — the shape is in lib/media-store.ts, shared with buildings.
 
-// Photos
-
-function photoRef(unitId: string) {
-  return doc(db, COLLECTIONS.equipmentUnits, unitId, "media", "photo");
-}
-
-/** Null when the unit has no photo — the ordinary case, not an error. */
-export async function readPhoto(unitId: string): Promise<string | null> {
-  try {
-    const snap = await getDoc(photoRef(unitId));
-    return snap.exists() ? ((snap.data().dataUrl as string) ?? null) : null;
-  } catch {
-    return null;
-  }
-}
-
-export async function writePhoto(
-  unitId: string,
-  dataUrl: string,
-): Promise<WriteResult> {
-  try {
-    await setDoc(photoRef(unitId), { dataUrl, at: new Date().toISOString() });
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, message: writeError(error) };
-  }
-}
-
-export async function deletePhoto(unitId: string): Promise<WriteResult> {
-  try {
-    await deleteDoc(photoRef(unitId));
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, message: writeError(error) };
-  }
-}
+export const readPhoto = (unitId: string) =>
+  readMedia(COLLECTIONS.equipmentUnits, unitId);
+export const writePhoto = (unitId: string, dataUrl: string) =>
+  writeMedia(COLLECTIONS.equipmentUnits, unitId, dataUrl);
+export const deletePhoto = (unitId: string) =>
+  deleteMedia(COLLECTIONS.equipmentUnits, unitId);

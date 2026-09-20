@@ -21,6 +21,11 @@ import {
   type WriteResult,
   writeError,
 } from "@/lib/firestore-store";
+import {
+  deletePhoto as deleteMedia,
+  readPhoto as readMedia,
+  writePhoto as writeMedia,
+} from "@/lib/media-store";
 import { toBuilding, toRoom } from "@/lib/store-mappers";
 import type { Building, Room } from "@/lib/types";
 
@@ -110,3 +115,12 @@ export async function deleteRoom(roomId: string): Promise<WriteResult> {
     return { ok: false, message: writeError(error) };
   }
 }
+
+// Photos, the same shape as an equipment unit's.
+
+export const readBuildingPhoto = (buildingId: string) =>
+  readMedia(COLLECTIONS.buildings, buildingId);
+export const writeBuildingPhoto = (buildingId: string, dataUrl: string) =>
+  writeMedia(COLLECTIONS.buildings, buildingId, dataUrl);
+export const deleteBuildingPhoto = (buildingId: string) =>
+  deleteMedia(COLLECTIONS.buildings, buildingId);

@@ -136,6 +136,15 @@ export function canManageSensorTypes(role: UserRole): boolean {
   return roleRank(role) <= 2;
 }
 
+// The equipment type registry sits with the sensor one: both are "what kinds
+// of thing exist on this estate", and neither changes a building or an account.
+export function canManageEquipmentTypes(role: UserRole): boolean {
+  return roleRank(role) <= 2;
+}
+
+export const EQUIPMENT_TYPE_LOCK_REASON =
+  "Equipment types are managed by Admin Managers and the CEO / Super Admin.";
+
 export const SENSOR_TYPE_LOCK_REASON =
   "Sensor types are managed by Admin Managers and the CEO / Super Admin.";
 

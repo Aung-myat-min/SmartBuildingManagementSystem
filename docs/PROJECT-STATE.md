@@ -28,7 +28,7 @@ the predicates that enforce it, with four UML pages in
 what is built; that one covers how it behaves.
 
 **The single most important fact: the data is real and the rules are not.**
-Firebase Auth is live, ten collections are in Firestore behind live
+Firebase Auth is live, eleven collections are in Firestore behind live
 `onSnapshot` subscriptions, and a change made by one person persists for the
 next. What `src/lib/mock-data.ts` still holds is the seed corpus and the things
 generated on purpose — reports, historical records, the power series. But
@@ -101,17 +101,17 @@ There is **no test script and no test runner installed**.
 | Login + account-access screens | **Built (demo)** | `/login` is a demo account picker, not real auth. `forgot-password`, `first-sign-in`, `session-expired` are static screens. |
 | App shell (sidebar, header, tabs) | **Built** | Three widths implemented: phone tab bar, tablet icon rail, desktop sidebar. |
 | Dashboard | **Built** | KPI tiles, power series, estate table, decision list, live alerts, log feed. |
-| Equipment | **Built** | Register/Board views, filters, detail drawer with history and six actions, new-unit drawer, inline edit/service/move forms. |
+| Equipment | **Built** | Board by default, draggable between condition columns; Register/Board views, filters, detail drawer with history and six actions, new-unit drawer, inline edit/service/move forms. |
 | Sensors | **Built** | Grouped by building, alarm rows break the rhythm, actions rendered from the type registry, deep-link via `?sensor=`. |
 | Maintenance Requests | **Built** | Kanban/Table views, new-request drawer, forward and backward status moves. |
 | Historical Records | **Built** | The Log Book filtered to estate sources (`admin` excluded), over a 90-day subscription. Range/building/source filters, daily grouping, CSV export. |
 | Log Book | **Built** | Live feed, source filters, pause. Admin Manager + CEO only. |
 | Reports | **Built** | Library + full report view, generate sheet, PDF/CSV buttons. |
-| Administration | **Built** | Buildings (CEO), User Accounts and Sensor Types (Admin + CEO), each separately gated. |
+| Administration | **Built** | Buildings (CEO) and User Accounts (Admin + CEO), separately gated. The type registries moved to the pages that use them. |
 | Settings | **Built** | Your account (writes to `users`), Appearance (working theme picker, no Save — the swatch applies it), Password & sessions. |
 | More (phone overflow) | **Built** | Lists the pages the tab bar has no room for. |
 | Theming (light/dark) | **Built** | `next-themes` is mounted; `/settings` switches it. |
-| Persistence | **Built** | Ten collections in Firestore, live `onSnapshot` on every one. Only `powerSeries()`, `BUILDING_META` and `EQUIPMENT_TYPES` stay generated. |
+| Persistence | **Built** | Eleven collections in Firestore, live `onSnapshot` on every one. Only `powerSeries()`, `BUILDING_META` and `EQUIPMENT_TYPES` stay generated. |
 | Authentication | **Built** | Firebase Auth, three real accounts, no role switcher. |
 | Firebase backend | **Built** | Client SDK only; `firestore.rules` are **not deployed** — see §11.2. |
 | Tests | **Built** | Vitest over `src/**/*.test.ts` — the pure rules, the mappers and the export shaping. |
@@ -1602,7 +1602,7 @@ geometry** (bar heights, grid templates).
 
 ### 11.1 What is in Firestore
 
-Ten collections, each with a store module in `src/lib/` and a live
+Eleven collections, each with a store module in `src/lib/` and a live
 `onSnapshot` resolved by `AppStateProvider`:
 
 | Collection | Store module | Document id |

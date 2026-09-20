@@ -5,6 +5,7 @@ import {
   Camera,
   CheckCircle2,
   LayoutGrid,
+  Lock,
   MoveRight,
   Search,
   Table as TableIcon,
@@ -27,7 +28,13 @@ import {
   SameDevicePanel,
 } from "@/components/shared/detail-drawer";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FormDrawer, FormField } from "@/components/shared/form-drawer";
+import {
+  FormDrawer,
+  FormField,
+  NumberInput,
+  WideSheet,
+} from "@/components/shared/form-drawer";
+import { RowButton, TextInput } from "@/components/shared/inputs";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
@@ -46,7 +53,7 @@ import type { WriteResult } from "@/lib/firestore-store";
 import { formatDate, formatRelative } from "@/lib/format";
 import {
   buildingName,
-  EQUIPMENT_TYPES,
+  equipmentTypes,
   equipmentUnitLabel,
   roomLabel,
   roomsForBuilding,
@@ -54,7 +61,9 @@ import {
 } from "@/lib/mock-data";
 import {
   canDecommissionEquipment,
+  canManageEquipmentTypes,
   DECOMMISSION_LOCK_REASON,
+  EQUIPMENT_TYPE_LOCK_REASON,
   isBuildingLocked,
 } from "@/lib/permissions";
 import { downscaleImage, photoTooLarge } from "@/lib/photo";
@@ -92,7 +101,7 @@ const BOARD_ORDER: EquipmentBoardColumn[] = [
 ];
 
 function typeLabel(typeId: string) {
-  return EQUIPMENT_TYPES.find((t) => t.id === typeId)?.label ?? typeId;
+  return equipmentTypes().find((t) => t.id === typeId)?.label ?? typeId;
 }
 
 export default function EquipmentPage() {
@@ -105,11 +114,14 @@ export default function EquipmentPage() {
     equipmentUnits,
     setEquipmentCondition,
   } = useAppState();
+  const confirm = useConfirm();
   const locked = isBuildingLocked(role);
 
+  // v2 because the old key already holds "register" for anyone who has opened
+  // this page, so a changed default would never actually appear.
   const [view, setView] = usePersistedState<"register" | "board">(
-    "equipment.view",
-    "register",
+    "equipment.view.v2",
+    "board",
   );
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState(
@@ -122,6 +134,11 @@ export default function EquipmentPage() {
   );
   const [selectedId, setSelectedId] = React.useState<string | null>(null);
   const [newOpen, setNewOpen] = React.useState(false);
+  const [typesOpen, setTypesOpen] = React.useState(false);
+  const [dragId, setDragId] = React.useState<string | null>(null);
+  const [overCol, setOverCol] = React.useState<EquipmentBoardColumn | null>(
+    null,
+  );
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
 
@@ -146,6 +163,47 @@ export default function EquipmentPage() {
   const selected = selectedId
     ? (equipmentUnits.find((u) => u.id === selectedId) ?? null)
     : null;
+
+  /**
+   * A drop changes the unit's condition, so only the four real conditions are
+   * targets. `due-service` is computed from nextServiceDue — a unit drags out
+   * of it, never into it.
+   */
+  const dropOn = async (col: EquipmentBoardColumn, unitId: string) => {
+    setDragId(null);
+    setOverCol(null);
+    const unit = equipmentUnits.find((u) => u.id === unitId);
+    if (!unit) return;
+    if (col === "due-service") {
+      toast.error("Due service is worked out from the service date", {
+        description:
+          "It is not a condition you can set. Record a service on the unit to move it.",
+      });
+      return;
+    }
+    if (boardColumnFor(unit) === col) return;
+    if (col === "decommissioned") {
+      if (!canDecommissionEquipment(role)) {
+        toast.error(DECOMMISSION_LOCK_REASON);
+        return;
+      }
+      const result = await confirm({
+        title: `Decommission ${unit.tag}?`,
+        body: `${equipmentUnitLabel(unit)} in ${roomLabel(unit.roomId)}.`,
+        note: `${unit.tag} stops reporting and drops out of every count on the estate. Its history stays in the Log Book.`,
+        tone: "danger",
+        confirmLabel: "Decommission",
+        requireReason: true,
+      });
+      if (!result.confirmed) return;
+    }
+    const written = await setEquipmentCondition(unit.id, col);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
+    toast.success(`${unit.tag} → ${COLUMN_META[col].label}`);
+  };
 
   const boardColumns = [
     ...BOARD_ORDER,
@@ -190,7 +248,7 @@ export default function EquipmentPage() {
           className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
           <option value="all">All types</option>
-          {EQUIPMENT_TYPES.map((t) => (
+          {equipmentTypes().map((t) => (
             <option key={t.id} value={t.id}>
               {t.label}
             </option>
@@ -240,6 +298,27 @@ export default function EquipmentPage() {
             onClick={() => setView("board")}
           />
         </div>
+
+        {canManageEquipmentTypes(role) ? (
+          <button
+            type="button"
+            title="Add, rename or archive the kinds of asset this estate holds"
+            onClick={() => setTypesOpen(true)}
+            className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+          >
+            Manage types
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            title={EQUIPMENT_TYPE_LOCK_REASON}
+            className="border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
+          >
+            <Lock className="size-2.75" />
+            Manage types
+          </button>
+        )}
 
         <button
           type="button"
@@ -338,9 +417,30 @@ export default function EquipmentPage() {
             const items = units.filter((u) => boardColumnFor(u) === col);
             const meta = COLUMN_META[col];
             return (
+              // A labelled group rather than a bare div: dragging is a
+              // pointer-only accelerator, and every condition it can set is
+              // also a button in the unit's detail drawer.
               <div
                 key={col}
-                className="border-border bg-card overflow-hidden rounded-[5px] border"
+                role="group"
+                aria-label={`${meta.label} — ${items.length} units`}
+                onDragOver={(e) => {
+                  if (!dragId) return;
+                  e.preventDefault();
+                  setOverCol(col);
+                }}
+                onDragLeave={() => setOverCol((c) => (c === col ? null : c))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (dragId) void dropOn(col, dragId);
+                }}
+                className={cn(
+                  "border-border bg-card overflow-hidden rounded-[5px] border transition-colors",
+                  overCol === col &&
+                    (col === "due-service"
+                      ? "border-danger/50 bg-danger-muted/30"
+                      : "border-primary bg-surface-hover"),
+                )}
               >
                 <div
                   className={cn(
@@ -360,9 +460,20 @@ export default function EquipmentPage() {
                       <button
                         type="button"
                         key={u.id}
+                        draggable
+                        onDragStart={(e) => {
+                          setDragId(u.id);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setOverCol(null);
+                        }}
                         onClick={() => setSelectedId(u.id)}
                         className={cn(
                           "border-divider hover:border-primary bg-card cursor-pointer rounded border border-l-[3px] px-2.75 py-2.5 text-left",
+                          "active:cursor-grabbing",
+                          dragId === u.id && "opacity-40",
                           col === "faulty"
                             ? "border-l-danger"
                             : col === "due-service"
@@ -419,6 +530,8 @@ export default function EquipmentPage() {
         canDecommission={canDecommissionEquipment(role)}
       />
 
+      <EquipmentTypeSheet open={typesOpen} onOpenChange={setTypesOpen} />
+
       <NewUnitDrawer
         open={newOpen}
         onOpenChange={setNewOpen}
@@ -443,7 +556,7 @@ function NewUnitDrawer({
 }) {
   const { buildings, equipmentUnits, addUnit } = useAppState();
   const [tag, setTag] = React.useState("");
-  const [typeId, setTypeId] = React.useState(EQUIPMENT_TYPES[0]?.id ?? "");
+  const [typeId, setTypeId] = React.useState(equipmentTypes()[0]?.id ?? "");
   const [buildingId, setBuildingId] = React.useState(defaultBuildingId);
   const [roomId, setRoomId] = React.useState("");
   const [installed, setInstalled] = React.useState("");
@@ -453,7 +566,7 @@ function NewUnitDrawer({
   React.useEffect(() => {
     if (!open) return;
     setTag("");
-    setTypeId(EQUIPMENT_TYPES[0]?.id ?? "");
+    setTypeId(equipmentTypes()[0]?.id ?? "");
     setBuildingId(defaultBuildingId);
     setRoomId(roomsForBuilding(defaultBuildingId)[0]?.id ?? "");
     setInstalled(new Date().toISOString().slice(0, 10));
@@ -484,6 +597,10 @@ function NewUnitDrawer({
           return;
         }
         const interval = Number(serviceInterval);
+        if (!Number.isFinite(interval) || interval < 1 || interval > 3650) {
+          setError("Give the service interval in days, 1 or more.");
+          return;
+        }
         const installedAt = new Date(installed).toISOString();
         const written = await addUnit({
           id,
@@ -522,7 +639,7 @@ function NewUnitDrawer({
           onChange={(e) => setTypeId(e.target.value)}
           className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
         >
-          {EQUIPMENT_TYPES.map((t) => (
+          {equipmentTypes().map((t) => (
             <option key={t.id} value={t.id}>
               {t.label}
             </option>
@@ -572,15 +689,11 @@ function NewUnitDrawer({
           />
         </FormField>
         <FormField label="Service interval">
-          <select
+          <NumberInput
             value={serviceInterval}
-            onChange={(e) => setServiceInterval(e.target.value)}
-            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-          >
-            <option value="90">Every 90 days</option>
-            <option value="180">Every 180 days</option>
-            <option value="365">Every year</option>
-          </select>
+            onChange={setServiceInterval}
+            suffix="days"
+          />
         </FormField>
       </div>
     </FormDrawer>
@@ -1068,7 +1181,7 @@ function EditUnitForm({
           onChange={(e) => setTypeId(e.target.value)}
           className="border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium"
         >
-          {EQUIPMENT_TYPES.map((t) => (
+          {equipmentTypes().map((t) => (
             <option key={t.id} value={t.id}>
               {t.label}
             </option>
@@ -1085,15 +1198,11 @@ function EditUnitForm({
           />
         </DrawerField>
         <DrawerField label="Service interval">
-          <select
+          <NumberInput
             value={serviceInterval}
-            onChange={(e) => setServiceInterval(e.target.value)}
-            className="border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium"
-          >
-            <option value="90">Every 90 days</option>
-            <option value="180">Every 180 days</option>
-            <option value="365">Every year</option>
-          </select>
+            onChange={setServiceInterval}
+            suffix="days"
+          />
         </DrawerField>
       </div>
     </DrawerInlineForm>
@@ -1211,5 +1320,180 @@ function MoveForm({
         </DrawerField>
       </div>
     </DrawerInlineForm>
+  );
+}
+
+/**
+ * The equipment type registry — the asset twin of the sensor one, and opened
+ * the same way: from the toolbar of the page whose records use it.
+ */
+function EquipmentTypeSheet({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const {
+    equipmentTypeRegistry,
+    equipmentUnits,
+    addEquipmentType,
+    renameEquipmentType,
+    archiveEquipmentType,
+    restoreEquipmentType,
+  } = useAppState();
+  const [draft, setDraft] = React.useState("");
+  const [editingId, setEditingId] = React.useState<string | null>(null);
+  const [editLabel, setEditLabel] = React.useState("");
+
+  const unitsOn = (typeId: string) =>
+    equipmentUnits.filter((u) => u.typeId === typeId).length;
+
+  const report = (result: { ok: boolean; error?: string }, ok: string) => {
+    if (!result.ok) {
+      toast.error(result.error ?? "That could not be saved.");
+      return false;
+    }
+    toast.success(ok);
+    return true;
+  };
+
+  return (
+    <WideSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Equipment types"
+      description="What kinds of asset this estate holds. A type carrying units cannot be archived — the register, the reliability report and the cost report all group by it."
+    >
+      <div className="flex gap-2">
+        <TextInput
+          value={draft}
+          placeholder="New type, e.g. Table"
+          onChange={(e) => setDraft(e.target.value)}
+        />
+        <button
+          type="button"
+          onClick={async () => {
+            if (report(await addEquipmentType(draft), `${draft.trim()} added`))
+              setDraft("");
+          }}
+          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+        >
+          Add type
+        </button>
+      </div>
+
+      <div className="border-border overflow-hidden rounded-[5px] border">
+        <div className="bg-surface-subtle border-divider text-muted-foreground flex border-b px-3 py-2 font-mono text-[10px] tracking-[0.06em] uppercase">
+          <span className="flex-1">Type</span>
+          <span className="w-34">Id</span>
+          <span className="w-16 text-right">Units</span>
+          <span className="w-20 text-center">State</span>
+          <span className="w-38 text-right">Manage</span>
+        </div>
+        {equipmentTypeRegistry.map((t) => {
+          const count = unitsOn(t.id);
+          const editing = editingId === t.id;
+          return (
+            <div
+              key={t.id}
+              className="border-rule flex items-center border-b px-3 py-2 text-[12px] last:border-b-0"
+            >
+              <span className="flex-1 pr-2">
+                {editing ? (
+                  <TextInput
+                    value={editLabel}
+                    autoFocus
+                    onChange={(e) => setEditLabel(e.target.value)}
+                  />
+                ) : (
+                  t.label
+                )}
+              </span>
+              <span className="text-muted-foreground w-34 font-mono text-[11px]">
+                {t.id}
+              </span>
+              <span className="w-16 text-right font-mono text-[11px]">
+                {count}
+              </span>
+              <span className="w-20 text-center">
+                <ToneBadge tone={t.archived ? "neutral" : "success"}>
+                  {t.archived ? "ARCHIVED" : "ACTIVE"}
+                </ToneBadge>
+              </span>
+              <span className="flex w-38 justify-end gap-1.5">
+                {editing ? (
+                  <>
+                    <RowButton
+                      onClick={async () => {
+                        if (
+                          report(
+                            await renameEquipmentType(t.id, editLabel),
+                            `${editLabel.trim()} renamed`,
+                          )
+                        )
+                          setEditingId(null);
+                      }}
+                    >
+                      Save
+                    </RowButton>
+                    <RowButton onClick={() => setEditingId(null)}>
+                      Cancel
+                    </RowButton>
+                  </>
+                ) : (
+                  <>
+                    <RowButton
+                      title="Rename this type everywhere it is used"
+                      onClick={() => {
+                        setEditingId(t.id);
+                        setEditLabel(t.label);
+                      }}
+                    >
+                      Rename
+                    </RowButton>
+                    {t.archived ? (
+                      <RowButton
+                        title="Bring this type back"
+                        onClick={async () =>
+                          report(
+                            await restoreEquipmentType(t.id),
+                            `${t.label} restored`,
+                          )
+                        }
+                      >
+                        Restore
+                      </RowButton>
+                    ) : (
+                      <RowButton
+                        danger
+                        title={
+                          count > 0
+                            ? `${count} unit${count === 1 ? "" : "s"} still use this type`
+                            : "Retire this type"
+                        }
+                        onClick={async () =>
+                          report(
+                            await archiveEquipmentType(t.id),
+                            `${t.label} archived`,
+                          )
+                        }
+                      >
+                        Archive
+                      </RowButton>
+                    )}
+                  </>
+                )}
+              </span>
+            </div>
+          );
+        })}
+        {equipmentTypeRegistry.length === 0 && (
+          <div className="text-muted-foreground px-3 py-8 text-center text-[12px]">
+            No equipment types yet — add the first one above.
+          </div>
+        )}
+      </div>
+    </WideSheet>
   );
 }

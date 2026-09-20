@@ -58,6 +58,13 @@ export interface Building {
   name: string;
   /** Site code shown beside the name, e.g. "SITE 216". */
   code: string;
+  /**
+   * Storeys above ground. The room form offers G plus 1..floors, so a
+   * two-storey building stops offering Floor 3.
+   */
+  floors: number;
+  address?: string;
+  description?: string;
 }
 
 export type RoomType = "lecture" | "lab" | "office" | "plant" | "common";
@@ -77,6 +84,8 @@ export interface Room {
 export interface EquipmentTypeDef {
   id: string; // e.g. "projector"
   label: string; // e.g. "Projector"
+  /** Retired rather than deleted, so units naming it still resolve a label. */
+  archived?: boolean;
 }
 
 // Applied uniformly to every equipment type, even ones usually singular
@@ -320,6 +329,9 @@ export type LogActionType =
   | "sensor-type-added"
   | "sensor-type-edited"
   | "sensor-type-archived"
+  | "equipment-type-added"
+  | "equipment-type-edited"
+  | "equipment-type-archived"
   | "building-added"
   | "building-edited"
   | "building-deleted"

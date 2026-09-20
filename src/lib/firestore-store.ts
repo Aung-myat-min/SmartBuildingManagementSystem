@@ -25,6 +25,7 @@ export const COLLECTIONS = {
   sensorTypes: "sensorTypes",
   sensors: "sensors",
   equipmentUnits: "equipmentUnits",
+  equipmentTypes: "equipmentTypes",
   equipmentHistory: "equipmentHistory",
   requests: "requests",
   reports: "reports",

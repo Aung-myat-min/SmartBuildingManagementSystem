@@ -12,6 +12,10 @@ import {
   useEquipmentHistory,
   useEquipmentUnits,
 } from "@/lib/equipment-store";
+import {
+  useEquipmentTypes,
+  writeEquipmentType,
+} from "@/lib/equipment-types-store";
 import { buildingDeletionRefusal, roomsToCascade } from "@/lib/estate-rules";
 import {
   createBuilding,
@@ -34,6 +38,7 @@ import {
   roomLabel,
   sensorType,
   setAssetSource,
+  setEquipmentTypeSource,
   setEstateSource,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
@@ -58,7 +63,9 @@ import type {
   EnvironmentalSensor,
   EquipmentCondition,
   EquipmentHistoryEvent,
+  EquipmentTypeDef,
   EquipmentUnit,
+  LogActionType,
   LogBookEntry,
   MaintenanceRequest,
   ReportDetail,
@@ -304,6 +311,18 @@ export interface AppState {
   /** Generated reports, newest first. The figures are snapshots. */
   reports: ReportDetail[];
   addReport: (report: ReportDetail) => Promise<WriteResult>;
+  /** Every equipment type, archived included — the registry table's list. */
+  equipmentTypeRegistry: EquipmentTypeDef[];
+  addEquipmentType: (
+    label: string,
+  ) => Promise<RegistryResult & { id?: string }>;
+  renameEquipmentType: (
+    typeId: string,
+    label: string,
+  ) => Promise<RegistryResult>;
+  /** Refused while units still carry the type, with the count. */
+  archiveEquipmentType: (typeId: string) => Promise<RegistryResult>;
+  restoreEquipmentType: (typeId: string) => Promise<RegistryResult>;
   /** The asset register. */
   equipmentUnits: EquipmentUnit[];
   /** Every unit's history, newest first — the drawer filters to its own. */
@@ -377,6 +396,7 @@ export function AppStateProvider({
     loading: sensorTypesLoading,
     error: sensorTypesError,
   } = useSensorTypes();
+  const { items: equipmentTypeRegistry } = useEquipmentTypes();
   // The Log Book is the first collection to leave memory. Nothing merges a
   // seed list in front of it any more — the seeded entries are documents.
   const {
@@ -402,6 +422,7 @@ export function AppStateProvider({
   // sees an edit on the same render that made it. Assigning the current list
   // is idempotent, which is why it can sit in the render body.
   setSensorRegistrySource(sensorTypeRegistry);
+  setEquipmentTypeSource(equipmentTypeRegistry);
   // Same shim, same reason: roomLabel/buildingName/roomsForBuilding resolve
   // through this, so no consumer has to know the estate can change.
   setEstateSource({ buildings: estateBuildings, rooms: estateRooms });
@@ -993,6 +1014,87 @@ export function AppStateProvider({
     [log],
   );
 
+  // The equipment type registry. Same guard as the sensor one: a type is free
+  // to be added, it is not free to strand a unit.
+
+  const logType = React.useCallback(
+    (action: LogActionType, title: string, type: EquipmentTypeDef) => {
+      log({
+        source: "admin",
+        actionType: action,
+        title,
+        detail: `${type.label} (${type.id}).`,
+        targetType: "equipment",
+        targetId: type.id,
+      });
+    },
+    [log],
+  );
+
+  const addEquipmentType = React.useCallback(
+    async (label: string) => {
+      const clean = label.trim();
+      if (clean.length === 0) return fail("An equipment type needs a name.");
+      const id = uniqueId(
+        slugify(clean),
+        equipmentTypeRegistry.map((t) => t.id),
+      );
+      const next = { id, label: clean, archived: false };
+      const written = await writeEquipmentType(next);
+      if (!written.ok) return fail(written.message);
+      logType("equipment-type-added", "Equipment type added", next);
+      return { ok: true as const, id };
+    },
+    [equipmentTypeRegistry, logType],
+  );
+
+  const renameEquipmentType = React.useCallback(
+    async (typeId: string, label: string): Promise<RegistryResult> => {
+      const clean = label.trim();
+      if (clean.length === 0) return fail("An equipment type needs a name.");
+      const current = equipmentTypeRegistry.find((t) => t.id === typeId);
+      if (!current) return fail("No equipment type with that id.");
+      const next = { ...current, label: clean };
+      const written = await writeEquipmentType(next);
+      if (!written.ok) return fail(written.message);
+      logType("equipment-type-edited", "Equipment type renamed", next);
+      return OK;
+    },
+    [equipmentTypeRegistry, logType],
+  );
+
+  const archiveEquipmentType = React.useCallback(
+    async (typeId: string): Promise<RegistryResult> => {
+      const current = equipmentTypeRegistry.find((t) => t.id === typeId);
+      if (!current) return fail("No equipment type with that id.");
+      const inUse = equipmentUnits.filter((u) => u.typeId === typeId).length;
+      if (inUse > 0) {
+        return fail(
+          `${inUse} unit${inUse === 1 ? " is" : "s are"} registered as ${current.label}. Move or delete ${inUse === 1 ? "it" : "them"} before archiving the type.`,
+        );
+      }
+      const next = { ...current, archived: true };
+      const written = await writeEquipmentType(next);
+      if (!written.ok) return fail(written.message);
+      logType("equipment-type-archived", "Equipment type archived", next);
+      return OK;
+    },
+    [equipmentTypeRegistry, equipmentUnits, logType],
+  );
+
+  const restoreEquipmentType = React.useCallback(
+    async (typeId: string): Promise<RegistryResult> => {
+      const current = equipmentTypeRegistry.find((t) => t.id === typeId);
+      if (!current) return fail("No equipment type with that id.");
+      const next = { ...current, archived: false };
+      const written = await writeEquipmentType(next);
+      if (!written.ok) return fail(written.message);
+      logType("equipment-type-edited", "Equipment type restored", next);
+      return OK;
+    },
+    [equipmentTypeRegistry, logType],
+  );
+
   const addUnit = React.useCallback(
     async (unit: EquipmentUnit) => {
       const written = await createUnit(unit);
@@ -1229,6 +1331,11 @@ export function AppStateProvider({
       removeSensorAction,
       reports,
       addReport,
+      equipmentTypeRegistry,
+      addEquipmentType,
+      renameEquipmentType,
+      archiveEquipmentType,
+      restoreEquipmentType,
       equipmentUnits,
       equipmentHistory,
       addUnit,
@@ -1297,6 +1404,11 @@ export function AppStateProvider({
       removeSensorAction,
       reports,
       addReport,
+      equipmentTypeRegistry,
+      addEquipmentType,
+      renameEquipmentType,
+      archiveEquipmentType,
+      restoreEquipmentType,
       equipmentUnits,
       equipmentHistory,
       addUnit,

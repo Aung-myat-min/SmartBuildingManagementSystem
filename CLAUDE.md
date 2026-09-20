@@ -1,7 +1,7 @@
 # Smart Building Monitoring — codebase map
 
 Facilities-operations dashboard for a 3-building estate (CET333). Firebase Auth
-is real and **ten collections live in Firestore**, each behind a live
+is real and **eleven collections live in Firestore**, each behind a live
 `onSnapshot`. What is left in `mock-data.ts` is the seed corpus and the things
 that are generated on purpose — reports, historical records, the power series.
 
@@ -124,6 +124,8 @@ untestable. Timestamps become ISO strings here and nowhere else.
 | `equipment-store.ts` | `equipmentUnits`, `equipmentHistory` | Every write that changes what happened to a unit batches the history row with it. Photos at `equipmentUnits/{id}/media/photo`. |
 | `requests-store.ts` | `requests` | Exports `CLEAR` (`deleteField()`) — `undefined` is *ignored*, not cleared. |
 | `reports-store.ts` | `reports` | The document is the whole `ReportDetail`: figures are snapshotted at generation, never recomputed on open. |
+| `equipment-types-store.ts` | `equipmentTypes` | The asset twin of the sensor registry, same archive guard. |
+| `media-store.ts` | `{collection}/{id}/media/photo` | Photos for units and buildings. Not on the document — a field change would re-send the image. |
 
 The human id is the document id everywhere one exists (`b216`, `FD-216-14`,
 `EQ-216-01`, `REQ-4192`), because every cross-reference already holds that
@@ -237,7 +239,8 @@ as a Tailwind utility — **never hardcode a hex**.
   `providers.tsx` (`attribute="class"`) and `/settings` switches light/dark/system.
 
 Metrics are tokens, not literals: `--sidebar-w` 196 · `--header-h` 54 ·
-`--page-pad` 20 · `--drawer-form-w` 392 · `--drawer-detail-w` 412 · `--modal-w` 452.
+`--page-pad` 20 · `--drawer-form-w` 392 · `--drawer-detail-w` 412 · `--modal-w` 452 ·
+`--sheet-w` 720 (a registry table only — the one thing too wide for a form).
 Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 
 ## Shared components
@@ -256,7 +259,9 @@ Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 | `lib/icons.ts` | `SENSOR_ICONS` / `sensorIcon()` — the fixed icon allowlist a sensor type picks from by key, never a component reference. |
 
 **Container rules, fixed across every page.** Fields → form drawer. A record with
-history and actions → detail drawer. Decisions only → centred 452px confirm, whose
+history and actions → detail drawer. A registry *table* → the 720px `WideSheet`,
+opened from the toolbar of the page whose records use it (Sensors for sensor
+types, Equipment for equipment types) — not from Administration. Decisions only → centred 452px confirm, whose
 `note` says what the action costs in its own numbers. A confirm carries at most
 one field: a reason, or a cost. Every result → one toast,
 bottom-left, six seconds, no undo. On a phone both drawers become bottom sheets.
@@ -276,7 +281,7 @@ tooltip — it is never hidden.
 | `/records` | Historical Records | range/building/type filters, daily grouping, CSV export |
 | `/logbook` | Log Book | live feed fed by `logBook`, source and date-time filters, pause |
 | `/reports` | Reports | library + full report view, generated-between filter, generate sheet with a date-range period, PDF/CSV |
-| `/admin` | Administration | Buildings (photo, description, counts, room table) / User Accounts / Sensor Types tabs; Buildings is CEO-only and padlocked for an Admin Manager, the other two are shared |
+| `/admin` | Administration | Buildings (photo upload, floors, address, description, room table) / User Accounts. Buildings is CEO-only and padlocked for an Admin Manager |
 | `/settings` | Settings | Your account, Appearance, Password & sessions |
 | `/more` | More | phone-only overflow nav |
 

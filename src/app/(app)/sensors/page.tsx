@@ -25,8 +25,9 @@ import {
   SameDevicePanel,
 } from "@/components/shared/detail-drawer";
 import { EmptyState } from "@/components/shared/empty-state";
-import { FormDrawer } from "@/components/shared/form-drawer";
+import { FormDrawer, WideSheet } from "@/components/shared/form-drawer";
 import { PulseDot } from "@/components/shared/pulse-dot";
+import { SensorTypeRegistry } from "@/components/shared/sensor-type-registry";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { useLiveClock } from "@/hooks/use-live-clock";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -35,7 +36,6 @@ import { isSensorOffline, statusTone } from "@/lib/derive";
 import { formatRelative } from "@/lib/format";
 import { sensorIcon } from "@/lib/icons";
 import {
-  BUILDING_META,
   buildingName,
   equipmentForSensor,
   roomLabel,
@@ -47,8 +47,10 @@ import {
 import {
   canAct,
   canActOnSensor,
+  canManageSensorTypes,
   isBuildingLocked,
   SENSOR_LOCK_REASON,
+  SENSOR_TYPE_LOCK_REASON,
 } from "@/lib/permissions";
 import type { EnvironmentalSensor, SensorAction } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -127,6 +129,7 @@ function SensorsView() {
   const [collapsed, setCollapsed] = React.useState<Record<string, boolean>>({});
   const [openId, setOpenId] = React.useState<string | null>(null);
   const [formOpen, setFormOpen] = React.useState(false);
+  const [typesOpen, setTypesOpen] = React.useState(false);
 
   // Arriving from an equipment unit's SAME PHYSICAL DEVICE panel.
   const deviceParam = params.get("device");
@@ -279,6 +282,27 @@ function SensorsView() {
           Polled every 30s · {clock ?? "—"}
         </span>
 
+        {canManageSensorTypes(role) ? (
+          <button
+            type="button"
+            title="Add, rename or archive the kinds of device this estate has"
+            onClick={() => setTypesOpen(true)}
+            className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+          >
+            Manage types
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled
+            title={SENSOR_TYPE_LOCK_REASON}
+            className="border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
+          >
+            <Lock className="size-2.75" />
+            Manage types
+          </button>
+        )}
+
         {canAct(role) && (
           <button
             type="button"
@@ -319,7 +343,7 @@ function SensorsView() {
               />
               <span className="text-[13px] font-semibold">{b.name}</span>
               <span className="text-muted-foreground font-mono text-[10px]">
-                {BUILDING_META[b.id]?.code}
+                {b.code}
               </span>
               {groupAlarms > 0 && (
                 <ToneBadge tone="danger" className="gap-1.5">
@@ -475,6 +499,8 @@ function SensorsView() {
           router.push("/equipment");
         }}
       />
+
+      <SensorTypeSheet open={typesOpen} onOpenChange={setTypesOpen} />
 
       <NewSensorDrawer open={formOpen} onOpenChange={setFormOpen} />
     </div>
@@ -876,5 +902,26 @@ function NewSensorDrawer({
     >
       <SensorFields f={f} isEdit={false} />
     </FormDrawer>
+  );
+}
+
+/** The registry, opened from the toolbar rather than living in Administration. */
+function SensorTypeSheet({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const confirm = useConfirm();
+  return (
+    <WideSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      title="Sensor types"
+      description="Each type carries its own statuses and actions. The page above renders whatever is here — it holds no vocabulary of its own."
+    >
+      <SensorTypeRegistry confirm={confirm} />
+    </WideSheet>
   );
 }

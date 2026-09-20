@@ -54,3 +54,14 @@ function listPhrase(parts: string[]): string {
   if (parts.length === 1) return parts[0];
   return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
+
+/**
+ * The floors a room in this building can be on: ground, then 1..floors.
+ *
+ * The room form used to offer a fixed G/1/2/3 regardless of the building it
+ * was adding to, so a two-storey block happily accepted a Floor 3 room.
+ */
+export function floorsFor(floors: number): string[] {
+  const count = Math.max(0, Math.floor(floors));
+  return ["G", ...Array.from({ length: count }, (_, i) => String(i + 1))];
+}

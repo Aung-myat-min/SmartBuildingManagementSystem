@@ -107,6 +107,7 @@
   --drawer-form-w: 392px; /* create/edit: buildings, rooms, users, sensors, reports */
   --drawer-detail-w: 412px; /* a record with its history and actions */
   --modal-w: 452px; /* decisions only */
+  --sheet-w: 720px; /* a registry table — wider than a form, and only for one */
   --menu-notif-w: 392px;
   --menu-acct-w: 236px;
 }
