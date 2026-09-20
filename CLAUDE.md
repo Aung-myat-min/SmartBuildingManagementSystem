@@ -1,7 +1,7 @@
 # Smart Building Monitoring — codebase map
 
 Facilities-operations dashboard for a 3-building estate (CET333). Firebase Auth
-is real and **nine collections live in Firestore**, each behind a live
+is real and **ten collections live in Firestore**, each behind a live
 `onSnapshot`. What is left in `mock-data.ts` is the seed corpus and the things
 that are generated on purpose — reports, historical records, the power series.
 
@@ -64,7 +64,7 @@ Two invariants the code relies on:
 14 requests · 18 log entries · 13 reports. Accounts are **not** here — they
 live in Firestore; see `lib/users-store.ts`.
 Helpers: `buildingStats()`, `roomsForBuilding()`, `roomLabel()`, `buildingName()`,
-`equipmentUnitLabel()`, `powerSeries()`, `reportDetail()`.
+`equipmentUnitLabel()`, `typeLabel()`, `powerSeries()`.
 Lookups: `BUILDING_META`, `BUILDING_LOAD_KW`, `LOG_BOOK_SOURCE_META`,
 `REQUEST_NEXT_STATUS`, `REQUEST_NEXT_ACTION`.
 Estate: `buildings()` / `rooms()` / `roomsForBuilding()` / `roomLabel()` /
@@ -123,10 +123,19 @@ untestable. Timestamps become ISO strings here and nowhere else.
 | `sensors-store.ts` | `sensors` | `writeSensorStatus` writes status **and** `statusChangedAt` together. |
 | `equipment-store.ts` | `equipmentUnits`, `equipmentHistory` | Every write that changes what happened to a unit batches the history row with it. Photos at `equipmentUnits/{id}/media/photo`. |
 | `requests-store.ts` | `requests` | Exports `CLEAR` (`deleteField()`) — `undefined` is *ignored*, not cleared. |
+| `reports-store.ts` | `reports` | The document is the whole `ReportDetail`: figures are snapshotted at generation, never recomputed on open. |
 
 The human id is the document id everywhere one exists (`b216`, `FD-216-14`,
 `EQ-216-01`, `REQ-4192`), because every cross-reference already holds that
 string. `logBook` and `equipmentHistory` take auto-ids.
+
+**`lib/reporting.ts`** — `buildReport(kind, scope)` and the three builders
+behind it. Pure, importing no data, for the same reason `derive.ts` is: these
+numbers get exported and filed, so a silently wrong one is worse than a crash.
+Labels come in through `ReportScope` (`typeLabel`, `unitLabel`) rather than
+being imported, which is what keeps the module data-free and testable.
+Nothing here is invented — where the record cannot answer, the answer is zero
+with a note saying why.
 
 **`lib/photo.ts`** — `fitWithin` / `dataUrlBytes` / `photoTooLarge` (pure,
 tested) and `downscaleImage` (canvas, browser only). There is no Storage

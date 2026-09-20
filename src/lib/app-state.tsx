@@ -24,7 +24,7 @@ import {
   updateRoom as writeRoom,
 } from "@/lib/estate-store";
 import type { WriteResult } from "@/lib/firestore-store";
-import { formatMmk } from "@/lib/format";
+import { formatMmk, parseMmk } from "@/lib/format";
 import { appendLogEntry, type LogDraft, useLogBook } from "@/lib/logbook-store";
 import {
   buildingName,
@@ -37,6 +37,7 @@ import {
   setEstateSource,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
+import { createReport, useReports } from "@/lib/reports-store";
 import {
   CLEAR,
   createRequest,
@@ -60,6 +61,7 @@ import type {
   EquipmentUnit,
   LogBookEntry,
   MaintenanceRequest,
+  ReportDetail,
   Room,
   SensorAction,
   SensorStatusDef,
@@ -299,6 +301,9 @@ export interface AppState {
     typeId: string,
     actionId: string,
   ) => Promise<RegistryResult>;
+  /** Generated reports, newest first. The figures are snapshots. */
+  reports: ReportDetail[];
+  addReport: (report: ReportDetail) => Promise<WriteResult>;
   /** The asset register. */
   equipmentUnits: EquipmentUnit[];
   /** Every unit's history, newest first — the drawer filters to its own. */
@@ -614,6 +619,7 @@ export function AppStateProvider({
     error: unitsError,
   } = useEquipmentUnits();
   const { items: equipmentHistory } = useEquipmentHistory();
+  const { items: reports } = useReports();
 
   // The third holder, beside the estate and the sensor registry:
   // sensorForEquipment / equipmentForSensor / buildingStats are module
@@ -968,6 +974,25 @@ export function AppStateProvider({
 
   const actorName = user.name;
 
+  const addReport = React.useCallback(
+    async (report: ReportDetail) => {
+      const written = await createReport(report);
+      if (!written.ok) return written;
+      log({
+        source: "admin",
+        actionType: "report-generated",
+        title: "Report generated",
+        detail: `${report.id} — ${report.kind.replace(/-/g, " ")}, ${report.period}${report.buildingId ? `, ${buildingName(report.buildingId)}` : ", whole estate"}.`,
+        targetType: "report",
+        targetId: report.id,
+        buildingId: report.buildingId,
+        refId: report.id,
+      });
+      return written;
+    },
+    [log],
+  );
+
   const addUnit = React.useCallback(
     async (unit: EquipmentUnit) => {
       const written = await createUnit(unit);
@@ -1047,6 +1072,10 @@ export function AppStateProvider({
       ]
         .filter(Boolean)
         .join(" · ");
+      // The form has always collected a cost and only ever written it into the
+      // summary. Kept as a number too, so the cost report can see servicing
+      // and not just request work.
+      const costMmk = parseMmk(detail.cost) ?? undefined;
       const written = await recordServiceWrite(
         unitId,
         {
@@ -1059,6 +1088,7 @@ export function AppStateProvider({
           at,
           summary,
           actorName,
+          ...(costMmk !== undefined ? { costMmk } : {}),
         },
       );
       if (!written.ok) return written;
@@ -1197,6 +1227,8 @@ export function AppStateProvider({
       addSensorAction,
       updateSensorAction,
       removeSensorAction,
+      reports,
+      addReport,
       equipmentUnits,
       equipmentHistory,
       addUnit,
@@ -1263,6 +1295,8 @@ export function AppStateProvider({
       addSensorAction,
       updateSensorAction,
       removeSensorAction,
+      reports,
+      addReport,
       equipmentUnits,
       equipmentHistory,
       addUnit,

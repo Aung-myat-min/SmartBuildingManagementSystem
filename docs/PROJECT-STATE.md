@@ -28,7 +28,7 @@ the predicates that enforce it, with four UML pages in
 what is built; that one covers how it behaves.
 
 **The single most important fact: the data is real and the rules are not.**
-Firebase Auth is live, nine collections are in Firestore behind live
+Firebase Auth is live, ten collections are in Firestore behind live
 `onSnapshot` subscriptions, and a change made by one person persists for the
 next. What `src/lib/mock-data.ts` still holds is the seed corpus and the things
 generated on purpose — reports, historical records, the power series. But
@@ -111,7 +111,7 @@ There is **no test script and no test runner installed**.
 | Settings | **Built** | Your account (writes to `users`), Appearance (working theme picker, no Save — the swatch applies it), Password & sessions. |
 | More (phone overflow) | **Built** | Lists the pages the tab bar has no room for. |
 | Theming (light/dark) | **Built** | `next-themes` is mounted; `/settings` switches it. |
-| Persistence | **Built** | Nine collections in Firestore, live `onSnapshot` on every one. Reports and the power series stay generated. |
+| Persistence | **Built** | Ten collections in Firestore, live `onSnapshot` on every one. Only `powerSeries()`, `BUILDING_META` and `EQUIPMENT_TYPES` stay generated. |
 | Authentication | **Built** | Firebase Auth, three real accounts, no role switcher. |
 | Firebase backend | **Built** | Client SDK only; `firestore.rules` are **not deployed** — see §11.2. |
 | Tests | **Built** | Vitest over `src/**/*.test.ts` — the pure rules, the mappers and the export shaping. |
@@ -1602,7 +1602,7 @@ geometry** (bar heights, grid templates).
 
 ### 11.1 What is in Firestore
 
-Nine collections, each with a store module in `src/lib/` and a live
+Ten collections, each with a store module in `src/lib/` and a live
 `onSnapshot` resolved by `AppStateProvider`:
 
 | Collection | Store module | Document id |
@@ -1630,11 +1630,18 @@ which throws without a configured project and would make them untestable.
 Every query is single-collection and single-field-ordered, so
 `firestore.indexes.json` stays empty and nothing here needs an index deploy.
 
-**Still generated, deliberately:** `powerSeries()`, `reportDetail()`,
-`REPORTS`, `BUILDING_META`, `EQUIPMENT_TYPES`. Persisting invented data buys
-nothing. Report generation stays page-local, which is why its toast still says
-"visible in this session only" — and that is now the one place in the app where
-that sentence is true.
+**Still generated, deliberately:** `powerSeries()`, `BUILDING_META`,
+`EQUIPMENT_TYPES`. Persisting invented data buys nothing.
+
+**Reports are no longer among them.** `src/lib/reporting.ts` computes all three
+kinds from live `requests`, `equipmentUnits` and `equipmentHistory`, and a
+generated report is written to the `reports` collection with its figures
+snapshotted — a report is a record of what was true for its period, so
+reopening it later must show the same numbers. `Report` carries
+`periodStart` / `periodEnd`; the old `period` label alone could not be
+recomputed or audited. Expect thin figures until the app has been used: cost
+coverage reports the share of resolved requests actually carrying a figure,
+which is the honest headline while that share is low.
 
 **Historical Records is no longer among them.** It reads `logBook` through
 `useLogHistory()` — its own 90-day subscription, because the shared feed's

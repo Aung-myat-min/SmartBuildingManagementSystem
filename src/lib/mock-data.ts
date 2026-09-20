@@ -3,11 +3,7 @@
 // device in alarm; app-state.tsx layers this session's changes on top as
 // overrides, and no longer scripts anything.
 
-import {
-  countEscalated,
-  countOpenRequests,
-  ESCALATION_WINDOW_HOURS,
-} from "./derive";
+import { countEscalated, countOpenRequests } from "./derive";
 import type {
   Building,
   EnvironmentalSensor,
@@ -16,8 +12,6 @@ import type {
   EquipmentUnit,
   LogBookEntry,
   MaintenanceRequest,
-  Report,
-  ReportDetail,
   Room,
   SensorStatusDef,
   SensorTypeDef,
@@ -275,7 +269,7 @@ export const EQUIPMENT_TYPES: EquipmentTypeDef[] = [
   { id: "ceiling-lights", label: "Ceiling lights" },
 ];
 
-function typeLabel(typeId: string): string {
+export function typeLabel(typeId: string): string {
   return EQUIPMENT_TYPES.find((t) => t.id === typeId)?.label ?? typeId;
 }
 
@@ -1502,213 +1496,3 @@ export const LOG_BOOK_SOURCE_META: Record<
 };
 
 // Reports
-
-export const REPORTS: Report[] = [
-  {
-    id: "RPT-2608-216",
-    kind: "maintenance-performance",
-    period: "August 2026",
-    buildingId: "b216",
-    generatedAt: "2026-09-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "ready",
-  },
-  {
-    id: "RPT-2608-209",
-    kind: "maintenance-performance",
-    period: "August 2026",
-    buildingId: "b209",
-    generatedAt: "2026-09-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "ready",
-  },
-  {
-    id: "RPT-2608-JSQ",
-    kind: "maintenance-performance",
-    period: "August 2026",
-    buildingId: "jsq",
-    generatedAt: "2026-09-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "ready",
-  },
-  {
-    id: "RPT-2608-EST",
-    kind: "maintenance-performance",
-    period: "August 2026",
-    generatedAt: "2026-09-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "ready",
-  },
-  {
-    id: "RPT-2608-REL",
-    kind: "equipment-reliability",
-    period: "August 2026",
-    generatedAt: "2026-09-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "ready",
-  },
-  {
-    id: "RPT-2608-CST",
-    kind: "cost-of-maintenance",
-    period: "August 2026",
-    generatedAt: "2026-09-02T00:00:00Z",
-    generatedBy: "Daw Htun",
-    status: "ready",
-  },
-  {
-    id: "RPT-2609-ADH",
-    kind: "equipment-reliability",
-    period: "01–08 Sep 2026",
-    buildingId: "b216",
-    generatedAt: "2026-09-08T00:00:00Z",
-    generatedBy: "Elysha",
-    status: "ready",
-  },
-  {
-    id: "RPT-2607-216",
-    kind: "maintenance-performance",
-    period: "July 2026",
-    buildingId: "b216",
-    generatedAt: "2026-08-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "ready",
-  },
-  {
-    id: "RPT-2607-EST",
-    kind: "maintenance-performance",
-    period: "July 2026",
-    generatedAt: "2026-08-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "ready",
-  },
-  {
-    id: "RPT-2607-REL",
-    kind: "equipment-reliability",
-    period: "July 2026",
-    buildingId: "b209",
-    generatedAt: "2026-08-01T00:00:00Z",
-    generatedBy: "Su Myat",
-    status: "ready",
-  },
-  {
-    id: "RPT-2607-CST",
-    kind: "cost-of-maintenance",
-    period: "July 2026",
-    generatedAt: "2026-08-03T00:00:00Z",
-    generatedBy: "Daw Htun",
-    status: "ready",
-  },
-  {
-    id: "RPT-2606-EST",
-    kind: "maintenance-performance",
-    period: "June 2026",
-    generatedAt: "2026-07-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "archived",
-  },
-  {
-    id: "RPT-2609-EST",
-    kind: "maintenance-performance",
-    period: "September 2026",
-    generatedAt: "2026-10-01T00:00:00Z",
-    generatedBy: "System · schedule",
-    status: "scheduled",
-  },
-];
-
-export function reportDetail(report: Report): ReportDetail {
-  // Deterministic per-report figures so numbers stay stable across renders.
-  const seed = Array.from(report.id).reduce((a, c) => a + c.charCodeAt(0), 0);
-  const rnd = seededRandom(seed * 7919);
-  const scope = report.buildingId
-    ? buildingName(report.buildingId)
-    : "Whole estate";
-
-  const weeks = ["Wk 1", "Wk 2", "Wk 3", "Wk 4", "Wk 5"].map((label) => {
-    const resolved = 8 + Math.floor(rnd() * 14);
-    const carriedOver = Math.floor(rnd() * 5);
-    return { label, resolved, carriedOver };
-  });
-
-  const faultTypes = EQUIPMENT_TYPES.slice(0, 5)
-    .map((t) => ({
-      typeLabel: t.label,
-      count: 1 + Math.floor(rnd() * 9),
-    }))
-    .sort((a, b) => b.count - a.count);
-
-  const offenderUnits = EQUIPMENT_UNITS.filter((u) =>
-    report.buildingId ? u.buildingId === report.buildingId : true,
-  ).slice(0, 5);
-  const offenders = offenderUnits
-    .map((u) => ({
-      tag: u.tag,
-      unitLabel: `${typeLabel(u.typeId)} — ${roomLabel(u.roomId)}`,
-      faults: 1 + Math.floor(rnd() * 6),
-      downtimeHours: 2 + Math.floor(rnd() * 40),
-      costMmk: 20000 + Math.floor(rnd() * 400000),
-    }))
-    .sort((a, b) => b.faults - a.faults);
-
-  const partsCost = 420000 + Math.floor(rnd() * 300000);
-  const laborCost = 260000 + Math.floor(rnd() * 200000);
-  const contractorCost = 180000 + Math.floor(rnd() * 250000);
-  const total = partsCost + laborCost + contractorCost;
-  const budgetMmk = Math.round(total * (1.05 + rnd() * 0.25));
-
-  const totalResolved = weeks.reduce((a, w) => a + w.resolved, 0);
-  const totalCarried = weeks.reduce((a, w) => a + w.carriedOver, 0);
-  const resolutionRate = Math.round(
-    (totalResolved / (totalResolved + totalCarried)) * 100,
-  );
-
-  return {
-    ...report,
-    kpis: [
-      {
-        label: "RESOLVED WITHIN 24H",
-        value: resolutionRate,
-        unit: "%",
-        target: 90,
-        compare: "gte",
-        targetLabel: "Target ≥ 90%",
-      },
-      {
-        label: "AVG. RESPONSE TIME",
-        value: Math.round(40 + rnd() * 200) / 10,
-        unit: "hrs",
-        target: ESCALATION_WINDOW_HOURS,
-        compare: "lte",
-        targetLabel: `Target ≤ ${ESCALATION_WINDOW_HOURS}h`,
-      },
-      {
-        label: "ESCALATION RATE",
-        value: Math.round(rnd() * 180) / 10,
-        unit: "%",
-        target: 10,
-        compare: "lt",
-        targetLabel: "Target < 10%",
-      },
-      {
-        label: "SPEND AGAINST BUDGET",
-        value: Math.round((total / budgetMmk) * 1000) / 10,
-        unit: "%",
-        target: 100,
-        compare: "lte",
-        targetLabel: "Target ≤ 100%",
-      },
-    ],
-    weeks,
-    faultTypes,
-    offenders,
-    costs: [
-      { label: "Parts", valueMmk: partsCost },
-      { label: "Labour", valueMmk: laborCost },
-      { label: "Contractors", valueMmk: contractorCost },
-      { label: "Total", valueMmk: total, isTotal: true },
-    ],
-    budgetMmk,
-    spentMmk: total,
-    notes: `${scope} — ${report.period}. Figures are drawn from resolved and in-progress maintenance requests plus scheduled contractor visits recorded in the Log Book for the period. Costs are estimated from parts, labour and contractor invoices on file; treat as indicative until finance reconciles the month.`,
-  };
-}

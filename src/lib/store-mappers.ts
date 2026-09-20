@@ -12,6 +12,7 @@ import type {
   EquipmentUnit,
   LogBookEntry,
   MaintenanceRequest,
+  ReportDetail,
   Room,
   SensorTypeDef,
 } from "@/lib/types";
@@ -173,5 +174,33 @@ export function toRequest(
     verificationRequested: d.verificationRequested,
     withdrawn: d.withdrawn,
     costMmk: d.costMmk,
+  };
+}
+
+export function toReport(
+  id: string,
+  data: Record<string, unknown>,
+): ReportDetail {
+  const d = data as Partial<ReportDetail>;
+  return {
+    id,
+    kind: d.kind ?? "maintenance-performance",
+    period: d.period ?? "",
+    periodStart: d.periodStart ?? "",
+    periodEnd: d.periodEnd ?? "",
+    buildingId: d.buildingId,
+    generatedAt: d.generatedAt ?? "",
+    generatedBy: d.generatedBy ?? "System",
+    status: d.status ?? "ready",
+    // The snapshot. A report written before a section existed simply has none
+    // of it, which renders as an empty section rather than a crash.
+    kpis: d.kpis ?? [],
+    weeks: d.weeks ?? [],
+    faultTypes: d.faultTypes ?? [],
+    offenders: d.offenders ?? [],
+    costs: d.costs ?? [],
+    budgetMmk: d.budgetMmk,
+    spentMmk: d.spentMmk ?? 0,
+    notes: d.notes ?? "",
   };
 }

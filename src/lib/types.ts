@@ -133,6 +133,8 @@ export type EquipmentHistoryEventType =
 
 export interface EquipmentHistoryEvent {
   id: string;
+  /** What the work cost, where the form collected one. Feeds the cost report. */
+  costMmk?: number;
   equipmentUnitId: string;
   type: EquipmentHistoryEventType;
   at: string; // ISO timestamp
@@ -374,7 +376,13 @@ export type ReportStatus = "ready" | "scheduled" | "archived";
 export interface Report {
   id: string;
   kind: ReportKind;
-  period: string; // e.g. "August 2026" or "01–08 Sep 2026"
+  period: string; // the label, e.g. "August 2026" or "01–08 Sep 2026"
+  /**
+   * The range the figures were computed over. The label alone cannot be
+   * recomputed or audited, and the generate form has always collected these.
+   */
+  periodStart: string; // ISO date
+  periodEnd: string; // ISO date, inclusive
   buildingId?: string; // absent = whole estate
   generatedAt: string; // ISO timestamp
   generatedBy: string; // "System · schedule" or a person's name
@@ -408,6 +416,8 @@ export interface ReportOffender {
   unitLabel: string;
   faults: number;
   downtimeHours: number;
+  /** The fault has no return-to-service yet, so the downtime is still running. */
+  ongoing?: boolean;
   costMmk: number;
 }
 
@@ -423,7 +433,12 @@ export interface ReportDetail extends Report {
   faultTypes: ReportFaultType[];
   offenders: ReportOffender[];
   costs: ReportCostLine[];
-  budgetMmk: number;
+  /**
+   * Absent, and the budget bar is not drawn. Nothing in this app holds a
+   * budget; inventing one inside an otherwise real report would be worse than
+   * omitting it.
+   */
+  budgetMmk?: number;
   spentMmk: number;
   notes: string;
 }

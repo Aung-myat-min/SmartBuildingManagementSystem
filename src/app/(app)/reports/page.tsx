@@ -29,8 +29,24 @@ import {
 import { useAppState } from "@/lib/app-state";
 import { kpiPasses, nextSequentialId } from "@/lib/derive";
 import { printToPdf, stampedFilename, toCsv } from "@/lib/export";
+import type { WriteResult } from "@/lib/firestore-store";
 import { formatDate, formatMmk, formatPeriod } from "@/lib/format";
-import { buildingName, REPORTS, reportDetail } from "@/lib/mock-data";
+import { buildingName, equipmentUnitLabel, typeLabel } from "@/lib/mock-data";
+import { buildReport } from "@/lib/reporting";
+
+/**
+ * What each kind shows. Every report used to render all five sections, which
+ * was invisible while the figures were noise and obvious the moment a section
+ * could legitimately come back empty — a maintenance report has no cost
+ * breakdown to show.
+ */
+const SECTIONS: Record<ReportKind, readonly Section[]> = {
+  "maintenance-performance": ["kpis", "weeks", "offenders"],
+  "equipment-reliability": ["kpis", "faultTypes", "offenders"],
+  "cost-of-maintenance": ["kpis", "costs"],
+};
+type Section = "kpis" | "weeks" | "faultTypes" | "offenders" | "costs";
+
 import { canAccessReports, roleLabel } from "@/lib/permissions";
 import type {
   Report,
@@ -137,28 +153,35 @@ function reportCsv(detail: ReportDetail): string {
   return sections.join("\r\n");
 }
 
-function downloadReportCsv(report: Report): void {
-  const detail = reportDetail(report);
+function downloadReportCsv(detail: ReportDetail): void {
   const blob = new Blob([`\uFEFF${reportCsv(detail)}`], {
     type: "text/csv;charset=utf-8",
   });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = stampedFilename(report.id.toLowerCase());
+  link.download = stampedFilename(detail.id.toLowerCase());
   link.click();
   URL.revokeObjectURL(url);
 }
 
 export default function ReportsPage() {
-  const { buildings, role, log } = useAppState();
+  const {
+    buildings,
+    role,
+    currentUser,
+    reports,
+    addReport,
+    requests,
+    equipmentUnits,
+    equipmentHistory,
+  } = useAppState();
 
   const [query, setQuery] = React.useState("");
   const [buildingFilter, setBuildingFilter] = React.useState("all");
   const [kindFilter, setKindFilter] = React.useState<"all" | ReportKind>("all");
   const [range, setRange] = React.useState<DateRange>(EMPTY_RANGE);
   const [genOpen, setGenOpen] = React.useState(false);
-  const [extra, setExtra] = React.useState<Report[]>([]);
   const [openReportId, setOpenReportId] = React.useState<string | null>(null);
   // Set by the library card's PDF button, cleared once the detail view has
   // rendered and printed.
@@ -178,7 +201,7 @@ export default function ReportsPage() {
     );
   }
 
-  const all = [...extra, ...REPORTS];
+  const all = reports;
   const filtered = all.filter((r) => {
     if (buildingFilter !== "all" && (r.buildingId ?? "all") !== buildingFilter)
       return false;
@@ -263,7 +286,11 @@ export default function ReportsPage() {
       </div>
 
       {groups.length === 0 && (
-        <EmptyState className="p-6">No reports match these filters.</EmptyState>
+        <EmptyState className="p-6">
+          {all.length === 0
+            ? "No reports yet. Generate one from a date range and it is saved here."
+            : "No reports match these filters."}
+        </EmptyState>
       )}
 
       {groups.map((g) => (
@@ -356,21 +383,27 @@ export default function ReportsPage() {
         open={genOpen}
         onOpenChange={setGenOpen}
         existingIds={all.map((r) => r.id)}
-        onGenerate={(r) => {
-          setExtra((prev) => [r, ...prev]);
-          log({
-            source: "admin",
-            actionType: "report-generated",
-            title: "Report generated",
-            detail: `${r.id} — ${r.kind.replace(/-/g, " ")}, ${r.period}${r.buildingId ? `, ${buildingName(r.buildingId)}` : ", whole estate"}.`,
-            targetType: "report",
-            targetId: r.id,
-            buildingId: r.buildingId,
-            refId: r.id,
+        currentUser={currentUser}
+        onGenerate={async (meta) => {
+          // Computed once, here, and stored with the report. A report is a
+          // record of what was true for its period, so reopening it next month
+          // has to show the same figures.
+          const figures = buildReport(meta.kind, {
+            requests,
+            units: equipmentUnits,
+            history: equipmentHistory,
+            periodStart: meta.periodStart,
+            periodEnd: meta.periodEnd,
+            buildingId: meta.buildingId,
+            typeLabel,
+            unitLabel: equipmentUnitLabel,
           });
-          toast.success(`${r.id} generated`, {
-            description: "Visible in this session only.",
+          const written = await addReport({ ...meta, ...figures });
+          if (!written.ok) return written;
+          toast.success(`${meta.id} generated`, {
+            description: "Saved to the report library.",
           });
+          return written;
         }}
       />
     </div>
@@ -387,15 +420,17 @@ function GenerateReportSheet({
   open,
   onOpenChange,
   existingIds,
+  currentUser,
   onGenerate,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Every id already in use, so a new one cannot collide with one of them. */
   existingIds: string[];
-  onGenerate: (r: Report) => void;
+  currentUser: { name: string };
+  onGenerate: (r: Report) => Promise<WriteResult>;
 }) {
-  const { buildings, currentUser } = useAppState();
+  const { buildings } = useAppState();
   const [kind, setKind] = React.useState<ReportKind>("maintenance-performance");
   const [buildingId, setBuildingId] = React.useState("all");
   // A report covers whatever range someone picks, rather than the three
@@ -403,6 +438,7 @@ function GenerateReportSheet({
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+  const [pending, setPending] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -486,7 +522,8 @@ function GenerateReportSheet({
         <div className="mt-2 flex gap-2 px-4">
           <Button
             className="flex-1"
-            onClick={() => {
+            disabled={pending}
+            onClick={async () => {
               if (!from || !to) {
                 setError("A report needs a start and an end date.");
                 return;
@@ -495,15 +532,24 @@ function GenerateReportSheet({
                 setError("The start date is after the end date.");
                 return;
               }
-              onGenerate({
+              setError(null);
+              setPending(true);
+              const written = await onGenerate({
                 id: nextSequentialId("RPT", existingIds, 1000),
                 kind,
                 period,
+                periodStart: from,
+                periodEnd: to,
                 buildingId: buildingId === "all" ? undefined : buildingId,
                 generatedAt: new Date().toISOString(),
                 generatedBy: currentUser.name,
                 status: "ready",
               });
+              setPending(false);
+              if (!written.ok) {
+                setError(written.message);
+                return;
+              }
               onOpenChange(false);
             }}
           >
@@ -541,12 +587,13 @@ function ReportDetailView({
   onPrinted,
   onBack,
 }: {
-  report: Report;
+  report: ReportDetail;
   printOnOpen: boolean;
   onPrinted: () => void;
   onBack: () => void;
 }) {
-  const detail = React.useMemo(() => reportDetail(report), [report]);
+  const detail = report;
+  const sections = SECTIONS[detail.kind];
 
   // The library's PDF button opens the report and prints it. Printing from an
   // effect rather than the click handler is what guarantees the page being
@@ -556,11 +603,12 @@ function ReportDetailView({
     onPrinted();
     printToPdf();
   }, [printOnOpen, onPrinted]);
-  const budgetPct = Math.min(
-    100,
-    Math.round((detail.spentMmk / detail.budgetMmk) * 100),
-  );
-  const overBudget = detail.spentMmk > detail.budgetMmk;
+  const budget = detail.budgetMmk;
+  const budgetPct =
+    budget === undefined
+      ? 0
+      : Math.min(100, Math.round((detail.spentMmk / budget) * 100));
+  const overBudget = budget !== undefined && detail.spentMmk > budget;
 
   return (
     <div className="flex flex-col gap-4">
@@ -655,169 +703,183 @@ function ReportDetailView({
       </div>
 
       <div className="grid gap-3.5 xl:grid-cols-[1.35fr_1fr]">
-        <Card className="gap-3 p-4">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground font-mono text-[10px] tracking-wider">
-              REQUESTS BY WEEK
-            </span>
-            <div className="flex gap-3 text-[10.5px]">
-              <span className="flex items-center gap-1.5">
-                <span className="bg-success size-2 rounded-sm" /> Resolved
+        {sections.includes("weeks") && (
+          <Card className="gap-3 p-4">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground font-mono text-[10px] tracking-wider">
+                REQUESTS BY WEEK
               </span>
-              <span className="flex items-center gap-1.5">
-                <span className="bg-warning size-2 rounded-sm" /> Carried over
-              </span>
+              <div className="flex gap-3 text-[10.5px]">
+                <span className="flex items-center gap-1.5">
+                  <span className="bg-success size-2 rounded-sm" /> Resolved
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="bg-warning size-2 rounded-sm" /> Carried over
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="flex h-38 items-end gap-3">
-            {detail.weeks.map((w) => {
-              const total = w.resolved + w.carriedOver;
-              const max = Math.max(
-                ...detail.weeks.map((x) => x.resolved + x.carriedOver),
-                1,
-              );
-              return (
-                <div
-                  key={w.label}
-                  className="flex flex-1 flex-col items-center gap-1.5"
-                  title={`${w.label}: ${w.resolved} resolved, ${w.carriedOver} carried over`}
-                >
-                  <span className="text-muted-foreground font-mono text-[10px]">
-                    {total}
-                  </span>
+            <div className="flex h-38 items-end gap-3">
+              {detail.weeks.map((w) => {
+                const total = w.resolved + w.carriedOver;
+                const max = Math.max(
+                  ...detail.weeks.map((x) => x.resolved + x.carriedOver),
+                  1,
+                );
+                return (
                   <div
-                    className="flex w-full flex-col justify-end gap-0.5"
-                    style={{ height: `${Math.round((total / max) * 96)}px` }}
+                    key={w.label}
+                    className="flex flex-1 flex-col items-center gap-1.5"
+                    title={`${w.label}: ${w.resolved} resolved, ${w.carriedOver} carried over`}
                   >
+                    <span className="text-muted-foreground font-mono text-[10px]">
+                      {total}
+                    </span>
                     <div
-                      className="bg-warning w-full rounded-t-[2px]"
-                      style={{ height: `${(w.carriedOver / total) * 100}%` }}
-                    />
-                    <div
-                      className="bg-success w-full rounded-b-[2px]"
-                      style={{ height: `${(w.resolved / total) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-muted-foreground font-mono text-[9.5px]">
-                    {w.label}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
-
-        <Card className="gap-3 p-4">
-          <span className="text-muted-foreground font-mono text-[10px] tracking-wider">
-            FAULTS BY EQUIPMENT TYPE
-          </span>
-          <div className="flex flex-col gap-2.5">
-            {detail.faultTypes.map((f, i) => {
-              const max = Math.max(...detail.faultTypes.map((x) => x.count));
-              return (
-                <div key={f.typeLabel}>
-                  <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
-                    <span className="font-[450]">{f.typeLabel}</span>
-                    <span className="text-neutral-foreground font-mono font-medium">
-                      {f.count}
+                      className="flex w-full flex-col justify-end gap-0.5"
+                      style={{ height: `${Math.round((total / max) * 96)}px` }}
+                    >
+                      <div
+                        className="bg-warning w-full rounded-t-[2px]"
+                        style={{ height: `${(w.carriedOver / total) * 100}%` }}
+                      />
+                      <div
+                        className="bg-success w-full rounded-b-[2px]"
+                        style={{ height: `${(w.resolved / total) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-muted-foreground font-mono text-[9.5px]">
+                      {w.label}
                     </span>
                   </div>
-                  <div className="bg-rule mt-1.5 h-1.75 overflow-hidden rounded-[2px]">
-                    <div
-                      className={cn(
-                        "h-full rounded-[2px]",
-                        FAULT_BARS[i % FAULT_BARS.length],
-                      )}
-                      style={{ width: `${(f.count / max) * 100}%` }}
-                    />
+                );
+              })}
+            </div>
+          </Card>
+        )}
+
+        {sections.includes("faultTypes") && (
+          <Card className="gap-3 p-4">
+            <span className="text-muted-foreground font-mono text-[10px] tracking-wider">
+              FAULTS BY EQUIPMENT TYPE
+            </span>
+            <div className="flex flex-col gap-2.5">
+              {detail.faultTypes.map((f, i) => {
+                const max = Math.max(...detail.faultTypes.map((x) => x.count));
+                return (
+                  <div key={f.typeLabel}>
+                    <div className="flex items-baseline justify-between gap-2 text-[11.5px]">
+                      <span className="font-[450]">{f.typeLabel}</span>
+                      <span className="text-neutral-foreground font-mono font-medium">
+                        {f.count}
+                      </span>
+                    </div>
+                    <div className="bg-rule mt-1.5 h-1.75 overflow-hidden rounded-[2px]">
+                      <div
+                        className={cn(
+                          "h-full rounded-[2px]",
+                          FAULT_BARS[i % FAULT_BARS.length],
+                        )}
+                        style={{ width: `${(f.count / max) * 100}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        </Card>
+                );
+              })}
+            </div>
+          </Card>
+        )}
       </div>
 
       <div className="grid gap-3.5 xl:grid-cols-[1.35fr_1fr]">
-        <Card className="gap-0 overflow-hidden p-0">
-          <div className="border-border border-b px-4 py-2.5">
-            <span className="text-muted-foreground font-mono text-[10px] tracking-wider">
-              WORST OFFENDERS
-            </span>
-          </div>
-          <div className="bg-surface-subtle border-border text-muted-foreground flex border-b px-4 py-2 font-mono text-[10px] tracking-wider">
-            <span className="w-24">TAG</span>
-            <span className="flex-1">UNIT</span>
-            <span className="w-16 text-right">FAULTS</span>
-            <span className="w-22 text-right">DOWNTIME</span>
-            <span className="w-24 text-right">COST</span>
-          </div>
-          {detail.offenders.map((o) => (
-            <div
-              key={o.tag}
-              className="border-border flex items-center border-b px-4 py-2 text-[12px] last:border-b-0"
-            >
-              <span className="text-primary w-24 font-mono text-[11px] font-medium">
-                {o.tag}
-              </span>
-              <span className="flex-1 truncate pr-2">{o.unitLabel}</span>
-              <span className="text-danger-foreground w-16 text-right font-mono font-medium">
-                {o.faults}
-              </span>
-              <span className="text-muted-foreground w-22 text-right font-mono">
-                {o.downtimeHours}h
-              </span>
-              <span className="text-muted-foreground w-24 text-right font-mono">
-                {formatMmk(o.costMmk)}
+        {sections.includes("offenders") && (
+          <Card className="gap-0 overflow-hidden p-0">
+            <div className="border-border border-b px-4 py-2.5">
+              <span className="text-muted-foreground font-mono text-[10px] tracking-wider">
+                WORST OFFENDERS
               </span>
             </div>
-          ))}
-        </Card>
-
-        <Card className="gap-0 overflow-hidden p-0">
-          <div className="border-border border-b px-4 py-2.5">
-            <span className="text-muted-foreground font-mono text-[10px] tracking-wider">
-              COST OF MAINTENANCE
-            </span>
-          </div>
-          <div className="flex flex-col px-4 py-2">
-            {detail.costs.map((c) => (
+            <div className="bg-surface-subtle border-border text-muted-foreground flex border-b px-4 py-2 font-mono text-[10px] tracking-wider">
+              <span className="w-24">TAG</span>
+              <span className="flex-1">UNIT</span>
+              <span className="w-16 text-right">FAULTS</span>
+              <span className="w-22 text-right">DOWNTIME</span>
+              <span className="w-24 text-right">COST</span>
+            </div>
+            {detail.offenders.map((o) => (
               <div
-                key={c.label}
-                className={cn(
-                  "flex justify-between py-1.5 text-[12.5px]",
-                  c.isTotal && "border-border mt-1 border-t pt-2 font-semibold",
-                )}
+                key={o.tag}
+                className="border-border flex items-center border-b px-4 py-2 text-[12px] last:border-b-0"
               >
-                <span>{c.label}</span>
-                <span className="font-mono">{formatMmk(c.valueMmk)}</span>
+                <span className="text-primary w-24 font-mono text-[11px] font-medium">
+                  {o.tag}
+                </span>
+                <span className="flex-1 truncate pr-2">{o.unitLabel}</span>
+                <span className="text-danger-foreground w-16 text-right font-mono font-medium">
+                  {o.faults}
+                </span>
+                <span className="text-muted-foreground w-22 text-right font-mono">
+                  {o.downtimeHours}h
+                </span>
+                <span className="text-muted-foreground w-24 text-right font-mono">
+                  {formatMmk(o.costMmk)}
+                </span>
               </div>
             ))}
-          </div>
-          <div className="bg-surface-subtle border-border border-t px-4 py-3">
-            <div className="flex justify-between text-[11px]">
-              <span className="text-muted-foreground">AGAINST BUDGET</span>
-              <span
-                className={
-                  overBudget
-                    ? "text-danger-foreground font-medium"
-                    : "text-success-foreground font-medium"
-                }
-              >
-                {budgetPct}% of {formatMmk(detail.budgetMmk)}
+          </Card>
+        )}
+
+        {sections.includes("costs") && (
+          <Card className="gap-0 overflow-hidden p-0">
+            <div className="border-border border-b px-4 py-2.5">
+              <span className="text-muted-foreground font-mono text-[10px] tracking-wider">
+                COST OF MAINTENANCE
               </span>
             </div>
-            <div className="bg-muted mt-1.5 h-2 overflow-hidden rounded-full">
-              <div
-                className={cn(
-                  "h-full rounded-full",
-                  overBudget ? "bg-danger" : "bg-success",
-                )}
-                style={{ width: `${Math.min(100, budgetPct)}%` }}
-              />
+            <div className="flex flex-col px-4 py-2">
+              {detail.costs.map((c) => (
+                <div
+                  key={c.label}
+                  className={cn(
+                    "flex justify-between py-1.5 text-[12.5px]",
+                    c.isTotal &&
+                      "border-border mt-1 border-t pt-2 font-semibold",
+                  )}
+                >
+                  <span>{c.label}</span>
+                  <span className="font-mono">{formatMmk(c.valueMmk)}</span>
+                </div>
+              ))}
             </div>
-          </div>
-        </Card>
+            {/* Drawn only when a budget exists. Nothing in this app holds one
+              yet, so inventing a bar to fill the space would be the report
+              lying about a number nobody supplied. */}
+            {budget !== undefined && (
+              <div className="bg-surface-subtle border-border border-t px-4 py-3">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-muted-foreground">AGAINST BUDGET</span>
+                  <span
+                    className={
+                      overBudget
+                        ? "text-danger-foreground font-medium"
+                        : "text-success-foreground font-medium"
+                    }
+                  >
+                    {budgetPct}% of {formatMmk(budget)}
+                  </span>
+                </div>
+                <div className="bg-muted mt-1.5 h-2 overflow-hidden rounded-full">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      overBudget ? "bg-danger" : "bg-success",
+                    )}
+                    style={{ width: `${Math.min(100, budgetPct)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </Card>
+        )}
       </div>
 
       <Card className="gap-2 p-4">
