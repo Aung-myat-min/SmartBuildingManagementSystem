@@ -1,19 +1,14 @@
 "use client";
 
-// ============================================================================
 // The asset register and its history.
 //
-// One module for two collections because every write crosses them: recording
-// a service moves the unit's dates *and* appends the row that says so, and
-// deleting a unit takes its history with it. A unit whose dates moved without
-// a history row would be the drawer quietly lying about what happened to it.
+// One module for two collections because every write crosses them: a service
+// moves the unit's dates *and* appends the row saying so, and deleting a unit
+// takes its history with it.
 //
-// Photos live at `equipmentUnits/{id}/media/photo` rather than on the unit.
-// On the unit, every subscriber would download every photo on the first
-// snapshot and re-download one whenever any field on that unit changed — a
-// condition flip would re-send the image. In a subcollection they are fetched
-// once, when a drawer opens.
-// ============================================================================
+// Photos live at `equipmentUnits/{id}/media/photo`, not on the unit — on the
+// unit every subscriber would download every photo on first snapshot, and a
+// condition flip would re-send the image.
 
 import {
   addDoc,
@@ -161,7 +156,7 @@ export async function moveUnitWrite(
   }
 }
 
-// ---- Photos ----------------------------------------------------------------
+// Photos
 
 function photoRef(unitId: string) {
   return doc(db, COLLECTIONS.equipmentUnits, unitId, "media", "photo");

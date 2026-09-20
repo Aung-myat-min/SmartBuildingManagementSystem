@@ -1,25 +1,12 @@
-// ============================================================================
-// Seeds the three sign-in accounts and the eight user profile documents.
-//
-// This is the EMULATOR path (Admin SDK, no credentials needed). For a live
-// project use scripts/bootstrap-live.mjs instead.
-//
-// Run it against the emulator suite:
+// Seeds the sign-in accounts and user profiles — the EMULATOR path (Admin SDK,
+// no credentials). Use scripts/bootstrap-live.mjs against a real project.
 //
 //   npx firebase-tools emulators:start --only auth,firestore
 //   node scripts/seed-users.mjs
 //
-// Against a real project, create the three accounts and their documents by
-// hand in the Firebase console instead. The rules cannot bootstrap themselves:
-// `allow create` on /users reads the actor's own /users doc to find their role,
-// and before the first CEO document exists there is no role to find.
-//
-// Identities are taken from the mock corpus so the seeded Log Book and request
-// history still refer to people who exist. `legacyUid` is what joins a real
-// Firebase uid back to the mock `submittedBy` / `actorUid` values — without it
-// no seeded request is withdrawable or verifiable by the person who raised it.
-// It goes when the data migrates.
-// ============================================================================
+// The rules cannot bootstrap themselves: `allow create` on /users reads the
+// actor's own /users doc for their role, and before the first CEO document
+// exists there is no role to find.
 
 import { cert, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";

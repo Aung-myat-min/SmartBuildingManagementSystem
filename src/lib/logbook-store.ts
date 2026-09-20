@@ -1,11 +1,9 @@
 "use client";
 
-// ============================================================================
 // The Log Book — the first collection to leave memory, and deliberately the
 // smallest: append-only, one writer, no merge, no override, nothing points at
 // it. What it buys immediately is that every later stage of the migration is
 // observable in a trail that survives a reload.
-// ============================================================================
 
 import {
   addDoc,

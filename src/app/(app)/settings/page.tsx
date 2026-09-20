@@ -149,7 +149,7 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ---- Profile -----------------------------------------------------------
+// Profile
 
 function ProfileSection({
   name,
@@ -268,7 +268,7 @@ function ProfileSection({
   );
 }
 
-// ---- Appearance ----------------------------------------------------------
+// Appearance
 
 const THEMES = [
   {
@@ -401,7 +401,7 @@ function AppearanceSection() {
   );
 }
 
-// ---- Security --------------------------------------------------------------
+// Security
 
 function SecuritySection() {
   const { currentUser, log } = useAppState();

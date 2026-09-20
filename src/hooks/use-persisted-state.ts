@@ -6,20 +6,13 @@ import { useAuth } from "@/lib/auth";
 const PREFIX = "sbm:";
 
 /**
- * State that survives a reload, kept in localStorage under one key.
+ * View state that survives a reload, in localStorage, keyed by the signed-in
+ * uid so two people sharing a browser do not share preferences.
  *
- * Use it for how a page is *shown* — which view is selected, what is
- * collapsed, how a list is sorted. Not for what is being *looked at*: search
- * text and data filters are task-scoped, and silently restoring them leaves
- * someone staring at a filtered list wondering where their records went.
- *
- * The stored value is read after mount rather than during render, because the
- * server has no localStorage and a value read during render would make the
- * prerendered HTML and the first client render disagree.
- *
- * Keys carry the signed-in uid. Two people sharing a browser otherwise share
- * every view preference, and an Admin Manager would inherit whichever tab the
- * last person left Administration on.
+ * For how a page is *shown* — selected view, collapsed sections, sort order —
+ * not what is being looked at: restoring filters leaves someone staring at a
+ * list with records apparently missing. Read after mount, never during render;
+ * the server has no localStorage and the mismatch breaks hydration.
  */
 export function usePersistedState<T>(
   key: string,

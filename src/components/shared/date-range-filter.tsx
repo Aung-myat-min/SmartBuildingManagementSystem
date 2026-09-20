@@ -13,12 +13,10 @@ export interface DateRange {
 export const EMPTY_RANGE: DateRange = { from: "", to: "" };
 
 /**
- * From/to bounds on a toolbar. Native date inputs rather than a built picker:
- * they carry the platform's own calendar and keyboard handling, they cost no
- * dependency, and an empty value is simply an open end.
- *
- * `withTime` switches to datetime-local, for the screens where the hour
- * discriminates — a Log Book shift does, a report's generation day does not.
+ * From/to bounds on a toolbar. Native date inputs, so the platform's own
+ * calendar and keyboard handling come free and an empty value is an open end.
+ * `withTime` switches to datetime-local where the hour matters — a Log Book
+ * shift does, a report's generation day does not.
  */
 export function DateRangeFilter({
   value,

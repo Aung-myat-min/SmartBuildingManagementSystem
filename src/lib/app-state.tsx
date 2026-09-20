@@ -631,7 +631,7 @@ export function AppStateProvider({
     [log, sensors],
   );
 
-  // ---- Sensor type registry ------------------------------------------------
+  // Sensor type registry
   //
   // Every guard below is about records that already point at what is being
   // changed. The registry is free to grow; it is not free to strand a sensor.
@@ -833,7 +833,7 @@ export function AppStateProvider({
     [patchType],
   );
 
-  // ---- Estate ---------------------------------------------------------------
+  // Estate
 
   const addBuilding = React.useCallback(
     (building: Building) => createBuilding(building),
@@ -940,7 +940,7 @@ export function AppStateProvider({
     [log, sensors],
   );
 
-  // ---- The asset register --------------------------------------------------
+  // The asset register
   //
   // Every write below that changes what happened to a unit also appends the
   // history row that says so, in one batch. A register whose dates moved

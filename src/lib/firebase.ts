@@ -1,15 +1,10 @@
-// ============================================================================
-// The one place the Firebase SDK is initialised.
+// The one place the Firebase SDK is initialised. Only lib/auth.tsx and the
+// store modules import it.
 //
-// **The config below is not a secret.** It ships in every client bundle by
-// design: it identifies the project, it does not grant anything. Authorisation
-// is `firestore.rules` plus the console's authorised-domains list. Do not
-// commit `.env.local`, but do not treat a leaked config as an incident either,
-// and do not try to "fix" this by hiding the key behind a server route — that
-// would buy nothing and cost the static build.
-//
-// Only `lib/auth.tsx` and the Firestore stores import this module.
-// ============================================================================
+// **The config is not a secret.** It ships in every client bundle by design:
+// it identifies the project, it grants nothing. Authorisation is
+// firestore.rules plus the authorised-domains list. Hiding the key behind a
+// server route would buy nothing and cost the static build.
 
 import {
   deleteApp,
@@ -55,15 +50,14 @@ if (!useEmulators && !firebaseConfig.apiKey) {
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
-// `ignoreUndefinedProperties` because the domain is full of optionals —
-// declineNote, lastServiceAt, buildingId on a non-staff account — and Firestore
-// rejects an `undefined` value outright rather than treating it as absent.
-// Without this every document builder would need its own strip pass.
+// `ignoreUndefinedProperties` because the domain is full of optionals and
+// Firestore rejects `undefined` outright rather than treating it as absent.
+// (Which also means undefined *skips* a field on update — clearing one needs
+// deleteField(). See requests-store.)
 //
-// initializeFirestore throws if the instance already exists, which Turbopack's
-// hot reload makes routine, so the second pass falls through to the existing
-// one. Checking getApps() here would not work: the app is created above, so it
-// is always non-empty by this line.
+// initializeFirestore throws if the instance exists, routine under hot reload,
+// so the second pass falls through. A getApps() check would not work: the app
+// is created above, so it is never empty by this line.
 export const db = (() => {
   try {
     return initializeFirestore(app, { ignoreUndefinedProperties: true });
@@ -82,12 +76,10 @@ if (useEmulators && !emulatorsWired) {
 }
 
 /**
- * A second, isolated app instance used only to create an account without
- * signing the current administrator out — `createUserWithEmailAndPassword`
- * signs in whoever it just created, and on the primary instance that means the
- * admin loses their session mid-task.
- *
- * The caller is responsible for tearing it down; see `releaseProvisionerApp`.
+ * A second, isolated instance for creating accounts.
+ * `createUserWithEmailAndPassword` signs in whoever it just created, which on
+ * the primary instance costs the administrator their session mid-task. The
+ * caller tears it down; see `releaseProvisionerApp`.
  */
 export function provisionerApp(): FirebaseApp {
   return initializeApp(firebaseConfig, "provisioner");

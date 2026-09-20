@@ -1,10 +1,8 @@
 "use client";
 
-// ============================================================================
 // Real file export. Both the Historical Records ledger and the Reports library
 // claimed to export and only raised a toast; this is the one implementation
 // they share, so a second caller cannot quietly diverge on quoting rules.
-// ============================================================================
 
 /** A column: its header, and how to read it off a row. */
 export interface CsvColumn<T> {

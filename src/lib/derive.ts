@@ -1,16 +1,10 @@
-// ============================================================================
 // Derived values.
 //
-// Six things in this product look like stored fields and are not: escalation,
-// due-service, offline, a status's current tone, open-request counts and
-// report KPI pass/fail. Whether a status counts as an alarm is no longer one
-// of them — it is a flag on the sensor type's registry entry. Storing the inputs and deriving these at read time means a
-// threshold change is an edit here, not a data migration.
-//
-// Every screen reads these helpers rather than re-implementing the rule, so
-// the sidebar badge, the toolbar chip, the building cards and the dashboard
-// tiles can never disagree with each other.
-// ============================================================================
+// Escalation, due-service, offline, a status's current tone, open-request
+// counts and KPI pass/fail look like stored fields and are not. Deriving them
+// at read time means a threshold change is an edit here, not a migration, and
+// every screen reads these rather than re-implementing the rule. (Whether a
+// status is an alarm is not here — that is `isAlarm` on the registry entry.)
 
 // This module stays free of data imports so mock-data (and later Firebase)
 // can apply the rules without a cycle: format -> derive -> data -> app-state.
@@ -26,7 +20,7 @@ import type {
   Tone,
 } from "./types";
 
-// ---- Thresholds ------------------------------------------------------------
+// Thresholds
 
 /** A high-priority request past this age, still open, is escalated. */
 export const ESCALATION_WINDOW_HOURS = 24;
@@ -34,7 +28,7 @@ export const ESCALATION_WINDOW_HOURS = 24;
 /** A healthy unit this close to its next service shows as due. */
 export const DUE_SERVICE_DAYS = 30;
 
-// ---- Requests --------------------------------------------------------------
+// Requests
 
 // Open means still owed to somebody. An unapproved request counts: nobody
 // has looked at it yet, which is the worst kind of outstanding, and a
@@ -93,7 +87,7 @@ export function countEscalated(
   ).length;
 }
 
-// ---- Equipment -------------------------------------------------------------
+// Equipment
 
 /** Board columns are the four conditions plus a computed fifth. */
 export type EquipmentBoardColumn = EquipmentCondition | "due-service";
@@ -144,14 +138,12 @@ export function boardColumnFor(
 }
 
 /**
- * The room-level running / faulty / under-maintenance split, counted off the
- * register rather than stored beside it.
+ * The running / faulty / under-maintenance split, counted off the register
+ * rather than stored beside it.
  *
- * There used to be a second table holding these numbers, authored separately
- * from the units, and the two had drifted: it claimed 24 desktop PCs nobody
- * had registered and an air conditioner in a room with no assets. Counting
- * makes `running + faulty + underMaintenance === total` true by construction
- * instead of by maintenance, and means marking a unit faulty moves the tile.
+ * A separate table of these numbers had drifted from the units it described.
+ * Counting makes `running + faulty + underMaintenance === total` true by
+ * construction, and means marking a unit faulty moves the tile.
  */
 export interface EquipmentBreakdown {
   running: number;
@@ -191,11 +183,9 @@ export function openRequestsForUnit(
 /**
  * The next id in a human-readable sequence — `REQ-4192`, `RPT-1043`.
  *
- * These used to be `prefix + Math.floor(base + Math.random() * 99)`: ninety-nine
- * slots, so a collision was near-certain within a session. In memory that was
- * invisible, because two records could share an id and still both render. As a
- * document id it would silently overwrite an existing record, so the id has to
- * be derived from what already exists rather than guessed.
+ * Derived from what exists, never guessed: these are document ids, so a
+ * collision silently overwrites a record rather than showing up as a
+ * duplicate. Pass every id including withdrawn ones.
  */
 export function nextSequentialId(
   prefix: string,
@@ -210,7 +200,7 @@ export function nextSequentialId(
   return `${prefix}-${next}`;
 }
 
-// ---- Sensors ---------------------------------------------------------------
+// Sensors
 
 /**
  * An offline device has stopped reporting, so it raises no alarms — screens
@@ -221,12 +211,10 @@ export function isSensorOffline(status: string): boolean {
 }
 
 /**
- * The colour a status is drawn in *now*. Most statuses have one tone for
- * good. A status carrying `escalateAfterMinutes` has two: it holds its
- * resting tone while the state is brief, then moves to `escalateTone` once
- * it has persisted — an unlocked door is blue for half an hour and amber
- * after that. `since` is when the sensor entered the status, not when it
- * last reported.
+ * The colour a status is drawn in *now*. One carrying `escalateAfterMinutes`
+ * has two: its resting tone while the state is brief, `escalateTone` once it
+ * persists — an unlocked door is blue for half an hour, amber after. `since`
+ * is when the sensor entered the status, not when it last reported.
  */
 export function statusTone(
   def: Pick<SensorStatusDef, "tone" | "escalateAfterMinutes" | "escalateTone">,
@@ -241,7 +229,7 @@ export function statusTone(
   return minutes >= escalateAfterMinutes ? escalateTone : def.tone;
 }
 
-// ---- Reports ---------------------------------------------------------------
+// Reports
 
 /** Pass or fail is the value measured against the target, never a stored flag. */
 export function kpiPasses(kpi: ReportKpi): boolean {

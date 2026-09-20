@@ -637,7 +637,7 @@ function ViewButton({
   );
 }
 
-// ---- Detail drawer ---------------------------------------------------------
+// Detail drawer
 
 function EquipmentDrawer({
   unit,

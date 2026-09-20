@@ -1,21 +1,12 @@
-// ============================================================================
-// One-time bootstrap for a LIVE Firebase project.
-//
-// The security rules cannot bootstrap themselves: `allow create` on /users
-// reads the actor's own /users document to find their role, and before the
-// first CEO document exists there is no role to find. So the very first
-// documents have to be written while the rules are still permissive — i.e.
-// before `firebase deploy --only firestore:rules`.
+// One-time bootstrap for a LIVE Firebase project. Client SDK, so no
+// service-account key: creating an account is an open operation.
 //
 //   1. node scripts/bootstrap-live.mjs      ← you are here
 //   2. npx firebase-tools deploy --only firestore:rules
 //
-// Run it the other way round and this script gets PERMISSION_DENIED.
-//
-// Unlike scripts/seed-users.mjs (which uses the Admin SDK against the emulator
-// and needs no credentials), this uses the ordinary client SDK: creating an
-// account is an open operation, so no service-account key is required.
-// ============================================================================
+// That order matters. The rules cannot bootstrap themselves — `allow create`
+// on /users reads the actor's own role — so run it the other way round and
+// this gets PERMISSION_DENIED.
 
 import { readFileSync } from "node:fs";
 import { initializeApp } from "firebase/app";

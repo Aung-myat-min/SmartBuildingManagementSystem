@@ -108,7 +108,7 @@ export function canAccessLogBook(role: UserRole): boolean {
   return canAct(role);
 }
 
-// ---- Administration --------------------------------------------------------
+// Administration
 //
 // One page, two tabs, two different gates. The estate is the CEO's; accounts
 // are shared with the Admin Manager, who lands on User Accounts with the

@@ -1,12 +1,10 @@
 "use client";
 
-// ============================================================================
 // Buildings and rooms.
 //
 // One module for two collections because they are one domain and the writes
 // cross: deleting a building takes its rooms with it, in a batch, so the two
 // cannot half-happen.
-// ============================================================================
 
 import {
   collection,

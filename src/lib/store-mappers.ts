@@ -1,12 +1,8 @@
-// ============================================================================
 // Firestore document → domain type. One module for every collection's mapper.
 //
-// These are pure and import nothing but types, deliberately: the collection
-// modules pull in `@/lib/firebase`, which throws without a configured project,
-// so anything living beside them is untestable. The mapping is the part worth
-// testing — the Timestamp boundary, the fallbacks, the fields a half-written
-// document has not got yet — so it lives here instead.
-// ============================================================================
+// Pure, importing only types, deliberately: the store modules pull in
+// `@/lib/firebase`, which throws without a configured project, so anything
+// beside them is untestable. The mapping is the part worth testing.
 
 import type { Timestamp } from "firebase/firestore";
 import type {
@@ -21,13 +17,12 @@ import type {
 } from "@/lib/types";
 
 /**
- * A Firestore `Timestamp` as an ISO string. ISO everywhere above this line —
- * no page, no derive rule and no formatter ever sees a Timestamp.
+ * A Firestore `Timestamp` as an ISO string — nothing above this line ever sees
+ * a Timestamp.
  *
- * The null case is not padding: a document written with `serverTimestamp()`
- * comes back from the *local* snapshot with that field still null, before the
- * server has stamped it. Falling back to now keeps a freshly written row from
- * rendering blank and then jumping in the sort a moment later.
+ * The null case is not padding: `serverTimestamp()` reads back null from the
+ * *local* snapshot before the server stamps it, so a fresh row would render
+ * blank and then jump in the sort.
  */
 export function toIso(stamp: Timestamp | null | undefined): string {
   return stamp ? stamp.toDate().toISOString() : new Date().toISOString();

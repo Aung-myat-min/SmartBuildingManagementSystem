@@ -1,19 +1,15 @@
 "use client";
 
-// ============================================================================
 // The device list.
 //
 // A sensor's id is its document id — FD-216-14, printed on the device and
-// written into `linkedEquipmentId` on the unit it shares a body with. That is
-// why the id is frozen once registered: renaming would mean delete-and-create,
-// and the equipment link would be pointing at nothing in between.
+// written into the unit's `linkedEquipmentId`. So the id is frozen once
+// registered: renaming means delete-and-create, and the equipment link would
+// point at nothing in between.
 //
-// `status` and `statusChangedAt` are ordinary fields now rather than a session
-// override map. The pair has to move together — a status whose tone changes
-// with age (an unlocked door goes amber after thirty minutes) is measured from
-// `statusChangedAt`, so a status written without one would date from the
-// device's last routine report and could arrive already stale.
-// ============================================================================
+// `status` and `statusChangedAt` always move together: a tone that changes
+// with age is measured from the stamp, so a status written without one could
+// arrive already stale.
 
 import {
   collection,

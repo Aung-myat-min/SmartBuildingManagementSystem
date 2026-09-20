@@ -1,11 +1,9 @@
-// The identities the app is seeded with, shared by both seed paths so they
-// cannot drift apart.
+// The seeded identities, shared by both seed paths so they cannot drift.
 //
-// They are taken from the mock corpus so the seeded Log Book and request
-// history still refer to people who exist. `legacyUid` joins a real Firebase
-// uid back to the mock `submittedBy` / `actorUid` values — without it no seeded
-// request would be withdrawable or verifiable by the person who raised it once
-// uids become real. It goes when the data migrates.
+// Taken from the mock corpus, so the seeded Log Book and requests refer to
+// people who exist. `legacyUid` joins a real Firebase uid back to the corpus's
+// `submittedBy` / `actorUid` — without it no seeded request is withdrawable or
+// verifiable by whoever raised it. It goes when the data migrates.
 
 export const DEV_PASSWORD = process.env.SEED_PASSWORD ?? "Password!2026";
 

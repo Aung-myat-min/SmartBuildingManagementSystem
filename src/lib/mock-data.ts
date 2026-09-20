@@ -1,9 +1,7 @@
-// ============================================================================
 // Seed data — mirrors the estate described in the design pass: Building 216,
 // Building 209, Junction Square. Everything here is static, including the one
 // device in alarm; app-state.tsx layers this session's changes on top as
 // overrides, and no longer scripts anything.
-// ============================================================================
 
 import {
   countEscalated,
@@ -263,7 +261,7 @@ export function buildingName(buildingId: string): string {
   );
 }
 
-// ---- Equipment types + registry ------------------------------------------
+// Equipment types + registry
 
 export const EQUIPMENT_TYPES: EquipmentTypeDef[] = [
   { id: "projector", label: "Projector" },
@@ -282,7 +280,7 @@ function typeLabel(typeId: string): string {
   return EQUIPMENT_TYPES.find((t) => t.id === typeId)?.label ?? typeId;
 }
 
-// ---- Equipment units (asset register) --------------------------------------
+// Equipment units (asset register)
 
 export const EQUIPMENT_UNITS: EquipmentUnit[] = [
   {
@@ -597,23 +595,16 @@ export const EQUIPMENT_UNITS: EquipmentUnit[] = [
   },
 ];
 
-// ---- The two-record join ---------------------------------------------------
+// The two-record join
 //
-// A fire detector is one physical device with a row in each table: the
-// EquipmentUnit is the asset (tag, condition, service history), the
-// EnvironmentalSensor is the live state (status, last report). They are
-// joined by linkedEquipmentId and never merged — both drawers cross to the
-// other record rather than duplicating its fields.
+// A fire detector is one device with a row in each table: the EquipmentUnit is
+// the asset, the EnvironmentalSensor is the live state. Joined by
+// linkedEquipmentId, never merged.
 //
-// The join key is the unit's **id**, not its tag. They are equal in the seed,
-// which is exactly why this has to be settled now: a tag is a label somebody
-// can edit, and the day the equipment drawer's "Save details" writes for real,
-// a rename would otherwise orphan this join, every request's equipmentId and
-// every log entry's refId at once.
-//
-// Like the estate and the sensor registry, these read through a holder the
-// provider feeds, so they answer for the live register rather than the frozen
-// seed once the data is subscribed.
+// The key is the unit's **id**, not its tag: a tag is an editable label, and
+// renaming one would orphan this join, every request's equipmentId and every
+// log entry's refId at once. These read through a holder the provider feeds,
+// so they answer for the live register, not the seed.
 export function equipmentUnitLabel(u: EquipmentUnit): string {
   return typeLabel(u.typeId);
 }
@@ -661,7 +652,7 @@ export const EQUIPMENT_HISTORY: EquipmentHistoryEvent[] = [
   },
 ];
 
-// ---- Sensor types + registry ------------------------------------------------
+// Sensor types + registry
 
 export const SENSOR_TYPES: SensorTypeDef[] = [
   {
@@ -937,7 +928,7 @@ export function equipmentForSensor(
   return assetSource.units.find((u) => u.id === sensor.linkedEquipmentId);
 }
 
-// ---- Maintenance requests ---------------------------------------------------
+// Maintenance requests
 
 export const MAINTENANCE_REQUESTS: MaintenanceRequest[] = [
   {
@@ -1175,7 +1166,7 @@ export const REQUEST_PREV_ACTION: Record<
   completed: "Reopen",
 };
 
-// ---- Historical Records (long-range ledger) --------------------------------
+// Historical Records (long-range ledger)
 
 function seededRandom(seed: number) {
   let s = seed;
@@ -1297,7 +1288,7 @@ export const HISTORICAL_RECORDS: HistoricalRecord[] = (() => {
   return out.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 })();
 
-// ---- Log Book (live, system-written feed) ----------------------------------
+// Log Book (live, system-written feed)
 
 export const LOG_BOOK: LogBookEntry[] = [
   {
@@ -1625,7 +1616,7 @@ export const LOG_BOOK_SOURCE_META: Record<
   admin: { label: "ADMIN" },
 };
 
-// ---- Reports -----------------------------------------------------------------
+// Reports
 
 export const REPORTS: Report[] = [
   {

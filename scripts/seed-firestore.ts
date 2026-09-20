@@ -1,22 +1,12 @@
-// ============================================================================
-// Seeds the app's collections into Firestore from the corpus in
-// src/lib/mock-data.ts.
+// Seeds Firestore from the corpus in src/lib/mock-data.ts. Runs under
+// vite-node, not node, because it imports that corpus directly — TypeScript
+// behind the `@/` alias. A .mjs copy of the data would only drift.
 //
-// It runs under vite-node (already present as a Vitest dependency) rather than
-// plain node, because it imports that corpus directly — TypeScript, behind the
-// `@/` alias. Copying the data into a .mjs sibling would guarantee drift, and
-// the whole point of this script is that there is one corpus.
+//   pnpm seed:data [--dry-run | --reset]
 //
-//   pnpm seed:data              # write the seed, leaving app-made rows alone
-//   pnpm seed:data --dry-run    # say what it would write
-//   pnpm seed:data --reset      # delete each collection first, then write
-//
-// Idempotent: seeded documents keep their corpus ids and are written with
-// merge, so a re-run refreshes them. Rows created in the app have generated
-// ids and are never touched — which does mean an edit made in the app **to a
-// seeded row** is overwritten on the next run. That asymmetry is confusing
-// enough that the script prints it every time.
-// ============================================================================
+// Seeded rows keep their corpus ids and are merged, so a re-run refreshes
+// them — and overwrites any app edit made to a seeded row. App-created rows
+// have generated ids and are never touched.
 
 import { readFileSync } from "node:fs";
 import { initializeApp } from "firebase/app";

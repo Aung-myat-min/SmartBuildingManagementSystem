@@ -6,12 +6,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 /**
- * The 392px right drawer. Everything in this product that takes fields —
- * creating and editing buildings, rooms, users, sensors and reports — opens
- * here, so the shape of a form never changes between pages.
- *
- * Decisions go to the centred confirm modal instead; the only field that
- * belongs there is the required written reason.
+ * The 392px right drawer. Anything with fields opens here, so a form never
+ * changes shape between pages. Decisions go to the centred confirm modal
+ * instead — the only field that belongs there is the required reason.
  */
 export function FormDrawer({
   open,

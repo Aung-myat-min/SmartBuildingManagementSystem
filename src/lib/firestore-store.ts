@@ -1,17 +1,12 @@
 "use client";
 
-// ============================================================================
-// The mechanical half of a Firestore-backed collection, so the per-collection
-// modules only carry the part that is actually about the domain: the mapper
-// (the Timestamp↔ISO boundary and the per-field fallbacks) and the write
-// rules.
+// The mechanical half of a Firestore-backed collection, so each store module
+// only carries its domain: the mapper and the write rules.
 //
-// Queries here are deliberately single-collection and single-field-ordered.
-// The whole dataset is a few hundred documents, so every filter the UI offers
-// runs client-side — which means `firestore.indexes.json` stays empty and
-// nothing in this app needs an index deploy. Do not "optimise" a `where` in
-// here without adding the composite index it will then require.
-// ============================================================================
+// Queries stay single-collection and single-field-ordered. The dataset is a
+// few hundred documents, so every UI filter runs client-side and
+// `firestore.indexes.json` stays empty. Do not add a `where` here without the
+// composite index it will then require.
 
 import {
   type FirestoreError,

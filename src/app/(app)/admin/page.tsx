@@ -248,7 +248,7 @@ function TabButton({
   );
 }
 
-// ---- Buildings -------------------------------------------------------------
+// Buildings
 
 type ConfirmFn = ReturnType<typeof useConfirm>;
 
@@ -868,7 +868,7 @@ function EditRoomDrawer({
   );
 }
 
-// ---- User accounts ---------------------------------------------------------
+// User accounts
 
 function UsersTab({
   actorRole,
@@ -1277,7 +1277,7 @@ function UserDrawer({
   );
 }
 
-// ---- Sensor types ----------------------------------------------------------
+// Sensor types
 //
 // The registry the Sensors page renders from. Types are never deleted — a
 // type still named by a sensor record has to keep resolving — so retiring one

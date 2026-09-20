@@ -1,14 +1,11 @@
 "use client";
 
-// ============================================================================
-// Maintenance requests — the highest-traffic collection, and the last to move.
+// Maintenance requests.
 //
-// Three session structures collapse into fields here: `createdRequests` (a
-// list in front of the seed), `requestPatches` (an override per request) and
-// the withdrawn filter. `withdrawn` stays a field rather than becoming a
-// delete: a request pulled back before approval is a thing that happened, and
-// the Log Book entry recording it has to still resolve.
-// ============================================================================
+// `createdRequests`, `requestPatches` and the withdrawn filter all collapse
+// into fields here. `withdrawn` stays a field rather than a delete: pulling a
+// request back is a thing that happened, and its Log Book entry has to still
+// resolve.
 
 import {
   collection,
@@ -52,12 +49,11 @@ export async function createRequest(
 }
 
 /**
- * The sentinel for a field being removed rather than left alone.
+ * Removes a field rather than leaving it alone.
  *
- * Firestore is configured with `ignoreUndefinedProperties`, so sending
- * `undefined` *skips* the field — it does not clear it. Approving a request
- * has to clear the note that sent it back, and passing `undefined` would have
- * quietly left it there for its submitter to keep reading.
+ * With `ignoreUndefinedProperties`, sending `undefined` *skips* a field — it
+ * does not clear it. Approving must clear the decline note, and `undefined`
+ * would quietly leave it there to be read.
  */
 export const CLEAR: FieldValue = deleteField();
 

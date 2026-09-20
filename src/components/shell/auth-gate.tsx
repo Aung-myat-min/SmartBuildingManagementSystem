@@ -9,12 +9,9 @@ import { useAuth } from "@/lib/auth";
 /**
  * The app shell's guard. One file covers all ten routes.
  *
- * **This is UX, not security.** A client-only Firebase SDK has no server-side
- * route gate: anything the browser could fetch, a determined visitor can fetch
- * from devtools. What this buys is that nobody lands on a chrome-full
- * dashboard rendering nothing while signed out. Authorisation is enforced by
- * firestore.rules, which run on Google's servers and are the only thing that
- * actually refuses anybody.
+ * **UX, not security.** A client-only SDK has no server-side route gate; this
+ * just stops anyone landing on a chrome-full dashboard while signed out.
+ * Authorisation is firestore.rules, which run on Google's servers.
  */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { status, user, endedReason } = useAuth();

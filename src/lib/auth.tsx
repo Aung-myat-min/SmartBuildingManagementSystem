@@ -1,6 +1,5 @@
 "use client";
 
-// ============================================================================
 // The signed-in identity. The only module that imports `firebase/auth`.
 //
 // It is deliberately separate from app-state.tsx and mounted above it: the
@@ -8,7 +7,6 @@
 // needs a resolved role before it can do anything. Being authenticated is not
 // the same as being signed in here — the app has no usable identity until the
 // user's role is known, because every page reads it.
-// ============================================================================
 
 import {
   browserLocalPersistence,

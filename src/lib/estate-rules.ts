@@ -1,8 +1,6 @@
-// ============================================================================
 // Estate rules that have to hold whatever is writing — pure, so they can be
 // tested without a browser or a database, the same reason derive.ts imports
 // no data.
-// ============================================================================
 
 import { isRequestOpen } from "@/lib/derive";
 import type {
@@ -15,14 +13,10 @@ import type {
 /**
  * Why a building cannot be deleted, or null when it can.
  *
- * Deleting used to cascade to the building's rooms and stop there, leaving its
- * equipment, sensors, requests and log entries pointing at an id that no
- * longer resolved — invisible while it was all in memory, permanent once it is
- * documents. Refusing is also the house pattern: archiveSensorType already
- * refuses while anything still uses a type, and says how many.
- *
- * Empty rooms are not a reason to refuse — they belong to the building and go
- * with it. Anything that could outlive it is.
+ * Deleting cascades to its rooms — they belong to it — but refuses while
+ * equipment, sensors or open requests still point at the id, and says how many
+ * of each. Same shape as archiveSensorType. Orphaned references were invisible
+ * in memory and are permanent as documents.
  */
 export function buildingDeletionRefusal(
   buildingId: string,

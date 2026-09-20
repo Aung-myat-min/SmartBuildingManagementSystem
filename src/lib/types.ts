@@ -1,23 +1,17 @@
-// ============================================================================
 // Core domain types — Smart Building Monitoring System (CET333)
 //
-// Reflects decisions confirmed across planning sessions (client meeting +
-// design discussion), not just the assignment brief's bare feature list:
-//   - 3 roles (incl. CEO/Super Admin, a scope addition beyond the brief)
-//   - Equipment uses a uniform count-breakdown model (no per-type special-casing)
-//   - Equipment & Sensor types are data-driven registries, not hardcoded unions
-//   - Fire Sensor (equipment) and Fire Alarm (sensor) are one physical device,
-//     linked via equipmentId, not merged into a single record
-// ============================================================================
+// Two decisions the rest of the code leans on: equipment and sensor types are
+// data-driven registries, not hardcoded unions; and a fire detector is one
+// device with two records, linked by id rather than merged.
 
-// ---- Display tones ---------------------------------------------------------
+// Display tones
 
 // The five status colours the whole UI is painted from. Defined here rather
 // than in the badge component so data modules (registries, mock data) can
 // carry a tone without importing React.
 export type Tone = "success" | "warning" | "danger" | "info" | "neutral";
 
-// ---- Users & Roles --------------------------------------------------------
+// Users & Roles
 
 export type UserRole = "office-staff" | "admin-manager" | "ceo-super-admin";
 
@@ -54,7 +48,7 @@ export interface ManagedUser extends AppUser {
   lastActiveAt: string; // ISO timestamp
 }
 
-// ---- Buildings & Rooms -----------------------------------------------------
+// Buildings & Rooms
 
 // Confirmed scope: Building 216, Building 209, Junction Square.
 // Room numbers for 209 and Junction Square are still pending tutor
@@ -76,7 +70,7 @@ export interface Room {
   floor: string; // e.g. "G", "1", "2" — not numeric-only, ground floors vary
 }
 
-// ---- Equipment (type registry + count-breakdown model) --------------------
+// Equipment (type registry + count-breakdown model)
 
 // Data-driven registry, NOT a hardcoded string union. Adding a new equipment
 // type later (e.g. "whiteboard") means adding a row here, not touching code.
@@ -146,7 +140,7 @@ export interface EquipmentHistoryEvent {
   actorName: string;
 }
 
-// ---- Environmental Sensors (type registry with per-type states/actions) ---
+// Environmental Sensors (type registry with per-type states/actions)
 
 // Each sensor type defines its OWN valid statuses and manageable actions,
 // since a fire alarm and a door lock don't behave alike. The UI renders
@@ -243,19 +237,15 @@ export interface EnvironmentalSensor {
   updatedAt: string;
 }
 
-// ---- Maintenance Requests ---------------------------------------------------
+// Maintenance Requests
 
 export type RequestPriority = "normal" | "high";
 
-// Confirmed workflow: Office Staff submits -> an approver lets it in or sends
-// it back with a reason -> the work runs -> Office Staff sees status
-// (read-only throughout). Approval is the gate that keeps unreviewed work off
-// the board; staff never move a request themselves.
-//
 //   requested -> approved -> in-progress -> resolved -> completed
 //
-// "requested" is not yet work: it is a thing asked for. Everything from
-// "approved" onward is committed work with someone accountable for it.
+// Approval is the gate that keeps unreviewed work off the board; staff raise
+// and follow, they never move a request themselves. "requested" is not yet
+// work — everything from "approved" on is committed, with someone accountable.
 export type RequestStatus =
   | "requested"
   | "approved"
@@ -298,7 +288,7 @@ export interface MaintenanceRequest {
   // threshold can change without a data migration.
 }
 
-// ---- Historical Records (long-range ledger) --------------------------------
+// Historical Records (long-range ledger)
 
 // Superseded the original narrower "filtered view of MaintenanceRequest"
 // scope once the design pass showed the fuller picture: Historical Records
@@ -324,7 +314,7 @@ export interface HistoricalRecord {
   actorName: string; // "System" for automated entries
 }
 
-// ---- Log Book (system-written live audit trail) ----------------------------
+// Log Book (system-written live audit trail)
 
 // Scoped to Admin Manager & CEO only — Office Staff already have their own
 // request history via Historical Records. Distinct from Historical Records:
@@ -387,7 +377,7 @@ export interface LogBookEntry {
   refId?: string; // linked REQ-/EQ-/device id, where relevant
 }
 
-// ---- Reports -----------------------------------------------------------------
+// Reports
 
 export type ReportKind =
   | "maintenance-performance"

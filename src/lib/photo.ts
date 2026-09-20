@@ -1,11 +1,9 @@
-// ============================================================================
 // Preparing a unit photo for a Firestore document.
 //
 // There is no Storage bucket in this project, so a photo is a base64 JPEG in
 // a document, and a Firestore document is capped at 1 MiB. The arithmetic
 // that keeps it under that cap is here, pure, so it can be tested; the canvas
 // work that needs a browser is the thin part at the bottom.
-// ============================================================================
 
 /** The longest edge a stored photo is allowed. */
 export const PHOTO_MAX_EDGE = 640;

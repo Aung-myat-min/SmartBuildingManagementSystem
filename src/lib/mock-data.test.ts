@@ -1,16 +1,10 @@
-// ============================================================================
 // The corpus has to agree with itself.
 //
-// While everything lived in memory an inconsistency was invisible: a request
-// naming one room and its equipment unit naming another simply rendered two
-// different strings on two different screens. Once these rows become documents
-// that people edit, the same inconsistency becomes permanent and starts
-// producing wrong counts.
-//
-// So this suite is the guard that turns "the seed data disagrees with itself"
-// into a failing build. It runs against the seed literals directly, not
-// through the provider.
-// ============================================================================
+// In memory, a request naming one room and its unit naming another just
+// rendered two strings on two screens. As documents people edit, the same
+// inconsistency is permanent and starts producing wrong counts. This suite
+// turns it into a failing build. Runs against the seed literals directly,
+// not through the provider.
 
 import { describe, expect, it } from "vitest";
 import {

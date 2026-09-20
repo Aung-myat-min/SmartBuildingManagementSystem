@@ -1,11 +1,9 @@
 /**
- * Firebase's own error codes never reach a screen. One map, used by the four
- * login screens and by Settings, so the same failure reads the same way
- * wherever it happens.
+ * Firebase error codes never reach a screen. One map for the login screens and
+ * Settings, so the same failure reads the same way everywhere.
  *
- * Note the three credential failures share one message on purpose: telling
- * someone that an address exists but the password is wrong confirms the
- * address, which is how account lists get harvested.
+ * The three credential failures share one message on purpose: saying an
+ * address exists but the password is wrong confirms the address.
  */
 const MESSAGES: Record<string, string> = {
   "auth/invalid-credential": "That email and password don't match an account.",

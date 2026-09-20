@@ -1,17 +1,11 @@
 "use client";
 
-// ============================================================================
 // The sensor type registry.
 //
-// A type's statuses and actions stay nested arrays on its own document rather
-// than becoming subcollections: they are small, always read together and
-// always written together, and the validation in app-state.tsx checks a whole
-// type at once — splitting them would break that for nothing.
-//
-// The validation itself stays where it is. It is pure, it already returns the
-// refusal the form shows, and it has to answer before a write rather than
-// after one.
-// ============================================================================
+// Statuses and actions stay nested arrays on the type's own document, not
+// subcollections: they are small, always read and written together, and the
+// validation in app-state.tsx judges a whole type at once. That validation
+// stays there — it is pure and it has to answer before the write.
 
 import { collection, deleteDoc, doc, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";

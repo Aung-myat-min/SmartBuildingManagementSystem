@@ -1,13 +1,11 @@
 "use client";
 
-// ============================================================================
 // The `users` collection — the one thing in this app that is not mock data.
 //
 // Administration reads it live rather than holding a copy, which also closes
 // the documented gap that account edits used to be page-local: a role change
 // here reaches the signed-in person's own session through the subscription in
 // lib/auth.tsx, without a reload.
-// ============================================================================
 
 import { deleteApp, type FirebaseApp } from "firebase/app";
 import {
@@ -135,14 +133,10 @@ export function setUserStatus(
  * administrator.
  *
  * createUserWithEmailAndPassword signs you in as whoever it just created, so
- * it runs on a second, isolated app instance where nothing is watching. The
- * profile document is then written through the PRIMARY instance, so the write
- * carries the administrator's token and the rules authorise it as an admin
- * action — through the secondary one they would see a brand-new account
- * writing its own role, which is exactly what they must refuse.
- *
- * The generated password is never shown to anyone: the account is activated by
- * the reset link, which is what the drawer already promises.
+ * it runs on a second, isolated instance. The profile is written through the
+ * PRIMARY one, carrying the admin's token — through the secondary, the rules
+ * would see a new account writing its own role. The generated password is
+ * never shown; the reset link activates the account.
  */
 export async function createUser(input: {
   email: string;
