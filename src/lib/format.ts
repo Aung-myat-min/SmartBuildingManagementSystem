@@ -87,6 +87,21 @@ export function formatMmk(value: number): string {
   return `${Math.round(value).toLocaleString("en-US")} MMK`;
 }
 
+/**
+ * An amount typed into a form, as a number — or null when it is not one.
+ *
+ * Accepts the separators people actually type: `145,000`, `145 000`, `145000`.
+ * Rejects empty, negative and non-numeric, so the caller can refuse rather
+ * than store NaN. Zero is valid — it is what "no cost" records.
+ */
+export function parseMmk(input: string): number | null {
+  const cleaned = input.replace(/[\s,]/g, "");
+  if (cleaned.length === 0) return null;
+  if (!/^\d+(\.\d+)?$/.test(cleaned)) return null;
+  const value = Number(cleaned);
+  return Number.isFinite(value) ? Math.round(value) : null;
+}
+
 export function formatRelative(iso: string): string {
   const hours = ageHours(iso);
   if (hours < 1) return "just now";

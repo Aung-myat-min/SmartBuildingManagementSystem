@@ -8,6 +8,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { parseMmk } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type ConfirmTone = "danger" | "warning" | "info";
@@ -25,16 +26,24 @@ export interface ConfirmOptions {
   confirmLabel?: string;
   cancelLabel?: string;
   /**
-   * The one field allowed in a modal. Fire-alarm reset and decommission set
-   * this, and the action refuses to proceed without it.
+   * A confirm may carry a written reason **or** a cost, and nothing else.
+   * Fire-alarm reset and decommission set the reason, and refuse to proceed
+   * without it.
    */
   requireReason?: boolean;
   reasonPlaceholder?: string;
+  /**
+   * Asks what the work cost. Marking a request resolved is the only moment
+   * anyone knows, so it is asked there rather than left for later. Defaults
+   * to "no cost", which records `0` — absent would mean nobody was asked.
+   */
+  requireCost?: boolean;
 }
 
 export interface ConfirmResult {
   confirmed: boolean;
   reason?: string;
+  costMmk?: number;
 }
 
 type Resolver = (result: ConfirmResult) => void;
@@ -72,12 +81,16 @@ const TONE_META: Record<
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [options, setOptions] = React.useState<ConfirmOptions | null>(null);
   const [reason, setReason] = React.useState("");
+  const [hasCost, setHasCost] = React.useState(false);
+  const [cost, setCost] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
   const resolverRef = React.useRef<Resolver | null>(null);
 
   const confirm = React.useCallback((opts: ConfirmOptions) => {
     setOptions(opts);
     setReason("");
+    setHasCost(false);
+    setCost("");
     setError(null);
     return new Promise<ConfirmResult>((resolve) => {
       resolverRef.current = resolve;
@@ -95,7 +108,20 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       setError("A written reason is required before this can be confirmed.");
       return;
     }
-    close({ confirmed: true, reason: reason.trim() || undefined });
+    let costMmk: number | undefined;
+    if (options?.requireCost) {
+      if (!hasCost) {
+        costMmk = 0;
+      } else {
+        const parsed = parseMmk(cost);
+        if (parsed === null) {
+          setError("Enter the amount in MMK, or choose No cost.");
+          return;
+        }
+        costMmk = parsed;
+      }
+    }
+    close({ confirmed: true, reason: reason.trim() || undefined, costMmk });
   };
 
   const tone = options?.tone ?? "info";
@@ -153,6 +179,51 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   className="border-input focus:border-primary w-full resize-y rounded border px-2.5 py-2.25 text-[12px] leading-relaxed outline-none"
                 />
               </label>
+            )}
+
+            {options?.requireCost && (
+              <div className="flex flex-col gap-2">
+                <span className="text-muted-foreground font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
+                  Cost of this work
+                </span>
+                <label className="flex cursor-pointer items-center gap-2 text-[12px]">
+                  <input
+                    type="radio"
+                    name="confirm-cost"
+                    checked={!hasCost}
+                    onChange={() => {
+                      setHasCost(false);
+                      if (error) setError(null);
+                    }}
+                    className="accent-primary size-3.5 cursor-pointer"
+                  />
+                  No cost
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 text-[12px]">
+                  <input
+                    type="radio"
+                    name="confirm-cost"
+                    checked={hasCost}
+                    onChange={() => setHasCost(true)}
+                    className="accent-primary size-3.5 cursor-pointer"
+                  />
+                  Cost
+                  <input
+                    value={cost}
+                    inputMode="numeric"
+                    placeholder="145,000"
+                    onChange={(e) => {
+                      setCost(e.target.value);
+                      setHasCost(true);
+                      if (error) setError(null);
+                    }}
+                    className="border-input focus:border-primary w-32 rounded border px-2 py-1.5 text-right font-mono text-[11.5px] outline-none"
+                  />
+                  <span className="text-muted-foreground font-mono text-[10.5px]">
+                    MMK
+                  </span>
+                </label>
+              </div>
             )}
 
             {error && (

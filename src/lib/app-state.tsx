@@ -24,6 +24,7 @@ import {
   updateRoom as writeRoom,
 } from "@/lib/estate-store";
 import type { WriteResult } from "@/lib/firestore-store";
+import { formatMmk } from "@/lib/format";
 import { appendLogEntry, type LogDraft, useLogBook } from "@/lib/logbook-store";
 import {
   buildingName,
@@ -208,8 +209,15 @@ export interface AppState {
   withdrawRequest: (id: string) => Promise<WriteResult>;
   /** Its submitter says the resolved work looks done. A flag, not a status. */
   requestVerification: (id: string) => Promise<WriteResult>;
-  /** Forward one step, or back one step — never more, and the age never resets. */
-  moveRequest: (id: string, direction: "next" | "prev") => Promise<WriteResult>;
+  /**
+   * Forward one step, or back one step — never more, and the age never resets.
+   * `extra` carries what only the resolving step knows: what the work cost.
+   */
+  moveRequest: (
+    id: string,
+    direction: "next" | "prev",
+    extra?: { costMmk?: number },
+  ) => Promise<WriteResult>;
   /** The estate as it stands, not as it was seeded. */
   buildings: Building[];
   rooms: Room[];
@@ -479,7 +487,11 @@ export function AppStateProvider({
   );
 
   const moveRequest = React.useCallback(
-    async (id: string, direction: "next" | "prev") => {
+    async (
+      id: string,
+      direction: "next" | "prev",
+      extra?: { costMmk?: number },
+    ) => {
       const base = findRequest(id);
       const current = base?.status ?? "requested";
       const table =
@@ -492,8 +504,16 @@ export function AppStateProvider({
         // Approving answers the note that sent it back, so the note goes —
         // and it has to go explicitly, because `undefined` is ignored.
         ...(current === "requested" ? { declineNote: CLEAR } : {}),
+        // Only the resolving step is asked, so only it ever sends this.
+        ...(extra?.costMmk !== undefined ? { costMmk: extra.costMmk } : {}),
       });
       if (!written.ok) return written;
+      const costNote =
+        extra?.costMmk === undefined
+          ? ""
+          : extra.costMmk === 0
+            ? " No cost."
+            : ` Cost: ${formatMmk(extra.costMmk)}.`;
       log({
         source: "request",
         actionType: "request-status-changed",
@@ -501,7 +521,7 @@ export function AppStateProvider({
           target === "approved" && current === "requested"
             ? "Request approved"
             : `Request moved to ${target}`,
-        detail: `${id} — ${current} → ${target}.${base ? ` ${base.issue}.` : ""}`,
+        detail: `${id} — ${current} → ${target}.${base ? ` ${base.issue}.` : ""}${costNote}`,
         targetType: "request",
         targetId: id,
         buildingId: base?.buildingId,

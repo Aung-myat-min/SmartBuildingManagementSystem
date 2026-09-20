@@ -14,7 +14,6 @@ import type {
   EquipmentHistoryEvent,
   EquipmentTypeDef,
   EquipmentUnit,
-  HistoricalRecord,
   LogBookEntry,
   MaintenanceRequest,
   Report,
@@ -1175,120 +1174,6 @@ function seededRandom(seed: number) {
     return s / 2147483648;
   };
 }
-
-function pick<T>(rnd: () => number, arr: T[]): T {
-  return arr[Math.floor(rnd() * arr.length)];
-}
-
-const HR_TEXT: Record<HistoricalRecord["type"], string[]> = {
-  alarm: [
-    "Fire alarm triggered",
-    "Fire alarm reset with written reason",
-    "Door forced open past 90s threshold",
-    "Sensor stopped reporting",
-    "Sensor restored to normal",
-  ],
-  request: [
-    "Request opened",
-    "Request assigned to engineer",
-    "Work started on request",
-    "Request marked resolved",
-    "Request closed out",
-    "Request escalated past 24h",
-  ],
-  service: [
-    "Scheduled service completed",
-    "Filter replaced and unit tested",
-    "Firmware updated",
-    "Unit returned to service",
-    "Unit taken under maintenance",
-  ],
-  access: [
-    "Card access granted",
-    "Door unlocked from console",
-    "Door locked on schedule",
-    "Access denied — unknown card",
-  ],
-  system: [
-    "Account created",
-    "Role permissions changed",
-    "Report exported",
-    "Nightly backup completed",
-    "Sensor polling interval changed",
-  ],
-};
-
-const HR_PEOPLE = [
-  "Elysha",
-  "Su Myat",
-  "Hnin Nwe",
-  "Zaw Lin",
-  "Thida Win",
-  "Nay Oo",
-  "Daw Htun",
-];
-
-export const HISTORICAL_RECORDS: HistoricalRecord[] = (() => {
-  const rnd = seededRandom(20260909);
-  const types: HistoricalRecord["type"][] = [
-    "alarm",
-    "request",
-    "request",
-    "service",
-    "access",
-    "access",
-    "system",
-  ];
-  const buildingIds = ["b216", "b216", "b209", "jsq"];
-  const out: HistoricalRecord[] = [];
-  const now = new Date("2026-09-09T20:41:00Z").getTime();
-  let counter = 0;
-  for (let day = 0; day < 30; day++) {
-    const n = 4 + Math.floor(rnd() * 5);
-    for (let i = 0; i < n; i++) {
-      const type = pick(rnd, types);
-      const buildingId = pick(rnd, buildingIds);
-      const rooms = roomsForBuilding(buildingId);
-      const room = type === "system" ? undefined : pick(rnd, rooms);
-      const base = pick(rnd, HR_TEXT[type]);
-      const isRequest = type === "request";
-      const isService = type === "service";
-      const refId = isRequest
-        ? `REQ-${4000 + Math.floor(rnd() * 900)}`
-        : isService
-          ? `EQ-${buildingId.toUpperCase()}-0${1 + Math.floor(rnd() * 9)}`
-          : undefined;
-      const scheduled = base === "Door locked on schedule";
-      const reader = base === "Access denied — unknown card";
-      const dayStart = Math.floor((now - day * 86400000) / 86400000) * 86400000;
-      const hour = 6 + Math.floor(rnd() * 16); // spread across a 06:00-22:00 workday
-      const minute = Math.floor(rnd() * 60);
-      const timestamp = new Date(
-        Math.min(now, dayStart + hour * 3600000 + minute * 60000),
-      ).toISOString();
-      out.push({
-        id: `hr-${counter++}`,
-        timestamp,
-        type,
-        buildingId: type === "system" ? undefined : buildingId,
-        roomId: room?.id,
-        text: base + (refId ? ` · ${refId}` : ""),
-        refId,
-        actorName:
-          type === "system"
-            ? "System"
-            : scheduled
-              ? "System · schedule"
-              : reader
-                ? "System · card reader"
-                : pick(rnd, HR_PEOPLE),
-      });
-    }
-  }
-  return out.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-})();
-
-// Log Book (live, system-written feed)
 
 export const LOG_BOOK: LogBookEntry[] = [
   {

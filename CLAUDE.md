@@ -237,7 +237,7 @@ Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 | --- | --- |
 | `shared/tone-badge.tsx` | `<ToneBadge tone>` — every status, priority, condition, record type. `toneDotClass()` for raw dots. |
 | `shared/pulse-dot.tsx` | Live dot; only where something is genuinely happening now. |
-| `shared/confirm-dialog.tsx` | `useConfirm()` → promise. Decisions only, plus the one optional `requireReason` textarea. |
+| `shared/confirm-dialog.tsx` | `useConfirm()` → promise. Decisions only. It may carry a written reason (`requireReason`) **or** a cost (`requireCost`), and nothing else. |
 | `shared/access-denied.tsx` | Role-locked page: states the role and who to ask. No action — with real accounts there is nothing to switch to. |
 | `shared/empty-state.tsx` | Empty list/filter result. |
 | `shared/form-drawer.tsx` | `FormDrawer` — the 392px right drawer for anything with fields, plus `FormField` / `FormFieldLocked`. |
@@ -248,7 +248,8 @@ Radius 4–5px · body 12–12.5px · small caps labels 9.5–10px at `.06em`.
 
 **Container rules, fixed across every page.** Fields → form drawer. A record with
 history and actions → detail drawer. Decisions only → centred 452px confirm, whose
-`note` says what the action costs in its own numbers. Every result → one toast,
+`note` says what the action costs in its own numbers. A confirm carries at most
+one field: a reason, or a cost. Every result → one toast,
 bottom-left, six seconds, no undo. On a phone both drawers become bottom sheets.
 
 A control a role may not use stays on screen under a padlock with the reason in its

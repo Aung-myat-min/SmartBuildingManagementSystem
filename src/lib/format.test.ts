@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { ageHours, formatAge, formatPeriod, formatStamp } from "./format";
+import {
+  ageHours,
+  formatAge,
+  formatPeriod,
+  formatStamp,
+  parseMmk,
+} from "./format";
 
 const NOW = new Date("2026-09-18T12:00:00Z").getTime();
 
@@ -72,5 +78,33 @@ describe("formatStamp", () => {
   it("joins the date and the time", () => {
     expect(formatStamp("2026-09-08T14:00:00Z")).toMatch(/2026/);
     expect(formatStamp("2026-09-08T14:00:00Z")).toContain("·");
+  });
+});
+
+describe("parseMmk", () => {
+  it("takes the separators people actually type", () => {
+    expect(parseMmk("145,000")).toBe(145000);
+    expect(parseMmk("145 000")).toBe(145000);
+    expect(parseMmk("145000")).toBe(145000);
+  });
+
+  it("treats zero as a real amount", () => {
+    // "No cost" is recorded as 0, not as an absent field — an average over
+    // absent requests would be invented, over the zeroes it is real.
+    expect(parseMmk("0")).toBe(0);
+    expect(parseMmk("  0 ")).toBe(0);
+  });
+
+  it("refuses anything that is not an amount", () => {
+    expect(parseMmk("")).toBeNull();
+    expect(parseMmk("   ")).toBeNull();
+    expect(parseMmk("abc")).toBeNull();
+    expect(parseMmk("-5")).toBeNull();
+    expect(parseMmk("12.5.3")).toBeNull();
+  });
+
+  it("rounds, so a document never stores a fraction of a kyat", () => {
+    expect(parseMmk("145000.4")).toBe(145000);
+    expect(parseMmk("145000.6")).toBe(145001);
   });
 });

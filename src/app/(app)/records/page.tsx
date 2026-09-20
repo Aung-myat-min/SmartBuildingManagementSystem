@@ -10,18 +10,25 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { downloadCsv, stampedFilename } from "@/lib/export";
 import { formatDayLabel, formatTime } from "@/lib/format";
-import { buildingName, HISTORICAL_RECORDS, roomLabel } from "@/lib/mock-data";
+import { useLogHistory } from "@/lib/logbook-store";
+import { buildingName, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
 import { isBuildingLocked } from "@/lib/permissions";
-import type { HistoricalRecordType } from "@/lib/types";
+import type { LogBookSource } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const TYPE_META: Record<HistoricalRecordType, { label: string; tone: Tone }> = {
-  alarm: { label: "ALARM", tone: "danger" },
-  request: { label: "REQUEST", tone: "warning" },
-  service: { label: "SERVICE", tone: "success" },
-  access: { label: "ACCESS", tone: "info" },
-  system: { label: "SYSTEM", tone: "neutral" },
+/**
+ * The estate's own sources. `admin` is deliberately absent: Office Staff can
+ * reach this page and cannot reach the Log Book, so account, building and
+ * room changes must not surface here.
+ */
+const TYPE_META: Record<Exclude<LogBookSource, "admin">, { tone: Tone }> = {
+  alert: { tone: "danger" },
+  request: { tone: "warning" },
+  equipment: { tone: "success" },
+  sensor: { tone: "info" },
+  access: { tone: "neutral" },
 };
+type RecordSource = keyof typeof TYPE_META;
 /**
  * Tone -> a real utility class. Tailwind v4's `@theme inline` does not emit
  * every --color-* as a usable custom property, so `var(--color-danger)` in an
@@ -43,12 +50,12 @@ const TONE_BORDER_L: Record<Tone, string> = {
   neutral: "border-l-neutral-foreground",
 };
 
-const TYPE_ORDER: HistoricalRecordType[] = [
-  "alarm",
+const TYPE_ORDER: RecordSource[] = [
+  "alert",
   "request",
-  "service",
+  "equipment",
+  "sensor",
   "access",
-  "system",
 ];
 const RANGES = [
   { label: "7d", days: 7 },
@@ -66,24 +73,36 @@ export default function HistoricalRecordsPage() {
   const [buildingFilter, setBuildingFilter] = React.useState(
     locked ? activeBuildingId : "all",
   );
-  const [typeFilter, setTypeFilter] = React.useState<
-    "all" | HistoricalRecordType
-  >("all");
+  const [typeFilter, setTypeFilter] = React.useState<"all" | RecordSource>(
+    "all",
+  );
   const [query, setQuery] = React.useState("");
   const [limit, setLimit] = React.useState(40);
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
   const cutoff = Date.now() - range * DAY_MS;
 
-  const filtered = HISTORICAL_RECORDS.filter((r) => {
+  const { items: history, loading } = useLogHistory();
+
+  // The estate's own record: everything the Log Book holds except the
+  // account and estate changes, which stay behind the Log Book's own gate.
+  const estate = React.useMemo(
+    () =>
+      history.filter(
+        (e): e is typeof e & { source: RecordSource } => e.source !== "admin",
+      ),
+    [history],
+  );
+
+  const filtered = estate.filter((r) => {
     if (new Date(r.timestamp).getTime() < cutoff) return false;
     if (effectiveBuilding !== "all" && r.buildingId !== effectiveBuilding)
       return false;
-    if (typeFilter !== "all" && r.type !== typeFilter) return false;
+    if (typeFilter !== "all" && r.source !== typeFilter) return false;
     if (query.trim()) {
       const q = query.toLowerCase();
       const hay =
-        `${r.text} ${r.actorName} ${r.refId ?? ""} ${r.roomId ? roomLabel(r.roomId) : ""}`.toLowerCase();
+        `${r.title} ${r.detail} ${r.actorName} ${r.refId ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -93,12 +112,12 @@ export default function HistoricalRecordsPage() {
     { label: "TOTAL RECORDS", value: filtered.length, tone: "text-foreground" },
     {
       label: "ALARMS",
-      value: filtered.filter((r) => r.type === "alarm").length,
+      value: filtered.filter((r) => r.source === "alert").length,
       tone: "text-danger-foreground",
     },
     {
       label: "REQUESTS",
-      value: filtered.filter((r) => r.type === "request").length,
+      value: filtered.filter((r) => r.source === "request").length,
       tone: "text-warning-foreground",
     },
     {
@@ -121,11 +140,11 @@ export default function HistoricalRecordsPage() {
         t,
         filtered.filter(
           (r) =>
-            r.type === t &&
+            r.source === t &&
             new Date(r.timestamp).setHours(0, 0, 0, 0) === dayStart,
         ).length,
       ]),
-    ) as Record<HistoricalRecordType, number>;
+    ) as Record<RecordSource, number>;
     const total = TYPE_ORDER.reduce((a, t) => a + counts[t], 0);
     return { key: dayStart, label: dayLabel, counts, total };
   });
@@ -144,6 +163,17 @@ export default function HistoricalRecordsPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="border-border bg-card rounded-[5px] border px-3 py-2.25">
+        <span className="text-muted-foreground text-[11.5px] leading-snug">
+          <span className="text-foreground font-[450]">
+            The Log Book, filtered.
+          </span>{" "}
+          The same record, narrowed to what happened on the estate — alarms,
+          sensors, requests, equipment and access. Account, building and room
+          changes are left out; those are in the Log Book.
+        </span>
+      </div>
+
       <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
@@ -197,7 +227,7 @@ export default function HistoricalRecordsPage() {
           <option value="all">All types</option>
           {TYPE_ORDER.map((t) => (
             <option key={t} value={t}>
-              {TYPE_META[t].label}
+              {LOG_BOOK_SOURCE_META[t].label}
             </option>
           ))}
         </select>
@@ -211,17 +241,17 @@ export default function HistoricalRecordsPage() {
             // is on screen, or the file disagrees with the count beside it.
             downloadCsv(stampedFilename("historical-records"), filtered, [
               { header: "Timestamp", value: (r) => r.timestamp },
-              { header: "Type", value: (r) => TYPE_META[r.type].label },
+              {
+                header: "Type",
+                value: (r) => LOG_BOOK_SOURCE_META[r.source].label,
+              },
               {
                 header: "Building",
                 value: (r) =>
                   r.buildingId ? buildingName(r.buildingId) : "Estate",
               },
-              {
-                header: "Room",
-                value: (r) => (r.roomId ? roomLabel(r.roomId) : ""),
-              },
-              { header: "Record", value: (r) => r.text },
+              { header: "Record", value: (r) => r.title },
+              { header: "Detail", value: (r) => r.detail },
               { header: "Reference", value: (r) => r.refId ?? "" },
               { header: "Recorded by", value: (r) => r.actorName },
             ]);
@@ -270,7 +300,7 @@ export default function HistoricalRecordsPage() {
                     TONE_BG[TYPE_META[t].tone],
                   )}
                 />
-                {TYPE_META[t].label}
+                {LOG_BOOK_SOURCE_META[t].label}
               </span>
             ))}
           </div>
@@ -318,7 +348,9 @@ export default function HistoricalRecordsPage() {
         </div>
         {grouped.length === 0 && (
           <EmptyState className="m-4">
-            No records match these filters.
+            {loading
+              ? "Loading the estate's record…"
+              : "No records match these filters."}
           </EmptyState>
         )}
         {grouped.map(([day, records]) => (
@@ -334,26 +366,26 @@ export default function HistoricalRecordsPage() {
                 key={r.id}
                 className={cn(
                   "border-rule flex items-center border-b border-l-[3px] px-4 py-2 text-[12px] last:border-b-0",
-                  TONE_BORDER_L[TYPE_META[r.type].tone],
+                  TONE_BORDER_L[TYPE_META[r.source].tone],
                 )}
               >
                 <span className="text-muted-foreground w-16 font-mono text-[11px]">
                   {formatTime(r.timestamp)}
                 </span>
                 <span className="w-29.5">
-                  <ToneBadge tone={TYPE_META[r.type].tone}>
-                    {TYPE_META[r.type].label}
+                  <ToneBadge tone={TYPE_META[r.source].tone}>
+                    {LOG_BOOK_SOURCE_META[r.source].label}
                   </ToneBadge>
                 </span>
                 <span className="text-neutral-foreground w-57.5 truncate pr-2.5 text-[11.5px]">
                   {r.buildingId ? buildingName(r.buildingId) : "Estate-wide"}
-                  {r.roomId ? ` / ${roomLabel(r.roomId)}` : ""}
+                  {r.refId ? ` · ${r.refId}` : ""}
                 </span>
                 <span
                   className="min-w-0 flex-1 truncate pr-2.5 text-[12px] font-[450]"
-                  title={r.text}
+                  title={r.detail}
                 >
-                  {r.text}
+                  {r.title}
                 </span>
                 <span className="text-muted-foreground w-32 truncate text-[11.5px]">
                   {r.actorName}

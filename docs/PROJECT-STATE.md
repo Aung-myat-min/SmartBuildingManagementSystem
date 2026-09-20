@@ -104,14 +104,14 @@ There is **no test script and no test runner installed**.
 | Equipment | **Built** | Register/Board views, filters, detail drawer with history and six actions, new-unit drawer, inline edit/service/move forms. |
 | Sensors | **Built** | Grouped by building, alarm rows break the rhythm, actions rendered from the type registry, deep-link via `?sensor=`. |
 | Maintenance Requests | **Built** | Kanban/Table views, new-request drawer, forward and backward status moves. |
-| Historical Records | **Built** | Range/building/type filters, daily grouping, CSV export. Data is PRNG-generated. |
+| Historical Records | **Built** | The Log Book filtered to estate sources (`admin` excluded), over a 90-day subscription. Range/building/source filters, daily grouping, CSV export. |
 | Log Book | **Built** | Live feed, source filters, pause. Admin Manager + CEO only. |
 | Reports | **Built** | Library + full report view, generate sheet, PDF/CSV buttons. |
 | Administration | **Built** | Buildings (CEO), User Accounts and Sensor Types (Admin + CEO), each separately gated. |
 | Settings | **Built** | Your account (writes to `users`), Appearance (working theme picker, no Save — the swatch applies it), Password & sessions. |
 | More (phone overflow) | **Built** | Lists the pages the tab bar has no room for. |
 | Theming (light/dark) | **Built** | `next-themes` is mounted; `/settings` switches it. |
-| Persistence | **Built** | Nine collections in Firestore, live `onSnapshot` on every one. Reports, Historical Records and the power series stay generated. |
+| Persistence | **Built** | Nine collections in Firestore, live `onSnapshot` on every one. Reports and the power series stay generated. |
 | Authentication | **Built** | Firebase Auth, three real accounts, no role switcher. |
 | Firebase backend | **Built** | Client SDK only; `firestore.rules` are **not deployed** — see §11.2. |
 | Tests | **Built** | Vitest over `src/**/*.test.ts` — the pure rules, the mappers and the export shaping. |
@@ -1631,10 +1631,17 @@ Every query is single-collection and single-field-ordered, so
 `firestore.indexes.json` stays empty and nothing here needs an index deploy.
 
 **Still generated, deliberately:** `powerSeries()`, `reportDetail()`,
-`HISTORICAL_RECORDS`, `REPORTS`, `BUILDING_META`, `EQUIPMENT_TYPES`. Persisting
-invented data buys nothing. Report generation stays page-local, which is why
-its toast still says "visible in this session only" — and that is now the one
-place in the app where that sentence is true.
+`REPORTS`, `BUILDING_META`, `EQUIPMENT_TYPES`. Persisting invented data buys
+nothing. Report generation stays page-local, which is why its toast still says
+"visible in this session only" — and that is now the one place in the app where
+that sentence is true.
+
+**Historical Records is no longer among them.** It reads `logBook` through
+`useLogHistory()` — its own 90-day subscription, because the shared feed's
+`limit(200)` cannot cover a long-range ledger — filtered to every source except
+`admin`. That exclusion is load-bearing: Office Staff reach `/records`
+(`minRank: 3`) and not `/logbook` (`minRank: 2`), so account and estate changes
+must not surface there.
 
 **Notifications stay in memory** — session-scoped UI state, not domain data.
 
@@ -1667,8 +1674,11 @@ against live data without any caller knowing.
   nothing covers Firestore itself — that needs the emulator, and mocking the
   SDK would test the mock.
 - **`README.md` is still `create-next-app` boilerplate.**
-- **Historical Records are PRNG-generated**, not authored — realistic in shape,
-  arbitrary in detail, and their `refId`s resolve to nothing.
+- **Reports are still generated.** `reportDetail()` computes every KPI, weekly
+  figure and cost line from `seededRandom(reportId)`. Two of the three kinds —
+  maintenance-performance and equipment-reliability — are now derivable from
+  live `requests` and `equipmentHistory`, and `costMmk` on a resolved request
+  makes the third possible. Not yet wired.
 - **Room numbers for Building 209 and Junction Square are provisional** — a
   comment in `src/lib/types.ts` records that only 216's are confirmed.
 - **`legacyUid` is still load-bearing.** Seeded requests carry

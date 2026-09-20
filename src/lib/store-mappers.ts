@@ -172,5 +172,6 @@ export function toRequest(
     declineNote: d.declineNote,
     verificationRequested: d.verificationRequested,
     withdrawn: d.withdrawn,
+    costMmk: d.costMmk,
   };
 }

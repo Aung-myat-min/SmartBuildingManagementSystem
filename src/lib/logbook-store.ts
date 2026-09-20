@@ -12,7 +12,10 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  Timestamp,
+  where,
 } from "firebase/firestore";
+import * as React from "react";
 import { db } from "@/lib/firebase";
 import {
   COLLECTIONS,
@@ -48,6 +51,42 @@ export function useLogBook(): {
     collection(db, COLLECTIONS.logBook),
     orderBy("timestamp", "desc"),
     limit(LOG_BOOK_PAGE_SIZE),
+  );
+  return useLiveCollection(q, toLogEntry);
+}
+
+/** The ceiling for the long-range view, which reaches further back. */
+export const LOG_HISTORY_PAGE_SIZE = 500;
+
+/** How far back the long-range view subscribes. Narrower ranges filter this. */
+export const LOG_HISTORY_DAYS = 90;
+
+/**
+ * The same book over a long range rather than the last 200 entries.
+ *
+ * Historical Records is a long-range ledger and `limit(200)` will not cover
+ * 90 days once the app is in use, so it gets its own subscription. The
+ * `where` and the `orderBy` are on the same field, so this needs no composite
+ * index and firestore.indexes.json stays empty.
+ *
+ * The cutoff is pinned at mount rather than recomputed: useLiveCollection
+ * subscribes once by design, so a moving cutoff would be a query nobody ever
+ * re-runs. The page's 7d / 30d buttons filter what arrives, the way every
+ * other filter in this app does.
+ */
+export function useLogHistory(): {
+  items: LogBookEntry[];
+  loading: boolean;
+  error: string | null;
+} {
+  const [since] = React.useState(
+    () => new Date(Date.now() - LOG_HISTORY_DAYS * 86400000),
+  );
+  const q = query(
+    collection(db, COLLECTIONS.logBook),
+    where("timestamp", ">=", Timestamp.fromDate(since)),
+    orderBy("timestamp", "desc"),
+    limit(LOG_HISTORY_PAGE_SIZE),
   );
   return useLiveCollection(q, toLogEntry);
 }

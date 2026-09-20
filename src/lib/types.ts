@@ -283,36 +283,21 @@ export interface MaintenanceRequest {
    * out of every list and count rather than sitting on the board.
    */
   withdrawn?: boolean;
+  /**
+   * What the work cost, recorded when it is marked resolved.
+   *
+   * Three states, and the difference matters: absent means nobody was asked
+   * (every request resolved before this existed), `0` means asked and there
+   * was no cost, above zero is the amount. An average over the absent ones
+   * would be invented; an average over the zeroes is real.
+   */
+  costMmk?: number;
   // NOTE: "escalated" (high-priority + aging past threshold) is computed
   // client-side from submittedAt/priority/status — not stored, so the
   // threshold can change without a data migration.
 }
 
 // Historical Records (long-range ledger)
-
-// Superseded the original narrower "filtered view of MaintenanceRequest"
-// scope once the design pass showed the fuller picture: Historical Records
-// is one chronological ledger of everything the system did — alarms,
-// requests, services, access events and system entries — not just
-// resolved/completed requests. Available to every role; filter by
-// range/building/type, export the filtered set to CSV.
-export type HistoricalRecordType =
-  | "alarm"
-  | "request"
-  | "service"
-  | "access"
-  | "system";
-
-export interface HistoricalRecord {
-  id: string;
-  timestamp: string; // ISO timestamp
-  type: HistoricalRecordType;
-  buildingId?: string; // absent for estate-wide system entries
-  roomId?: string;
-  text: string; // e.g. "Fire alarm triggered"
-  refId?: string; // linked REQ-/EQ- id, where relevant
-  actorName: string; // "System" for automated entries
-}
 
 // Log Book (system-written live audit trail)
 

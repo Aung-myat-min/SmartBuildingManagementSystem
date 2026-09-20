@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   Lock,
   MapPin,
+  Receipt,
   Search,
   Table as TableIcon,
   Undo2,
@@ -27,7 +28,7 @@ import {
   nextSequentialId,
 } from "@/lib/derive";
 import type { WriteResult } from "@/lib/firestore-store";
-import { formatAge, formatStamp } from "@/lib/format";
+import { formatAge, formatMmk, formatStamp } from "@/lib/format";
 import {
   buildingName,
   equipmentUnitLabel,
@@ -195,7 +196,23 @@ export default function RequestsPage() {
       if (!result.confirmed) return;
     }
 
-    const written = await moveRequest(r.id, direction);
+    // Resolving is the only forward step that asks anything. It is also the
+    // only moment anyone knows what the work cost.
+    let extra: { costMmk?: number } | undefined;
+    if (target === "resolved") {
+      const result = await confirm({
+        title: `Mark ${r.id} resolved?`,
+        body: r.issue,
+        note: "Recorded against this request and counted in the cost report. Leave it at No cost if nothing was spent.",
+        tone: "info",
+        confirmLabel: "Mark resolved",
+        requireCost: true,
+      });
+      if (!result.confirmed) return;
+      extra = { costMmk: result.costMmk };
+    }
+
+    const written = await moveRequest(r.id, direction, extra);
     if (!written.ok) {
       toast.error(written.message);
       return;
@@ -741,6 +758,12 @@ function RequestCard({
           <CalendarClock className="size-2.75 shrink-0" />
           {formatStamp(request.submittedAt)}
         </span>
+        {request.costMmk !== undefined && (
+          <span className="flex items-center gap-1.5 font-mono">
+            <Receipt className="size-2.75 shrink-0" />
+            {request.costMmk === 0 ? "No cost" : formatMmk(request.costMmk)}
+          </span>
+        )}
       </div>
 
       <div className="mt-2.5 flex items-center gap-2">
