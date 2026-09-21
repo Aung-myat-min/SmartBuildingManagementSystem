@@ -183,13 +183,15 @@ action URL to the real host too.
 | --- | --- |
 | Pages | `src/app/(app)/<route>/page.tsx` |
 | Types | `src/lib/types.ts` — read this first |
-| Firestore | `src/lib/*-store.ts`, one per collection |
+| Firestore | `src/lib/*-store.ts`, one per area |
 | Shared state | `src/lib/app-state.tsx` |
 | Rules (pure logic) | `src/lib/derive.ts`, `reporting.ts`, `permissions.ts` |
 | Starting data | `src/lib/mock-data.ts` |
 
-More detail: [`docs/APPLICATION-FLOW.md`](docs/APPLICATION-FLOW.md) for what
-each role may do, [`docs/PROJECT-STATE.md`](docs/PROJECT-STATE.md) for the full
+More detail: [`docs/OVERVIEW.md`](docs/OVERVIEW.md) for the structure,
+architecture and use cases in plain English,
+[`docs/APPLICATION-FLOW.md`](docs/APPLICATION-FLOW.md) for exactly what each
+role may do, [`docs/PROJECT-STATE.md`](docs/PROJECT-STATE.md) for the full
 reference.
 
 ## Troubleshooting

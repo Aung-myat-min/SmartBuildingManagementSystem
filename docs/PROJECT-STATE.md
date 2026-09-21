@@ -1630,8 +1630,11 @@ which throws without a configured project and would make them untestable.
 Every query is single-collection and single-field-ordered, so
 `firestore.indexes.json` stays empty and nothing here needs an index deploy.
 
-**Still generated, deliberately:** `powerSeries()`, `BUILDING_META`,
-`EQUIPMENT_TYPES`. Persisting invented data buys nothing.
+**Still generated, deliberately:** `powerSeries()`, and that is now the only
+one. `BUILDING_META` was deleted when address, description and floors moved
+onto the building document, and `EQUIPMENT_TYPES` became the seed for its own
+collection. Persisting invented data buys nothing; power readings have no
+meter behind them.
 
 **Reports are no longer among them.** `src/lib/reporting.ts` computes all three
 kinds from live `requests`, `equipmentUnits` and `equipmentHistory`, and a
