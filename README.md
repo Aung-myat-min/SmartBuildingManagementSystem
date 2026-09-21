@@ -1,80 +1,213 @@
 # Smart Building Monitoring
 
-Facilities-operations dashboard for a three-building estate (CET333). Next.js 16
-(App Router) · React 19 · TypeScript · Tailwind v4 · shadcn/ui on Base UI · Biome.
+A facilities dashboard for a three-building estate (CET333). Staff watch
+equipment and sensors, raise maintenance requests, and read the log book and
+reports.
 
-The codebase map is [`CLAUDE.md`](CLAUDE.md); the full reference — build status,
-every exported function, page-by-page behaviour and the known gaps — is
-[`docs/PROJECT-STATE.md`](docs/PROJECT-STATE.md).
+Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 · shadcn/ui on
+Base UI · Firebase · Biome.
 
-## Running it
+## Setup
+
+You need **Node 20 or newer**, **pnpm**, and a **Google account** for Firebase.
+It takes about ten minutes.
+
+### 1. Get the code
 
 ```bash
+git clone <repo-url>
+cd smart-campus-management
 pnpm install
-pnpm dev            # http://localhost:3000
 ```
 
-`pnpm lint` runs Biome, `pnpm format` writes formatting, `pnpm build` produces a
-production build. Verify a build by its **exit code** — "✓ Compiled successfully"
-prints before the prerender step that can still fail.
+### 2. Make a Firebase project
 
-## Firebase
+Go to [console.firebase.google.com](https://console.firebase.google.com) and
+click **Add project**. Any name works. You can turn Google Analytics off.
 
-Authentication and the `users` collection are real; every other collection is
-still mock data in `src/lib/mock-data.ts`.
+Then turn on the two things this app uses:
 
-### Setup
+- **Build → Authentication → Get started → Email/Password → Enable → Save**
+- **Build → Firestore Database → Create database → Start in test mode →**
+  pick a location → **Create**
 
-Copy `.env.example` to `.env.local` and fill in the six `NEXT_PUBLIC_FIREBASE_*`
-values from the Firebase console (Project settings → General → Your apps).
+> Test mode means anyone with your project's key can read and write the
+> database. That is fine while you are building. See [Security](#security)
+> before you show this to anyone.
 
-**These values are not secrets.** They ship in the client bundle by design and
-identify the project rather than granting access to it. Authorisation lives in
-`firestore.rules` and the console's authorised-domains list.
+### 3. Copy your project's settings
 
-### Bootstrapping a project, once
+In the console: **Project settings** (the gear icon) **→ General → Your apps**.
 
-The rules cannot bootstrap themselves: `allow create` on `/users` reads the
-actor's own `/users` document to find their role, and before the first CEO
-document exists there is no role to find. So the first documents go in while the
-rules are still permissive, and the rules are published immediately after.
+Click the web icon `</>`, give the app any nickname, and click
+**Register app**. You will see a `firebaseConfig` block. Keep that page open.
+
+Now in the project folder:
 
 ```bash
-pnpm bootstrap        # three sign-in accounts + eight profile documents
-pnpm rules:deploy     # lock it down — do not skip this
+cp .env.example .env.local
 ```
 
-Run those the other way round and the bootstrap gets `PERMISSION_DENIED`; skip
-the second and the database is open to the internet. `pnpm rules:deploy` needs
-`npx firebase-tools login` first, or paste `firestore.rules` into the console
-under Firestore → Rules → Publish.
+Open `.env.local` and copy each value across:
 
-Seeded accounts, all with the password `Password!2026` — change them before
-anything real depends on this:
-
-| Email | Role |
+| In `.env.local` | From `firebaseConfig` |
 | --- | --- |
-| `hnin.nwe@university.edu` | Office Staff (Building 216) |
-| `elysha@university.edu` | Admin Manager |
-| `daw.htun@university.edu` | CEO / Super Admin |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | `apiKey` |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `authDomain` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | `projectId` |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `storageBucket` |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | `messagingSenderId` |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | `appId` |
 
-Two console steps that are easy to miss:
+Leave `NEXT_PUBLIC_FIREBASE_EMULATORS=0`.
 
-1. **Authentication → Settings → Authorised domains** must include wherever the
-   app is served from, or sign-in is rejected.
-2. **Authentication → Templates → Customise action URL** must point at
-   `https://<host>/login/first-sign-in`, or password-reset links land on
-   Firebase's generic page instead of this app's screen.
+These values are **not secrets**. They are in the browser bundle by design.
+They say which project to talk to; they do not grant access to it.
 
-### Local — the emulator suite, optional
-
-Needs Java (the Firestore emulator is a JVM process). Useful for working on the
-rules without touching the live project.
+### 4. Fill the project with starting data
 
 ```bash
-pnpm emulators        # auth :9099 · firestore :8080 · UI :4000
-pnpm seed             # the same accounts, via the Admin SDK
+pnpm init:project
 ```
 
-Point the app at them with `NEXT_PUBLIC_FIREBASE_EMULATORS=1` in `.env.local`;
-no project config is needed in that mode.
+This makes one CEO account and the estate it manages:
+
+- 3 buildings and 19 rooms
+- 16 equipment types and 28 equipment units
+- 2 sensor types and 17 sensors
+
+It does **not** make any maintenance requests, log book entries, equipment
+history or reports. Those appear when you use the app, so you start with a
+clean record.
+
+Running it twice is safe. It updates the same documents instead of making
+copies, and signs in to the account if it already exists.
+
+```bash
+pnpm init:project --dry-run    # show what it would do, change nothing
+pnpm init:project --reset      # delete the estate first, then write it again
+```
+
+To use your own email and password:
+
+```bash
+CEO_EMAIL=you@example.com CEO_PASSWORD=YourPassword1! CEO_NAME="Your Name" pnpm init:project
+```
+
+The password must be at least 6 characters — that is Firebase's rule.
+
+### 5. Run it
+
+```bash
+pnpm dev
+```
+
+Open <http://localhost:3000> and sign in with the account from step 4. The
+default is:
+
+```
+daw.htun@university.edu
+Password!2026
+```
+
+## Making more accounts
+
+Sign in as the CEO and go to **Administration → User Accounts → New account**.
+
+The new person gets an email with a link to set their own password. **The email
+address must be real and you must be able to open it** — otherwise the account
+exists but nobody can ever sign in to it. A Gmail alias works well for testing:
+`yourname+staff@gmail.com`, `yourname+admin@gmail.com`.
+
+One console step is easy to miss. In **Authentication → Templates → Password
+reset → Edit → Customise action URL**, set:
+
+```
+http://localhost:3000/login/first-sign-in
+```
+
+Without this, the link in the email goes to a Firebase page instead of this
+app's screen.
+
+There are three roles:
+
+| Role | What they can do |
+| --- | --- |
+| Office Staff | One building. Raise requests, work on equipment. Sensors are read-only. |
+| Admin Manager | The whole estate. Approve requests, act on sensors, manage accounts. |
+| CEO / Super Admin | Everything, plus buildings and rooms. |
+
+There is no role switcher. To see another role, sign in as it.
+
+## Everyday commands
+
+```bash
+pnpm dev        # run the app
+pnpm test       # run the tests
+pnpm lint       # check formatting and code style
+pnpm format     # fix formatting
+pnpm build      # production build
+```
+
+Check a build by whether the command **succeeded**, not by the text it prints —
+"✓ Compiled successfully" appears before a later step that can still fail.
+
+## Security
+
+The database is in **test mode**, which means it is open to anyone who has the
+project key. The key is in the browser bundle, so that is effectively everyone.
+
+The app does check roles — it hides and padlocks what you may not use — but
+that check runs in the browser. It stops mistakes, not attackers.
+
+To close it, publish the rules in `firestore.rules`:
+
+```bash
+npx firebase-tools login
+pnpm rules:deploy
+```
+
+Or paste the file into the console under **Firestore → Rules → Publish**.
+
+Do this before the project is shared, deployed, or marked.
+
+## Deploying
+
+Wherever you host it, add the site's address under **Authentication → Settings
+→ Authorised domains**, or sign-in will be refused. Update the password-reset
+action URL to the real host too.
+
+## Where things are
+
+| | |
+| --- | --- |
+| Pages | `src/app/(app)/<route>/page.tsx` |
+| Types | `src/lib/types.ts` — read this first |
+| Firestore | `src/lib/*-store.ts`, one per collection |
+| Shared state | `src/lib/app-state.tsx` |
+| Rules (pure logic) | `src/lib/derive.ts`, `reporting.ts`, `permissions.ts` |
+| Starting data | `src/lib/mock-data.ts` |
+
+More detail: [`docs/APPLICATION-FLOW.md`](docs/APPLICATION-FLOW.md) for what
+each role may do, [`docs/PROJECT-STATE.md`](docs/PROJECT-STATE.md) for the full
+reference.
+
+## Troubleshooting
+
+**`No .env.local found`** — you skipped step 3, or you are not in the project
+folder.
+
+**`auth/invalid-api-key`** — a value in `.env.local` is wrong or has a stray
+quote. Copy it again from the console.
+
+**`auth/operation-not-allowed`** — Email/Password is not switched on in
+Authentication → Sign-in method.
+
+**`PERMISSION_DENIED`** — the rules are published but the data was never set
+up. Run `pnpm init:project`, or check Firestore → Rules.
+
+**The page is stuck on "Signing in…"** — the browser cannot reach Firestore.
+Check the project id in `.env.local`, and that a Firestore database exists.
+
+**Signing in does nothing** — add your host under Authentication → Settings →
+Authorised domains.

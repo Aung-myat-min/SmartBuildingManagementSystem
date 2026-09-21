@@ -14,7 +14,8 @@
     "rules:deploy": "firebase deploy --only firestore:rules",
     "test": "vitest run",
     "test:watch": "vitest",
-    "seed:data": "npx vite-node --config vitest.config.mts scripts/seed-firestore.ts"
+    "seed:data": "npx vite-node --config vitest.config.mts scripts/seed-firestore.ts",
+    "init:project": "npx vite-node --config vitest.config.mts scripts/init-project.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
