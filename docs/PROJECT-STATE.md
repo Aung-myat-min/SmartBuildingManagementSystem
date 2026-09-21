@@ -5,9 +5,9 @@ something) arriving with **no prior context** can read this one file and start
 working. It covers what the product is, what is built, what every exported
 function does, how each page behaves, and what is deliberately unfinished.
 
-> `CLAUDE.md` in the repository root is the short map loaded into every session.
-> This file is the long form. Where the two disagree, trust the source and fix
-> both.
+> This is the long form. [`README.md`](../README.md) is how to set the project
+> up; [`APPLICATION-FLOW.md`](./APPLICATION-FLOW.md) is what each role may do.
+> Where any of them disagree with the code, trust the code and fix the doc.
 
 ---
 
@@ -1698,9 +1698,9 @@ Worth knowing, because several of these are not visible in a diff:
 
 - **Signing out no longer discards anything.** It used to unmount
   `AppStateProvider` and take the session's overrides with it. The overrides
-  are gone; a write by one person is there for the next. Both this document
-  and `CLAUDE.md` used to present that unmount as the mechanism keeping one
-  person's work out of another's session, and it is no longer true.
+  are gone; a write by one person is there for the next. This document used to
+  present that unmount as the mechanism keeping one person's work out of
+  another's session, and it is no longer true.
 - **Nine controls started writing.** Add to register, Save details, Delete,
   Save service, Move unit, the unit photo, Register sensor, the sensor inline
   Save changes and the Settings profile save had only ever logged and toasted.

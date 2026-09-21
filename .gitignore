@@ -47,3 +47,7 @@ next-env.d.ts
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# local working notes, not part of the project
+CLAUDE.md
+.claude/
