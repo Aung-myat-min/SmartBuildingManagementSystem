@@ -12,8 +12,10 @@
 // Safe to run twice: documents keep their ids and are merged, and an existing
 // CEO account is signed into rather than recreated.
 //
-// The email and password default to the CEO in scripts/accounts.mjs. Override
-// with CEO_EMAIL and CEO_PASSWORD.
+// Three accounts are created, one per role, so every part of the app can be
+// seen without inventing an account first. Override any address with
+// CEO_EMAIL / ADMIN_EMAIL / STAFF_EMAIL, and the shared password with
+// INIT_PASSWORD.
 
 import { readFileSync } from "node:fs";
 import { initializeApp } from "firebase/app";
@@ -45,9 +47,29 @@ import {
 const DRY_RUN = process.argv.includes("--dry-run");
 const RESET = process.argv.includes("--reset");
 
-const CEO_EMAIL = process.env.CEO_EMAIL ?? "daw.htun@university.edu";
-const CEO_PASSWORD = process.env.CEO_PASSWORD ?? "Password!2026";
-const CEO_NAME = process.env.CEO_NAME ?? "Daw Htun";
+const PASSWORD = process.env.INIT_PASSWORD ?? "SmartPassword!";
+
+/** One account per role. Office Staff are scoped to a building; nobody else. */
+const ACCOUNTS = [
+  {
+    email: process.env.CEO_EMAIL ?? "daw.htun@university.edu",
+    name: process.env.CEO_NAME ?? "Daw Htun",
+    role: "ceo-super-admin",
+    buildingId: null,
+  },
+  {
+    email: process.env.ADMIN_EMAIL ?? "elysha@university.edu",
+    name: process.env.ADMIN_NAME ?? "Elysha",
+    role: "admin-manager",
+    buildingId: null,
+  },
+  {
+    email: process.env.STAFF_EMAIL ?? "hnin.nwe@university.edu",
+    name: process.env.STAFF_NAME ?? "Hnin Nwe",
+    role: "office-staff",
+    buildingId: "b216",
+  },
+] as const;
 
 /** What this script owns. Activity collections are deliberately not here. */
 const ESTATE = [
@@ -121,25 +143,32 @@ async function clear(name: string): Promise<void> {
 }
 
 /** Creates the account, or signs in to an existing one to recover its uid. */
-async function ensureCeo(): Promise<string> {
+async function ensureAccount(email: string): Promise<string> {
   try {
-    const cred = await createUserWithEmailAndPassword(
-      auth,
-      CEO_EMAIL,
-      CEO_PASSWORD,
-    );
-    console.log(`  + ${CEO_EMAIL} created`);
+    const cred = await createUserWithEmailAndPassword(auth, email, PASSWORD);
+    console.log(`  + ${email} created`);
     return cred.user.uid;
   } catch (error) {
     const code = (error as { code?: string }).code;
     if (code !== "auth/email-already-in-use") throw error;
-    const cred = await signInWithEmailAndPassword(
-      auth,
-      CEO_EMAIL,
-      CEO_PASSWORD,
-    );
-    console.log(`  · ${CEO_EMAIL} already exists`);
-    return cred.user.uid;
+    // Already there from an earlier run. Signing in is how a client-SDK
+    // script recovers the uid — there is no admin lookup without a key.
+    try {
+      const cred = await signInWithEmailAndPassword(auth, email, PASSWORD);
+      console.log(`  · ${email} already exists`);
+      return cred.user.uid;
+    } catch (signInError) {
+      const signInCode = (signInError as { code?: string }).code;
+      if (signInCode !== "auth/invalid-credential") throw signInError;
+      throw new Error(
+        `${email} already exists with a different password, and this script ` +
+          `cannot read a uid without signing in.\n\n` +
+          `Either run it with the password that account already has:\n` +
+          `  INIT_PASSWORD='the-existing-one' pnpm init:project\n\n` +
+          `or delete the account in the Firebase console under\n` +
+          `Authentication → Users, and run this again.`,
+      );
+    }
   }
 }
 
@@ -148,24 +177,35 @@ async function main(): Promise<void> {
     `Setting up ${env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}${DRY_RUN ? " (dry run)" : ""}\n`,
   );
 
-  console.log("Account:");
-  const uid = DRY_RUN ? "(dry run)" : await ensureCeo();
+  console.log("Accounts:");
+  if (DRY_RUN) {
+    for (const a of ACCOUNTS) {
+      console.log(`  would create ${a.email.padEnd(26)} ${a.role}`);
+    }
+  } else {
+    // Every account is created first, then the profiles are written while
+    // signed in as the CEO — creating an account signs you in as it, and the
+    // last one created would otherwise be the one writing everybody's role.
+    const uids: string[] = [];
+    for (const a of ACCOUNTS) uids.push(await ensureAccount(a.email));
 
-  if (!DRY_RUN) {
-    await setDoc(
-      doc(db, "users", uid),
-      {
-        email: CEO_EMAIL,
-        name: CEO_NAME,
-        role: "ceo-super-admin",
-        buildingId: null,
-        status: "active",
-        lastActiveAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      },
-      { merge: true },
-    );
-    console.log(`  · profile written as ceo-super-admin`);
+    await signInWithEmailAndPassword(auth, ACCOUNTS[0].email, PASSWORD);
+    for (const [i, a] of ACCOUNTS.entries()) {
+      await setDoc(
+        doc(db, "users", uids[i]),
+        {
+          email: a.email,
+          name: a.name,
+          role: a.role,
+          buildingId: a.buildingId,
+          status: "active",
+          lastActiveAt: serverTimestamp(),
+          createdAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      console.log(`  · ${a.email.padEnd(26)} profile written as ${a.role}`);
+    }
   }
 
   if (RESET) {
@@ -211,13 +251,19 @@ async function main(): Promise<void> {
 
   if (!DRY_RUN) await signOut(auth);
 
+  const rows = ACCOUNTS.map((a) => `  ${a.email.padEnd(26)} ${a.role}`).join(
+    "\n",
+  );
   console.log(`
 Done. Sign in at http://localhost:3000/login
 
-  ${CEO_EMAIL}
-  ${CEO_PASSWORD}
+${rows}
 
-No requests, Log Book entries, equipment history or reports were created —
+  password for all three: ${PASSWORD}
+
+There is no role switcher — to see another role, sign in as it.
+
+No requests, Log Book entries, equipment history or reports were created;
 those appear as you use the app.`);
 }
 

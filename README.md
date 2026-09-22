@@ -70,7 +70,18 @@ They say which project to talk to; they do not grant access to it.
 pnpm init:project
 ```
 
-This makes one CEO account and the estate it manages:
+This makes three accounts — one per role — and the estate they manage:
+
+| Email | Role |
+| --- | --- |
+| `daw.htun@university.edu` | CEO / Super Admin |
+| `elysha@university.edu` | Admin Manager |
+| `hnin.nwe@university.edu` | Office Staff (Building 216) |
+
+All three use the password `SmartPassword!`. There is no role switcher, so
+three accounts is how you see all three views.
+
+Plus the estate:
 
 - 3 buildings and 19 rooms
 - 16 equipment types and 28 equipment units
@@ -88,13 +99,15 @@ pnpm init:project --dry-run    # show what it would do, change nothing
 pnpm init:project --reset      # delete the estate first, then write it again
 ```
 
-To use your own email and password:
+To use your own addresses or password:
 
 ```bash
-CEO_EMAIL=you@example.com CEO_PASSWORD=YourPassword1! CEO_NAME="Your Name" pnpm init:project
+CEO_EMAIL=you@example.com ADMIN_EMAIL=admin@example.com \
+STAFF_EMAIL=staff@example.com INIT_PASSWORD=YourPassword1! pnpm init:project
 ```
 
-The password must be at least 6 characters — that is Firebase's rule.
+`CEO_NAME`, `ADMIN_NAME` and `STAFF_NAME` set the display names. The password
+must be at least 6 characters — that is Firebase's rule.
 
 ### 5. Run it
 
@@ -102,22 +115,27 @@ The password must be at least 6 characters — that is Firebase's rule.
 pnpm dev
 ```
 
-Open <http://localhost:3000> and sign in with the account from step 4. The
-default is:
+Open <http://localhost:3000> and sign in with any account from step 4 — start
+with the CEO to see everything:
 
 ```
 daw.htun@university.edu
-Password!2026
+SmartPassword!
 ```
 
 ## Making more accounts
 
 Sign in as the CEO and go to **Administration → User Accounts → New account**.
 
-The new person gets an email with a link to set their own password. **The email
-address must be real and you must be able to open it** — otherwise the account
-exists but nobody can ever sign in to it. A Gmail alias works well for testing:
-`yourname+staff@gmail.com`, `yourname+admin@gmail.com`.
+The new account can sign in straight away with **`SmartPassword!`**, and is
+also emailed a link to choose its own password. Tell the person both, and ask
+them to change it.
+
+> Because that starting password is the same every time, anyone who knows it
+> can sign in as a new account before its owner changes it. For anything real,
+> use the emailed link only and delete this paragraph's convenience.
+
+A Gmail alias is useful for testing the email: `yourname+staff@gmail.com`.
 
 One console step is easy to miss. In **Authentication → Templates → Password
 reset → Edit → Customise action URL**, set:

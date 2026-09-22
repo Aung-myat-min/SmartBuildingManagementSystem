@@ -135,8 +135,9 @@ export function setUserStatus(
  * createUserWithEmailAndPassword signs you in as whoever it just created, so
  * it runs on a second, isolated instance. The profile is written through the
  * PRIMARY one, carrying the admin's token — through the secondary, the rules
- * would see a new account writing its own role. The generated password is
- * never shown; the reset link activates the account.
+ * would see a new account writing its own role. The account starts on
+ * INITIAL_PASSWORD and is also sent a reset link, so it is usable whether or
+ * not the email arrives.
  */
 export async function createUser(input: {
   email: string;
@@ -155,7 +156,7 @@ export async function createUser(input: {
     const cred = await createUserWithEmailAndPassword(
       secondaryAuth,
       input.email.trim(),
-      throwawayPassword(),
+      INITIAL_PASSWORD,
     );
 
     await setDoc(doc(db, "users", cred.user.uid), {
@@ -182,12 +183,19 @@ export async function createUser(input: {
   }
 }
 
-/** Long, random, and discarded — the reset link is the way in. */
-function throwawayPassword(): string {
-  const bytes = new Uint8Array(24);
-  crypto.getRandomValues(bytes);
-  return `Aa1${Array.from(bytes, (b) => b.toString(36)).join("")}`;
-}
+/**
+ * What a new account can sign in with straight away.
+ *
+ * This used to be long, random and thrown away, so the reset link was the only
+ * way in — which meant an account whose email never arrived could never be
+ * used at all. A known starting password means an administrator can hand it
+ * over and the person is in.
+ *
+ * The cost is real and worth stating: anyone who knows this string can sign in
+ * as any account that has not yet changed it. The reset email still goes out,
+ * and the sooner it is used the better.
+ */
+export const INITIAL_PASSWORD = "SmartPassword!";
 
 /**
  * Account writes can fail as Firestore writes *or* as Auth operations — the

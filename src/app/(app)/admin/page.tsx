@@ -47,6 +47,7 @@ import type {
 } from "@/lib/types";
 import {
   createUser,
+  INITIAL_PASSWORD,
   setUserStatus,
   updateUser,
   useUsers,
@@ -1198,7 +1199,9 @@ function UsersTab({
             targetId: written.uid ?? draft.email,
             buildingId: draft.buildingId,
           });
-          toast.success(`${draft.name} has been sent a first sign-in link`);
+          toast.success(`${draft.name} can sign in now`, {
+            description: `Starting password ${INITIAL_PASSWORD} — a reset link has also been emailed.`,
+          });
           return written;
         }}
       />
@@ -1297,7 +1300,7 @@ function UserDrawer({
       description={
         editing
           ? "Role and building scope take effect the next time they sign in."
-          : "The account is created with a first sign-in link; they choose their own password."
+          : `The account can sign in straight away with ${INITIAL_PASSWORD}, and is also sent a link to choose its own. Ask them to change it.`
       }
       submitLabel={
         saving ? "Saving…" : editing ? "Save changes" : "Create account"
