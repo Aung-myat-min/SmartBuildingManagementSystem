@@ -88,9 +88,14 @@ export interface Room {
 
 // Data-driven registry, NOT a hardcoded string union. Adding a new equipment
 // type later (e.g. "whiteboard") means adding a row here, not touching code.
+/** What a unit of this type can be told to do, beyond existing. */
+export type EquipmentControls = "hvac";
+
 export interface EquipmentTypeDef {
   id: string; // e.g. "projector"
   label: string; // e.g. "Projector"
+  /** "hvac" gives its units a mode, a setpoint and a fan speed. */
+  controls?: EquipmentControls;
   /** Retired rather than deleted, so units naming it still resolve a label. */
   archived?: boolean;
 }
@@ -137,6 +142,16 @@ export interface EquipmentUnit {
    * to guess how far ahead to schedule the next one.
    */
   serviceIntervalDays?: number;
+  /**
+   * Present on a unit of a type with `controls: "hvac"`. The simulation moves
+   * the room's temperature toward `setpointC` at a rate set by `fan`, so
+   * cooling a room visibly drops its reading.
+   */
+  hvac?: {
+    mode: "cool" | "heat" | "fan" | "off";
+    setpointC: number;
+    fan: 1 | 2 | 3;
+  };
 }
 
 export type EquipmentHistoryEventType =

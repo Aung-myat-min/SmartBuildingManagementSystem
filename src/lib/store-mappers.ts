@@ -57,7 +57,12 @@ export function toEquipmentType(
   data: Record<string, unknown>,
 ): EquipmentTypeDef {
   const d = data as Partial<EquipmentTypeDef>;
-  return { id, label: d.label ?? id, archived: d.archived ?? false };
+  return {
+    id,
+    label: d.label ?? id,
+    controls: d.controls,
+    archived: d.archived ?? false,
+  };
 }
 
 export function toBuilding(
@@ -145,6 +150,7 @@ export function toEquipmentUnit(
     nextServiceDue: d.nextServiceDue ?? "",
     lastServiceAt: d.lastServiceAt,
     serviceIntervalDays: d.serviceIntervalDays,
+    hvac: d.hvac,
   };
 }
 

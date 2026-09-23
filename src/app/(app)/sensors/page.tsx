@@ -52,6 +52,7 @@ import {
   SENSOR_LOCK_REASON,
   SENSOR_TYPE_LOCK_REASON,
 } from "@/lib/permissions";
+import { bandFor, formatReading, isMeasuring } from "@/lib/sensor-readings";
 import type { EnvironmentalSensor, SensorAction } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -314,6 +315,8 @@ function SensorsView() {
           </button>
         )}
       </div>
+
+      <MonitoringStrip />
 
       {visibleBuildings.map((b) => {
         const group = visible.filter((s) => s.buildingId === b.id);
@@ -925,3 +928,197 @@ function SensorTypeSheet({
     </WideSheet>
   );
 }
+
+/**
+ * The measuring sensors, live.
+ *
+ * Readings come from the simulation in app-state — a local series that starts
+ * empty on load. Only a band crossing reaches Firestore, so holding a value
+ * here writes once rather than every tick.
+ */
+function MonitoringStrip() {
+  const { sensors, role, activeBuildingId, simulation } = useAppState();
+  const locked = isBuildingLocked(role);
+  const { readings, series, manual, paused, setPaused, hold, release } =
+    simulation;
+
+  const measuring = sensors.filter(
+    (s) =>
+      (!locked || s.buildingId === activeBuildingId) &&
+      isMeasuring(sensorType(s.typeId)),
+  );
+  if (measuring.length === 0) return null;
+
+  return (
+    <div className="border-border bg-card flex flex-col gap-3 rounded-[5px] border p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <PulseDot tone={paused ? "neutral" : "success"} pulse={!paused} />
+        <span className="text-[12.5px] font-semibold">Live monitoring</span>
+        <span className="text-muted-foreground text-[11.5px] leading-snug">
+          {measuring.length} measuring device
+          {measuring.length === 1 ? "" : "s"}. Drag a dial to hold a value and
+          push it across a threshold.
+        </span>
+        <div className="flex-1" />
+        <button
+          type="button"
+          onClick={() => setPaused(!paused)}
+          className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.75 py-1.5 text-[11px] leading-none font-medium"
+        >
+          {paused ? "Resume" : "Pause"}
+        </button>
+      </div>
+
+      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+        {measuring.map((s) => (
+          <ReadingCard
+            key={s.id}
+            sensor={s}
+            reading={readings[s.id] ?? s.reading}
+            history={series[s.id] ?? []}
+            held={manual[s.id] !== undefined}
+            onHold={(v) => hold(s.id, v)}
+            onRelease={() => release(s.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ReadingCard({
+  sensor,
+  reading,
+  history,
+  held,
+  onHold,
+  onRelease,
+}: {
+  sensor: EnvironmentalSensor;
+  reading: number | undefined;
+  history: number[];
+  held: boolean;
+  onHold: (value: number) => void;
+  onRelease: () => void;
+}) {
+  const type = sensorType(sensor.typeId);
+  const m = type?.measurement;
+  if (!m) return null;
+
+  const value = reading ?? m.min;
+  const band = bandFor(type, value);
+  const def = type?.statuses.find((st) => st.id === band?.statusId);
+  const tone = def?.tone ?? "neutral";
+
+  return (
+    <div
+      className={cn(
+        "border-divider bg-background flex flex-col gap-2 rounded border p-2.75",
+        def?.isAlarm && "border-danger/50 bg-danger-muted/40",
+      )}
+    >
+      <div className="flex items-center gap-1.5">
+        <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
+          {sensor.id}
+        </span>
+        <span className="text-muted-foreground truncate text-[10.5px]">
+          {roomLabel(sensor.roomId)}
+        </span>
+        <div className="flex-1" />
+        <ToneBadge tone={tone}>{def?.label ?? "—"}</ToneBadge>
+      </div>
+
+      <div className="flex items-end gap-2">
+        <span className="font-mono text-[21px] leading-none font-semibold tabular-nums">
+          {formatReading(type, value)}
+        </span>
+        <div className="flex-1" />
+        <Sparkline values={history} tone={tone} />
+      </div>
+
+      <label className="flex items-center gap-2">
+        <span className="text-muted-foreground shrink-0 font-mono text-[9.5px]">
+          {m.min}
+        </span>
+        <input
+          type="range"
+          min={m.min}
+          max={m.max}
+          step={m.decimals > 0 ? 0.1 : 1}
+          value={value}
+          onChange={(e) => onHold(Number(e.target.value))}
+          className="accent-primary min-w-0 flex-1 cursor-pointer"
+        />
+        <span className="text-muted-foreground shrink-0 font-mono text-[9.5px]">
+          {m.max}
+        </span>
+      </label>
+
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground text-[10.5px]">
+          {held ? "Held — not drifting" : "Drifting"}
+        </span>
+        <div className="flex-1" />
+        {held && (
+          <button
+            type="button"
+            onClick={onRelease}
+            className="text-primary cursor-pointer text-[10.5px] font-medium hover:underline"
+          >
+            Release
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** A hand-drawn line, as the Dashboard's bars are — no chart dependency. */
+function Sparkline({ values, tone }: { values: number[]; tone: Tone }) {
+  if (values.length < 2) {
+    return (
+      <span className="text-muted-foreground font-mono text-[9.5px]">
+        collecting…
+      </span>
+    );
+  }
+  const w = 84;
+  const h = 22;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / span) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+
+  return (
+    <svg
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      aria-hidden="true"
+      className="shrink-0 overflow-visible"
+    >
+      <polyline
+        points={points}
+        fill="none"
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        className={SPARK_STROKE[tone]}
+      />
+    </svg>
+  );
+}
+
+const SPARK_STROKE: Record<Tone, string> = {
+  success: "stroke-success",
+  warning: "stroke-warning",
+  danger: "stroke-danger",
+  info: "stroke-info",
+  neutral: "stroke-neutral-foreground",
+};

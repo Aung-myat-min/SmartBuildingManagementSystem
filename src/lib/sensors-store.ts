@@ -66,11 +66,15 @@ export async function writeSensorStatus(
   sensorId: string,
   status: string,
   at: string,
+  reading?: number,
 ): Promise<WriteResult> {
   return updateSensor(sensorId, {
     status,
     statusChangedAt: at,
     updatedAt: at,
+    // Written with the status it produced, so the stored number and the
+    // stored status can never describe different moments.
+    ...(reading !== undefined ? { reading } : {}),
   });
 }
 

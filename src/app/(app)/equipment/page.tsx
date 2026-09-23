@@ -1013,6 +1013,8 @@ function EquipmentDrawer({
         />
       )}
 
+      <HvacPanel unit={unit} />
+
       <DetailDrawerSection label="Actions">
         {form === "none" && (
           <>
@@ -1494,5 +1496,109 @@ function EquipmentTypeSheet({
         )}
       </div>
     </WideSheet>
+  );
+}
+
+/**
+ * The controls on an air conditioner or air handling unit.
+ *
+ * Only for a type flagged `controls: "hvac"` — a projector has no setpoint.
+ * The simulation reads these: a unit cooling a room drags its temperature
+ * sensor toward the setpoint, so this panel is the input end of the whole
+ * threshold-to-alarm chain.
+ */
+function HvacPanel({ unit }: { unit: EquipmentUnit }) {
+  const { equipmentTypeRegistry, editUnit } = useAppState();
+  const type = equipmentTypeRegistry.find((t) => t.id === unit.typeId);
+  const [saving, setSaving] = React.useState(false);
+  if (type?.controls !== "hvac") return null;
+
+  const hvac = unit.hvac ?? {
+    mode: "off" as const,
+    setpointC: 22,
+    fan: 2 as const,
+  };
+
+  const write = async (next: NonNullable<EquipmentUnit["hvac"]>) => {
+    setSaving(true);
+    const written = await editUnit(unit.id, { hvac: next });
+    setSaving(false);
+    if (!written.ok) {
+      toast.error(written.message);
+      return;
+    }
+    toast.success(
+      next.mode === "off"
+        ? `${unit.tag} switched off`
+        : `${unit.tag} — ${next.mode} to ${next.setpointC} °C`,
+    );
+  };
+
+  return (
+    <DetailDrawerSection label="Climate control">
+      <div className="flex flex-col gap-2.5">
+        <div className="grid grid-cols-2 gap-2.25">
+          <DrawerField label="Mode">
+            <select
+              value={hvac.mode}
+              disabled={saving}
+              onChange={(e) =>
+                write({
+                  ...hvac,
+                  mode: e.target.value as NonNullable<
+                    EquipmentUnit["hvac"]
+                  >["mode"],
+                })
+              }
+              className="border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium disabled:opacity-60"
+            >
+              <option value="off">Off</option>
+              <option value="cool">Cool</option>
+              <option value="heat">Heat</option>
+              <option value="fan">Fan only</option>
+            </select>
+          </DrawerField>
+          <DrawerField label="Set point">
+            <NumberInput
+              value={String(hvac.setpointC)}
+              min={10}
+              max={35}
+              suffix="°C"
+              onChange={(v) => {
+                const n = Number(v);
+                if (Number.isFinite(n)) void write({ ...hvac, setpointC: n });
+              }}
+            />
+          </DrawerField>
+        </div>
+
+        <DrawerField label="Fan speed">
+          <div className="flex gap-1.5">
+            {([1, 2, 3] as const).map((speed) => (
+              <button
+                key={speed}
+                type="button"
+                disabled={saving}
+                onClick={() => void write({ ...hvac, fan: speed })}
+                className={cn(
+                  "flex-1 cursor-pointer rounded border px-2 py-1.5 text-[11px] leading-none font-medium",
+                  hvac.fan === speed
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-input bg-card text-neutral-foreground hover:border-primary",
+                )}
+              >
+                {speed === 1 ? "Low" : speed === 2 ? "Medium" : "High"}
+              </button>
+            ))}
+          </div>
+        </DrawerField>
+
+        <p className="text-muted-foreground text-[10.5px] leading-relaxed">
+          {hvac.mode === "off"
+            ? "Off — this room follows its own drift."
+            : `Moving ${roomLabel(unit.roomId)} toward ${hvac.setpointC} °C. Watch its temperature sensor on the Sensors page.`}
+        </p>
+      </div>
+    </DetailDrawerSection>
   );
 }

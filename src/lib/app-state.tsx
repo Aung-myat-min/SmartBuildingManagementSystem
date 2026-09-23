@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { type SimulationState, useSimulation } from "@/hooks/use-simulation";
 import { countOpenRequests, nextServiceDate } from "@/lib/derive";
 import {
   appendHistory,
@@ -47,7 +48,7 @@ import {
   pendingDecisions,
   pruneReadIds,
 } from "@/lib/notifications";
-import { canAdvanceRequest } from "@/lib/permissions";
+import { canActOnSensor, canAdvanceRequest } from "@/lib/permissions";
 import { createReport, useReports } from "@/lib/reports-store";
 import {
   CLEAR,
@@ -201,6 +202,8 @@ export interface AppState {
   addRoom: (room: Room) => Promise<WriteResult>;
   updateRoom: (room: Room) => Promise<WriteResult>;
   removeRoom: (roomId: string) => Promise<WriteResult>;
+  /** The live reading simulation. See hooks/use-simulation.ts. */
+  simulation: SimulationState;
   /** Every device on the network. */
   sensors: EnvironmentalSensor[];
   addSensor: (sensor: EnvironmentalSensor) => Promise<WriteResult>;
@@ -211,7 +214,11 @@ export interface AppState {
   ) => Promise<WriteResult>;
   /** Takes a device off the network for good. */
   removeSensor: (sensorId: string) => Promise<WriteResult>;
-  setSensorStatus: (sensorId: string, status: string) => Promise<WriteResult>;
+  setSensorStatus: (
+    sensorId: string,
+    status: string,
+    reading?: number,
+  ) => Promise<WriteResult>;
   /**
    * The Log Book: what this session wrote, newest first, in front of the seed
    * entries. Every action in the app lands here.
@@ -635,7 +642,7 @@ export function AppStateProvider({
   setAssetSource({ units: equipmentUnits, sensors });
 
   const setSensorStatus = React.useCallback(
-    async (sensorId: string, status: string) => {
+    async (sensorId: string, status: string, reading?: number) => {
       const sensor = sensors.find((s) => s.id === sensorId);
       // The stamp goes in with the status, not after it: a status whose tone
       // changes with age is measured from it, so the two are one write.
@@ -643,6 +650,7 @@ export function AppStateProvider({
         sensorId,
         status,
         new Date().toISOString(),
+        reading,
       );
       if (!written.ok) return written;
       const type = sensor ? sensorType(sensor.typeId) : undefined;
@@ -1081,6 +1089,24 @@ export function AppStateProvider({
     [equipmentTypeRegistry, logType],
   );
 
+  // The tick reads the latest writer rather than closing over one, so the
+  // interval is not rebuilt every time a snapshot arrives.
+  const setSensorStatusRef = React.useRef(setSensorStatus);
+  setSensorStatusRef.current = setSensorStatus;
+
+  // The estate, ticking. One per tab, and only for someone who could act on a
+  // sensor anyway — an Office Staff tab should not be writing status changes
+  // the whole estate then sees.
+  const simulation = useSimulation({
+    sensors,
+    types: sensorTypeRegistry,
+    units: equipmentUnits,
+    enabled: canActOnSensor(role),
+    onCrossing: (sensorId, status, reading) => {
+      void setSensorStatusRef.current(sensorId, status, reading);
+    },
+  });
+
   const addUnit = React.useCallback(
     async (unit: EquipmentUnit) => {
       const written = await createUnit(unit);
@@ -1282,6 +1308,7 @@ export function AppStateProvider({
       updateRoom,
       removeRoom,
       sensors,
+      simulation,
       addSensor,
       editSensor,
       removeSensor,
@@ -1357,6 +1384,7 @@ export function AppStateProvider({
       updateRoom,
       removeRoom,
       sensors,
+      simulation,
       addSensor,
       editSensor,
       removeSensor,
