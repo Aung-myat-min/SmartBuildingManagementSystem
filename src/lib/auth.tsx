@@ -9,7 +9,6 @@
 // user's role is known, because every page reads it.
 
 import {
-  browserLocalPersistence,
   browserSessionPersistence,
   EmailAuthProvider,
   onAuthStateChanged,
@@ -63,11 +62,7 @@ export interface AuthState {
    * sign-in screen and the session-ended one.
    */
   endedReason: SessionEndReason | null;
-  signIn: (
-    email: string,
-    password: string,
-    keepSignedIn: boolean,
-  ) => Promise<AuthResult>;
+  signIn: (email: string, password: string) => Promise<AuthResult>;
   signOutNow: () => Promise<void>;
   sendReset: (email: string) => Promise<AuthResult>;
   changePassword: (current: string, next: string) => Promise<AuthResult>;
@@ -200,23 +195,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const signIn = React.useCallback(
-    async (email: string, password: string, keepSignedIn: boolean) => {
-      try {
-        // Must precede the sign-in call, or the credential lands in whichever
-        // store was configured last.
-        await setPersistence(
-          auth,
-          keepSignedIn ? browserLocalPersistence : browserSessionPersistence,
-        );
-        await signInWithEmailAndPassword(auth, email.trim(), password);
-        return { ok: true as const };
-      } catch (error) {
-        return { ok: false as const, message: authErrorMessage(error) };
-      }
-    },
-    [],
-  );
+  const signIn = React.useCallback(async (email: string, password: string) => {
+    try {
+      // Session persistence, always: the credential lives in the tab and
+      // dies with it, so closing the browser signs you out and nobody is
+      // auto-signed-in on a shared machine. Must precede the sign-in call,
+      // or the credential lands in whichever store was configured last.
+      await setPersistence(auth, browserSessionPersistence);
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+      return { ok: true as const };
+    } catch (error) {
+      return { ok: false as const, message: authErrorMessage(error) };
+    }
+  }, []);
 
   const signOutNow = React.useCallback(async () => {
     deliberate.current = true;

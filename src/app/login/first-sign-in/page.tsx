@@ -105,7 +105,7 @@ function FirstSignInView() {
     }
     // The code is spent now, so sign them straight in rather than sending them
     // back to a form they would have to fill in again.
-    const result = await signIn(email, pass, true);
+    const result = await signIn(email, pass);
     if (!result.ok) {
       // The password is set even so — /login is the honest next step.
       router.replace("/login");

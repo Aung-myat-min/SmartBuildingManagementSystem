@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
@@ -36,7 +35,6 @@ function LoginView() {
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
-  const [keepSignedIn, setKeepSignedIn] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [pending, setPending] = React.useState(false);
 
@@ -55,7 +53,7 @@ function LoginView() {
     if (pending) return;
     setPending(true);
     setError(null);
-    const result = await signIn(email, password, keepSignedIn);
+    const result = await signIn(email, password);
     if (!result.ok) {
       setError(result.message);
       setPending(false);
@@ -122,18 +120,9 @@ function LoginView() {
             />
           </div>
           <div className="flex items-center justify-between">
-            <label
-              htmlFor="keep-signed-in"
-              className="text-foreground/80 flex items-center gap-1.5 text-[12px]"
-            >
-              <Checkbox
-                id="keep-signed-in"
-                checked={keepSignedIn}
-                onCheckedChange={(checked) => setKeepSignedIn(checked === true)}
-                className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
-              />
-              Keep me signed in
-            </label>
+            <span className="text-muted-foreground text-[11.5px]">
+              You stay signed in until this tab closes.
+            </span>
             <Link
               href="/login/forgot-password"
               className="text-primary text-[12px] hover:underline"

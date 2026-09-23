@@ -4,7 +4,8 @@
 //
 //   pnpm init:project                 # create everything
 //   pnpm init:project --dry-run       # say what it would do
-//   pnpm init:project --reset         # wipe the estate first, then write it
+//   pnpm init:project --reset         # wipe the WHOLE database first
+//   pnpm init:project --reset --yes   # ... without being asked to confirm
 //
 // Runs under vite-node rather than node so it can import the estate from
 // src/lib/mock-data.ts directly, instead of keeping a second copy that drifts.
@@ -18,6 +19,7 @@
 // INIT_PASSWORD.
 
 import { readFileSync } from "node:fs";
+import { createInterface } from "node:readline/promises";
 import { initializeApp } from "firebase/app";
 import {
   createUserWithEmailAndPassword,
@@ -27,6 +29,7 @@ import {
 } from "firebase/auth";
 import {
   collection,
+  deleteDoc,
   doc,
   getDocs,
   getFirestore,
@@ -71,7 +74,7 @@ const ACCOUNTS = [
   },
 ] as const;
 
-/** What this script owns. Activity collections are deliberately not here. */
+/** What this script writes. */
 const ESTATE = [
   "buildings",
   "rooms",
@@ -80,6 +83,26 @@ const ESTATE = [
   "sensorTypes",
   "sensors",
 ] as const;
+
+/**
+ * What --reset deletes: everything, not just what gets rewritten. A reset that
+ * left the last person's requests and log entries behind was not one.
+ */
+const ALL_COLLECTIONS = [
+  ...ESTATE,
+  "requests",
+  "logBook",
+  "equipmentHistory",
+  "reports",
+  "users",
+] as const;
+
+/**
+ * Parents whose photos live in a `media` subcollection. Deleting a document
+ * does not delete its subcollections, so these have to be walked or the
+ * photos become unreachable rather than gone.
+ */
+const WITH_PHOTOS = ["equipmentUnits", "buildings"] as const;
 
 function loadEnv(): Record<string, string> {
   const env: Record<string, string> = {};
@@ -140,6 +163,30 @@ async function clear(name: string): Promise<void> {
     await batch.commit();
   }
   console.log(`  ${name.padEnd(16)} cleared ${snap.docs.length}`);
+}
+
+/** A photo lives at `{parent}/{id}/media/photo` and outlives its parent. */
+async function clearPhotos(parent: string): Promise<void> {
+  const snap = await getDocs(collection(db, parent));
+  let removed = 0;
+  for (const d of snap.docs) {
+    const media = await getDocs(collection(db, parent, d.id, "media"));
+    for (const m of media.docs) {
+      await deleteDoc(m.ref);
+      removed += 1;
+    }
+  }
+  if (removed > 0) {
+    console.log(`  ${`${parent}/media`.padEnd(16)} cleared ${removed}`);
+  }
+}
+
+/** Typed at the terminal, because --reset now deletes everything. */
+async function confirm(question: string): Promise<boolean> {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const answer = await rl.question(`${question}\n  Type "delete" to confirm: `);
+  rl.close();
+  return answer.trim().toLowerCase() === "delete";
 }
 
 /** Creates the account, or signs in to an existing one to recover its uid. */
@@ -209,8 +256,24 @@ async function main(): Promise<void> {
   }
 
   if (RESET) {
-    console.log("\nClearing the estate:");
-    for (const name of ESTATE) await clear(name);
+    if (!process.argv.includes("--yes")) {
+      const ok = await confirm(
+        `Delete EVERY document in ${env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}?`,
+      );
+      if (!ok) {
+        console.log("Nothing was deleted.");
+        process.exit(0);
+      }
+    }
+    console.log("\nClearing:");
+    for (const parent of WITH_PHOTOS) await clearPhotos(parent);
+    for (const name of ALL_COLLECTIONS) await clear(name);
+    console.log(
+      "\n  Auth accounts are NOT deleted — the client SDK cannot remove another\n" +
+        "  user's record. They will sign in and land on 'no profile' until the\n" +
+        "  accounts below are recreated. To clear them entirely:\n" +
+        `  https://console.firebase.google.com/project/${env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}/authentication/users`,
+    );
   }
 
   console.log(`\n${DRY_RUN ? "Would write:" : "Writing:"}`);
