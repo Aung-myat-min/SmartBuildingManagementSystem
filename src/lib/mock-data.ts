@@ -1465,39 +1465,6 @@ export interface AttentionItem {
   action: string;
 }
 
-export const ATTENTION_ITEMS: AttentionItem[] = [
-  {
-    id: "att-1",
-    sev: "maint",
-    buildingId: "b216",
-    typeLabel: "Air conditioner",
-    location: "216 / Room 202",
-    detail: "AC unit under maintenance since Monday",
-    since: "3d",
-    action: "Mark running",
-  },
-  {
-    id: "att-2",
-    sev: "faulty",
-    buildingId: "b209",
-    typeLabel: "Desktop PC",
-    location: "209 / Room 105",
-    detail: "2 of 24 lab machines faulty",
-    since: "19h",
-    action: "Log request",
-  },
-  {
-    id: "att-3",
-    sev: "offline",
-    buildingId: "jsq",
-    typeLabel: "Temperature sensor",
-    location: "Junction Sq / L3-08",
-    detail: "Sensor not reporting since 16:18",
-    since: "5h",
-    action: "Ping",
-  },
-];
-
 // Deterministic per-building power draw for the dashboard's "kW demand"
 // sparkline — not truly live, but shaped like it (small daily wobble).
 export function powerSeries(buildingId: string, bars = 24): number[] {

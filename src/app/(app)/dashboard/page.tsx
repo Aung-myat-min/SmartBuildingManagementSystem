@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useLiveClock } from "@/hooks/use-live-clock";
 import { useAppState } from "@/lib/app-state";
+import { attentionItems } from "@/lib/attention";
 import {
   countEscalated,
   countOpenRequests,
@@ -18,7 +19,6 @@ import {
 } from "@/lib/derive";
 import { formatAge, formatTime } from "@/lib/format";
 import {
-  ATTENTION_ITEMS,
   buildingName,
   buildingStats,
   powerSeries,
@@ -26,6 +26,7 @@ import {
   roomsForBuilding,
   sensorType,
   statusDef,
+  typeLabel,
 } from "@/lib/mock-data";
 import { canAct } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
@@ -110,9 +111,17 @@ export default function DashboardPage() {
     .slice(0, 4);
   const escalatedCount = countEscalated(scopedRequests);
 
-  const attentionItems = ATTENTION_ITEMS.filter(
-    (a) => !staff || a.buildingId === activeBuildingId,
-  );
+  // Derived, so the rail can only say things that are true of the estate.
+  // An Office Staff member sees their own building; everyone else the lot.
+  const attention = attentionItems({
+    sensors,
+    units: equipmentUnits,
+    buildingId: staff ? activeBuildingId : undefined,
+    typeLabel,
+    sensorType,
+    roomLabel,
+    buildingName,
+  }).slice(0, 6);
   const feed = logBook
     .filter((e) => !staff || e.buildingId === activeBuildingId)
     .slice(0, 7);
@@ -412,7 +421,7 @@ export default function DashboardPage() {
               tone={buildingAlarm ? "danger" : "neutral"}
               className="ml-auto"
             >
-              {(buildingAlarm ? 1 : 0) + attentionItems.length}
+              {attention.length}
             </ToneBadge>
           </div>
           <div className="border-border flex flex-col gap-2.5 border-b p-3">
@@ -448,27 +457,30 @@ export default function DashboardPage() {
                 </Button>
               </div>
             )}
-            {attentionItems.map((item) => (
-              <div
+            {attention.length === 0 && (
+              <div className="text-muted-foreground px-1 py-4 text-center text-[11.5px]">
+                Nothing needs attention here.
+              </div>
+            )}
+            {attention.map((item) => (
+              <Link
                 key={item.id}
-                className="border-border rounded-md border p-3"
+                href={item.href}
+                className={cn(
+                  "hover:border-primary rounded-md border border-l-3 p-3 transition-colors",
+                  item.sev === "alarm"
+                    ? "border-danger bg-danger-muted"
+                    : "border-border border-l-transparent",
+                )}
               >
                 <div className="flex items-center gap-1.5">
-                  <PulseDot
-                    tone={
-                      item.sev === "faulty"
-                        ? "danger"
-                        : item.sev === "offline"
-                          ? "neutral"
-                          : "warning"
-                    }
-                  />
+                  <PulseDot tone={item.tone} pulse={item.sev === "alarm"} />
                   <span className="text-muted-foreground font-mono text-[9.5px] tracking-wider uppercase">
                     {item.sev}
                   </span>
                   <span className="flex-1" />
                   <span className="text-muted-foreground font-mono text-[10px]">
-                    {item.since}
+                    {formatAge(item.since)}
                   </span>
                 </div>
                 <div className="mt-1.5 text-[12.5px] font-medium">
@@ -477,16 +489,7 @@ export default function DashboardPage() {
                 <div className="text-muted-foreground mt-0.5 text-[11px]">
                   {item.location}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={staff}
-                  className="mt-2 w-full text-[11px]"
-                >
-                  {staff && <Lock className="size-2.5" />}
-                  {item.action}
-                </Button>
-              </div>
+              </Link>
             ))}
           </div>
           <div className="px-4 pt-3 pb-1">
