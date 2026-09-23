@@ -53,7 +53,7 @@ export function AlarmBanner() {
     <button
       type="button"
       onClick={() => router.push(`/sensors?device=${first.id}`)}
-      className="bg-danger-muted text-danger-foreground border-danger/30 hover:bg-danger-muted/70 flex w-full cursor-pointer items-center gap-2.5 border-b px-4 py-2 text-left lg:px-5"
+      className="bg-danger-muted text-danger-foreground border-danger/30 hover:bg-danger-muted/70 animate-sb-drop flex w-full cursor-pointer items-center gap-2.5 border-b px-4 py-2 text-left lg:px-5"
     >
       <PulseDot tone="danger" pulse className="shrink-0" />
       <ShieldAlert className="size-3.5 shrink-0" />

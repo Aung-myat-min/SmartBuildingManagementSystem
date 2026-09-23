@@ -59,6 +59,7 @@ import {
   roomsForBuilding,
   sensorForEquipment,
 } from "@/lib/mock-data";
+import { staggerStyle } from "@/lib/motion";
 import {
   canDecommissionEquipment,
   canManageEquipmentTypes,
@@ -136,6 +137,7 @@ export default function EquipmentPage() {
   const [newOpen, setNewOpen] = React.useState(false);
   const [typesOpen, setTypesOpen] = React.useState(false);
   const [dragId, setDragId] = React.useState<string | null>(null);
+  const [landedId, setLandedId] = React.useState<string | null>(null);
   const [overCol, setOverCol] = React.useState<EquipmentBoardColumn | null>(
     null,
   );
@@ -202,6 +204,14 @@ export default function EquipmentPage() {
       toast.error(written.message);
       return;
     }
+    // The card unmounts from one column and mounts in another, so there is no
+    // element to move. Marking the one that landed lets it arrive rather than
+    // appear, which is the part that says the drop worked.
+    setLandedId(unit.id);
+    window.setTimeout(
+      () => setLandedId((id) => (id === unit.id ? null : id)),
+      500,
+    );
     toast.success(`${unit.tag} → ${COLUMN_META[col].label}`);
   };
 
@@ -343,7 +353,7 @@ export default function EquipmentPage() {
             <span className="w-18.5 text-right">Detail</span>
           </div>
 
-          {units.map((u) => {
+          {units.map((u, i) => {
             const condition = u.condition;
             const due = isDueService(u, condition);
             return (
@@ -351,8 +361,9 @@ export default function EquipmentPage() {
                 type="button"
                 key={u.id}
                 onClick={() => setSelectedId(u.id)}
+                style={staggerStyle(i)}
                 className={cn(
-                  "border-rule hover:bg-surface-hover flex w-full items-center border-b px-4 py-2.5 text-left",
+                  "border-rule hover:bg-surface-hover animate-sb-rise flex w-full items-center border-b px-4 py-2.5 text-left",
                   condition === "faulty" && "border-l-danger border-l-[3px]",
                   due && "border-l-warning border-l-[3px]",
                 )}
@@ -473,6 +484,7 @@ export default function EquipmentPage() {
                           "border-divider hover:border-primary bg-card cursor-pointer rounded border border-l-[3px] px-2.75 py-2.5 text-left",
                           "active:cursor-grabbing",
                           dragId === u.id && "opacity-40",
+                          landedId === u.id && "animate-sb-drop",
                           col === "faulty"
                             ? "border-l-danger"
                             : col === "due-service"

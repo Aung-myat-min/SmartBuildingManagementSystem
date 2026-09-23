@@ -25,6 +25,7 @@ import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import { LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
+import { staggerStyle } from "@/lib/motion";
 import {
   canAccessLogBook,
   isBuildingLocked,
@@ -281,10 +282,11 @@ export default function LogBookPage() {
                   · {entries.length} entries
                 </span>
               </div>
-              {entries.map((e) => (
+              {entries.map((e, i) => (
                 <div
                   key={e.id}
-                  className="border-border flex gap-2.5 border-b px-4 py-2.5 last:border-b-0"
+                  style={staggerStyle(i)}
+                  className="border-border animate-sb-rise flex gap-2.5 border-b px-4 py-2.5 last:border-b-0"
                 >
                   <span className="text-muted-foreground w-11 shrink-0 pt-0.5 font-mono text-[10.5px]">
                     {formatTime(e.timestamp)}

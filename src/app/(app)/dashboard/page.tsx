@@ -7,6 +7,7 @@ import { PulseDot } from "@/components/shared/pulse-dot";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useCountUp } from "@/hooks/use-count-up";
 import { useLiveClock } from "@/hooks/use-live-clock";
 import { useAppState } from "@/lib/app-state";
 import { attentionItems } from "@/lib/attention";
@@ -536,10 +537,13 @@ function Stat({
   label: string;
   className?: string;
 }) {
+  // Counted rather than snapped: a tile that lands on 5 tells you it is 5, one
+  // that walks down from 7 tells you something was cleared.
+  const shown = useCountUp(value);
   return (
     <div className={className}>
-      <div className="font-mono text-[27px] leading-none font-semibold">
-        {value}
+      <div className="font-mono text-[27px] leading-none font-semibold tabular-nums">
+        {shown}
       </div>
       <div className="text-muted-foreground mt-1 text-[11px]">{label}</div>
     </div>

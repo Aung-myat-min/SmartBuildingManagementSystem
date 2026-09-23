@@ -1547,9 +1547,28 @@ corner radius 4–5px.
 
 ### Animations
 
-`--animate-sb-pulse` (`sb-pulse 1.4s infinite`, the live dot) and
-`--animate-sb-slide` (`sb-slide 0.16s ease-out`, popover entry), used as
-`animate-sb-pulse` / `animate-sb-slide`.
+One curve and three durations, so nothing carries its own number:
+`--ease-out-soft` (`cubic-bezier(0.22, 1, 0.36, 1)`), `--dur-fast` 0.16s,
+`--dur-base` 0.24s, `--dur-slow` 0.5s.
+
+| Token | Used as | Where |
+| --- | --- | --- |
+| `--animate-sb-pulse` | `animate-sb-pulse` | the live dot |
+| `--animate-sb-slide` | `animate-sb-slide` | popover entry |
+| `--animate-sb-drop` | `animate-sb-drop` | the alarm banner; the board card that just landed |
+| `--animate-sb-rise` | `animate-sb-rise` | a row entering a list, delayed by `staggerStyle(i)` |
+| `--animate-sb-draw` | `animate-sb-draw` | a sparkline drawing itself in, once |
+
+Numbers are JavaScript, not CSS: `useCountUp(value, decimals)` walks a figure
+to its new value (KPI tiles, sensor readings) and `useReducedMotion()` tells it
+to skip. `lib/motion.ts` holds `staggerMs` / `staggerStyle`, capped at twelve
+rows so a long list does not take seconds to appear.
+
+**`prefers-reduced-motion: reduce` is honoured globally** — a blanket rule at
+the end of `globals.css` cuts every animation and transition, so a transition
+added later is covered without anyone remembering to. `@media print` does the
+same, because a staggered row is held hidden until its animation runs and
+printing does not wait for one.
 
 ### Dark mode
 

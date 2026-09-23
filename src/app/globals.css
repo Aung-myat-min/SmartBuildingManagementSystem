@@ -74,7 +74,19 @@
   --color-auth: var(--auth);
 
   --animate-sb-pulse: sb-pulse 1.4s infinite;
-  --animate-sb-slide: sb-slide 0.16s ease-out;
+  --animate-sb-slide: sb-slide var(--dur-fast) var(--ease-out-soft);
+  --animate-sb-drop: sb-drop var(--dur-base) var(--ease-out-soft);
+  --animate-sb-rise: sb-rise var(--dur-base) var(--ease-out-soft) backwards;
+  --animate-sb-draw: sb-draw var(--dur-slow) var(--ease-out-soft) forwards;
+}
+
+/* One easing curve and three durations, so a drawer, a banner and a row all
+   move the same way rather than each carrying its own number. */
+:root {
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-fast: 0.16s;
+  --dur-base: 0.24s;
+  --dur-slow: 0.5s;
 }
 
 @keyframes sb-pulse {
@@ -84,6 +96,37 @@
   }
   50% {
     opacity: 0.25;
+  }
+}
+
+/* A banner or a card arriving: down from above, for something that appeared. */
+@keyframes sb-drop {
+  from {
+    transform: translateY(-8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* A row entering a list. Staggered by an inline delay at the call site. */
+@keyframes sb-rise {
+  from {
+    transform: translateY(4px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* A line drawing itself, via stroke-dashoffset set on the element. */
+@keyframes sb-draw {
+  to {
+    stroke-dashoffset: 0;
   }
 }
 
@@ -274,11 +317,36 @@
     color: #111318;
   }
 
+  /* A staggered row is held hidden until its animation runs. Printing does not
+     wait for one, so a report could come out with blank rows. */
+  *,
+  *::before,
+  *::after {
+    animation: none;
+    transition: none;
+  }
+
   /* Cards stop being surfaces and become sections: no shadow, a hairline rule,
      and never split across a page break mid-table. */
   [data-slot="card"] {
     box-shadow: none;
     border-color: #d8dbe1;
     break-inside: avoid;
+  }
+}
+
+/* Motion is decoration on top of a static layout: everything above still reads
+   correctly without it. Honoured globally rather than per component, so a
+   transition added later is covered without anyone remembering to. The live
+   dot stops pulsing with everything else; it is still a coloured dot, which is
+   what it was saying. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+    scroll-behavior: auto;
   }
 }

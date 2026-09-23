@@ -29,6 +29,7 @@ import { FormDrawer, WideSheet } from "@/components/shared/form-drawer";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { SensorTypeRegistry } from "@/components/shared/sensor-type-registry";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
+import { useCountUp } from "@/hooks/use-count-up";
 import { useLiveClock } from "@/hooks/use-live-clock";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
@@ -1003,9 +1004,13 @@ function ReadingCard({
 }) {
   const type = sensorType(sensor.typeId);
   const m = type?.measurement;
+  const value = reading ?? m?.min ?? 0;
+  // The simulation steps every few seconds; counting between steps makes a
+  // reading look like it is being measured rather than re-fetched. Called
+  // before the guard below, because a hook cannot sit after a return.
+  const shown = useCountUp(value, m?.decimals ?? 0);
   if (!m) return null;
 
-  const value = reading ?? m.min;
   const band = bandFor(type, value);
   const def = type?.statuses.find((st) => st.id === band?.statusId);
   const tone = def?.tone ?? "neutral";
@@ -1030,7 +1035,7 @@ function ReadingCard({
 
       <div className="flex items-end gap-2">
         <span className="font-mono text-[21px] leading-none font-semibold tabular-nums">
-          {formatReading(type, value)}
+          {formatReading(type, shown)}
         </span>
         <div className="flex-1" />
         <Sparkline values={history} tone={tone} />
@@ -1073,8 +1078,24 @@ function ReadingCard({
   );
 }
 
+/**
+ * Longer than any sparkline path, so one dash covers the whole line and
+ * offsetting by it hides the line completely.
+ */
+const SPARK_DASH = 260;
+
 /** A hand-drawn line, as the Dashboard's bars are — no chart dependency. */
 function Sparkline({ values, tone }: { values: number[]; tone: Tone }) {
+  // Drawn in once, when the series first has enough points to be a line. After
+  // that the points change every tick and redrawing each time would flicker.
+  const [drawing, setDrawing] = React.useState(true);
+  const ready = values.length >= 2;
+  React.useEffect(() => {
+    if (!ready) return;
+    const timer = setTimeout(() => setDrawing(false), 600);
+    return () => clearTimeout(timer);
+  }, [ready]);
+
   if (values.length < 2) {
     return (
       <span className="text-muted-foreground font-mono text-[9.5px]">
@@ -1109,7 +1130,15 @@ function Sparkline({ values, tone }: { values: number[]; tone: Tone }) {
         strokeWidth={1.5}
         strokeLinejoin="round"
         strokeLinecap="round"
-        className={SPARK_STROKE[tone]}
+        className={cn(SPARK_STROKE[tone], drawing && "animate-sb-draw")}
+        style={
+          drawing
+            ? {
+                strokeDasharray: SPARK_DASH,
+                strokeDashoffset: SPARK_DASH,
+              }
+            : undefined
+        }
       />
     </svg>
   );
