@@ -279,7 +279,7 @@ export default function RequestsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
+        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
@@ -292,7 +292,7 @@ export default function RequestsPage() {
               type="button"
               title="Clear search"
               onClick={() => setQuery("")}
-              className="text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[15px] leading-none"
+              className="interactive focus-ring text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[15px] leading-none"
             >
               ×
             </button>
@@ -361,7 +361,7 @@ export default function RequestsPage() {
             title="Board view"
             onClick={() => setView("board")}
             className={cn(
-              "cursor-pointer rounded-[3px] px-2.5 py-1.75",
+              "interactive focus-ring cursor-pointer rounded-[3px] px-2.5 py-1.75",
               view === "board"
                 ? "bg-primary text-primary-foreground"
                 : "text-foreground/70",
@@ -374,7 +374,7 @@ export default function RequestsPage() {
             title="Table view"
             onClick={() => setView("table")}
             className={cn(
-              "cursor-pointer rounded-[3px] px-2.5 py-1.75",
+              "interactive focus-ring cursor-pointer rounded-[3px] px-2.5 py-1.75",
               view === "table"
                 ? "bg-primary text-primary-foreground"
                 : "text-foreground/70",
@@ -387,7 +387,7 @@ export default function RequestsPage() {
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
         >
           New request
         </button>
@@ -416,7 +416,7 @@ export default function RequestsPage() {
                   title="Expand completed requests"
                   onClick={() => setDoneCollapsed(false)}
                   className={cn(
-                    "bg-neutral-muted hover:bg-neutral-muted/70 border-border flex min-h-85 cursor-pointer flex-col items-center gap-2.75 rounded-[5px] border border-t-2 px-0 pt-2.75 pb-3.5",
+                    "interactive focus-ring pressable bg-neutral-muted hover:bg-neutral-muted/70 border-border flex min-h-85 cursor-pointer flex-col items-center gap-2.75 rounded-[5px] border border-t-2 px-0 pt-2.75 pb-3.5",
                     TONE_BORDER[col.tone],
                   )}
                 >
@@ -463,7 +463,7 @@ export default function RequestsPage() {
                       type="button"
                       title="Collapse completed requests"
                       onClick={() => setDoneCollapsed(true)}
-                      className="text-muted-foreground hover:text-foreground cursor-pointer px-0.5 font-mono text-[13px] leading-none"
+                      className="interactive focus-ring text-muted-foreground hover:text-foreground cursor-pointer px-0.5 font-mono text-[13px] leading-none"
                     >
                       ›
                     </button>
@@ -624,7 +624,7 @@ function MoveButtons({
           type="button"
           title="Withdraw this request — it has not been approved yet"
           onClick={() => onWithdraw(request)}
-          className="border-input bg-card text-neutral-foreground hover:border-danger/40 hover:text-danger-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2 text-[11px] leading-none font-medium"
+          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-danger/40 hover:text-danger-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2 text-[11px] leading-none font-medium"
         >
           Withdraw
         </button>
@@ -634,7 +634,7 @@ function MoveButtons({
           type="button"
           title="Tell the approver this looks done, so they can close it out"
           onClick={() => onVerify(request)}
-          className="border-primary bg-card text-accent-foreground hover:bg-accent/40 flex flex-1 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium"
+          className="interactive focus-ring pressable border-primary bg-card text-accent-foreground hover:bg-accent/40 flex flex-1 shrink-0 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium"
         >
           <CheckCheck className="size-3" />
           Looks done
@@ -645,7 +645,7 @@ function MoveButtons({
           type="button"
           title="Send this back with a reason — it stays in the queue"
           onClick={() => onDecline(request)}
-          className="border-input bg-card text-neutral-foreground hover:border-warning hover:text-warning-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2 text-[11px] leading-none font-medium"
+          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-warning hover:text-warning-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2 text-[11px] leading-none font-medium"
         >
           Send back
         </button>
@@ -655,7 +655,7 @@ function MoveButtons({
           type="button"
           title={backLabel ?? "Move back"}
           onClick={() => onMove(request, "prev")}
-          className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2"
+          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded-[3px] border px-2.25 py-2"
         >
           <Undo2 className="size-3" />
         </button>
@@ -667,7 +667,7 @@ function MoveButtons({
           title={mayAdvance ? nextLabel : REQUEST_ADVANCE_LOCK_REASON}
           onClick={() => onMove(request, "next")}
           className={cn(
-            "bg-card flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium",
+            "focus-ring interactive bg-card flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium",
             mayAdvance
               ? "border-primary text-accent-foreground hover:bg-accent/40"
               : "border-border text-muted-foreground cursor-not-allowed opacity-45",
@@ -914,7 +914,7 @@ function NewRequestDrawer({
           value={issue}
           onChange={(e) => setIssue(e.target.value)}
           placeholder="What is wrong, and what have you already tried?"
-          className="border-input focus:border-primary w-full resize-y rounded border px-2.5 py-2.25 text-[12px] leading-relaxed outline-none"
+          className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary w-full resize-y rounded border px-2.5 py-2.25 text-[12px] leading-relaxed outline-none"
         />
       </FormField>
 

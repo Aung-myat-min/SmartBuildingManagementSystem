@@ -37,7 +37,9 @@ export function DateRangeFilter({
   return (
     <div
       className={cn(
-        "border-input bg-card flex shrink-0 items-center gap-1.5 rounded border px-2 py-1",
+        // The inputs carry outline-none, so the box around them shows the
+        // focus. Without this, tabbing into a date range was invisible.
+        "focus-ring-within interactive border-input bg-card flex shrink-0 items-center gap-1.5 rounded border px-2 py-1",
         active && "border-primary",
         className,
       )}
@@ -68,7 +70,7 @@ export function DateRangeFilter({
           type="button"
           title="Clear the date range"
           onClick={() => onChange(EMPTY_RANGE)}
-          className="text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
+          className="interactive focus-ring text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
         >
           <X className="size-3" />
         </button>

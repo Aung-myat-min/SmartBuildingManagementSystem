@@ -26,7 +26,7 @@ export function MobileTabBar() {
             key={tab.href}
             href={tab.href}
             className={cn(
-              "flex min-h-12 flex-1 flex-col items-center gap-1.25 px-0.5 py-2",
+              "focus-ring interactive pressable flex min-h-12 flex-1 flex-col items-center gap-1.25 px-0.5 py-2",
               active ? "text-primary" : "text-muted-foreground",
             )}
           >

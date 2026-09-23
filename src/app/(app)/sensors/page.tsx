@@ -241,7 +241,7 @@ function SensorsView() {
             type="button"
             onClick={() => setFilter(id)}
             className={cn(
-              "cursor-pointer rounded border px-2.5 py-1.75 text-[11.5px] leading-none font-medium",
+              "focus-ring interactive cursor-pointer rounded border px-2.5 py-1.75 text-[11.5px] leading-none font-medium",
               filter === id
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-input text-neutral-foreground hover:border-primary",
@@ -289,7 +289,7 @@ function SensorsView() {
             type="button"
             title="Add, rename or archive the kinds of device this estate has"
             onClick={() => setTypesOpen(true)}
-            className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+            className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
           >
             Manage types
           </button>
@@ -298,7 +298,7 @@ function SensorsView() {
             type="button"
             disabled
             title={SENSOR_TYPE_LOCK_REASON}
-            className="border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
+            className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
           >
             <Lock className="size-2.75" />
             Manage types
@@ -310,7 +310,7 @@ function SensorsView() {
             type="button"
             title="Register a new sensor on the network"
             onClick={() => setFormOpen(true)}
-            className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+            className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
           >
             + New sensor
           </button>
@@ -335,7 +335,7 @@ function SensorsView() {
                 setCollapsed((prev) => ({ ...prev, [b.id]: isOpen }))
               }
               className={cn(
-                "hover:bg-surface-hover flex w-full items-center gap-2.5 px-4 py-3 text-left",
+                "focus-ring interactive hover:bg-surface-hover flex w-full items-center gap-2.5 px-4 py-3 text-left",
                 isOpen && "border-divider border-b",
               )}
             >
@@ -403,7 +403,7 @@ function SensorsView() {
                               type="button"
                               title="Open this sensor"
                               onClick={() => setOpenId(s.id)}
-                              className="flex w-full items-center gap-2.5 text-left"
+                              className="interactive focus-ring flex w-full items-center gap-2.5 text-left"
                             >
                               <PulseDot tone={view.tone} pulse={view.pulse} />
                               <div className="min-w-0 flex-1">
@@ -436,7 +436,7 @@ function SensorsView() {
                                       }
                                       onClick={() => runAction(s, a)}
                                       className={cn(
-                                        "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
+                                        "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
                                         allowed
                                           ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
                                           : "border-border cursor-not-allowed opacity-45",
@@ -651,7 +651,7 @@ function SensorDrawer({
               title={mayAct ? "Edit this sensor's details" : SENSOR_LOCK_REASON}
               onClick={() => setEditing(true)}
               className={cn(
-                "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
+                "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
                 mayAct
                   ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
                   : "border-border cursor-not-allowed opacity-45",
@@ -666,7 +666,7 @@ function SensorDrawer({
               title={mayAct ? "Remove this sensor" : SENSOR_LOCK_REASON}
               onClick={() => onRemove(sensor)}
               className={cn(
-                "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
+                "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
                 mayAct
                   ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
                   : "border-border cursor-not-allowed opacity-45",
@@ -726,7 +726,7 @@ function useSensorFields(seed: EnvironmentalSensor | null, active: boolean) {
 type SensorFieldState = ReturnType<typeof useSensorFields>;
 
 const FIELD_INPUT =
-  "border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none";
+  "interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none";
 const FIELD_SELECT =
   "border-input bg-card w-full cursor-pointer rounded border px-2 py-1.75 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60";
 
@@ -964,7 +964,7 @@ function MonitoringStrip() {
         <button
           type="button"
           onClick={() => setPaused(!paused)}
-          className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.75 py-1.5 text-[11px] leading-none font-medium"
+          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.75 py-1.5 text-[11px] leading-none font-medium"
         >
           {paused ? "Resume" : "Pause"}
         </button>
@@ -1068,7 +1068,7 @@ function ReadingCard({
           <button
             type="button"
             onClick={onRelease}
-            className="text-primary cursor-pointer text-[10.5px] font-medium hover:underline"
+            className="interactive focus-ring text-primary cursor-pointer text-[10.5px] font-medium hover:underline"
           >
             Release
           </button>

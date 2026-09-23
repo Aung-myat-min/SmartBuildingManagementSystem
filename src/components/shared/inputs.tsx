@@ -27,7 +27,7 @@ export function RowButton({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
+        "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
         danger
           ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
           : "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground",
@@ -43,7 +43,7 @@ export function TextInput(props: React.ComponentProps<"input">) {
   return (
     <input
       {...props}
-      className="border-input focus:border-primary w-full rounded border px-2.25 py-2 text-[12px] outline-none"
+      className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary w-full rounded border px-2.25 py-2 text-[12px] outline-none"
     />
   );
 }

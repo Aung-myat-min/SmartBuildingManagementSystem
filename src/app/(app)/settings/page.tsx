@@ -57,7 +57,7 @@ export default function SettingsPage() {
               type="button"
               onClick={() => setSection(s.id)}
               className={cn(
-                "border-border/60 flex w-full items-center gap-2.5 border-b border-l-[3px] px-3.5 py-2.75 text-left last:border-b-0",
+                "focus-ring interactive border-border/60 flex w-full items-center gap-2.5 border-b border-l-[3px] px-3.5 py-2.75 text-left last:border-b-0",
                 active
                   ? "bg-accent/50 border-l-primary"
                   : "hover:bg-surface-hover border-l-transparent",
@@ -89,7 +89,7 @@ export default function SettingsPage() {
             type="button"
             onClick={() => setSection(s.id)}
             className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11.5px] font-medium whitespace-nowrap",
+              "interactive focus-ring flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11.5px] font-medium whitespace-nowrap",
               s.id === section
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-border bg-card text-foreground/70",
@@ -322,7 +322,7 @@ function AppearanceSection() {
             type="button"
             onClick={() => setTheme(t.id)}
             className={cn(
-              "cursor-pointer overflow-hidden rounded-md border text-left",
+              "interactive focus-ring cursor-pointer overflow-hidden rounded-md border text-left",
               current === t.id ? "border-primary" : "border-border",
             )}
           >
@@ -493,7 +493,7 @@ function SecuritySection() {
           </Button>
           <Link
             href="/login/forgot-password"
-            className="text-primary text-[11.5px] font-medium hover:underline"
+            className="focus-ring interactive text-primary text-[11.5px] font-medium hover:underline"
           >
             Forgot your current password?
           </Link>

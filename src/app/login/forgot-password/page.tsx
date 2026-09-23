@@ -110,7 +110,7 @@ export default function ForgotPasswordPage() {
               </span>
               <Link
                 href="/login"
-                className="text-primary text-[11.5px] font-medium hover:underline"
+                className="focus-ring interactive text-primary text-[11.5px] font-medium hover:underline"
               >
                 Back to sign in
               </Link>
@@ -146,7 +146,7 @@ export default function ForgotPasswordPage() {
             <div className="border-border mt-4 flex items-center gap-1.5 border-t pt-3.5">
               <Link
                 href="/login"
-                className="text-primary text-[11.5px] font-medium hover:underline"
+                className="focus-ring interactive text-primary text-[11.5px] font-medium hover:underline"
               >
                 Back to sign in
               </Link>

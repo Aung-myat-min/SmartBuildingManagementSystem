@@ -290,6 +290,55 @@
   }
 }
 
+/* Interaction recipes.
+ *
+ * Almost every control in this app is hand-rolled — a row is a full-width
+ * <button>, a chip is a <button>, a board card is a <button> — because each
+ * one needs its own layout. What they share is how they should *feel*, and
+ * that is here rather than restated in eighty class strings. One word each,
+ * and they compose: a row is `interactive focus-ring`, a button adds
+ * `pressable`.
+ *
+ * These are the first things in the app to use --dur-fast and --ease-out-soft,
+ * which is the point: one curve, spelled once. */
+
+/* Hover, selection and disabled: the colour move only. Transform is not in the
+   list — a row that shifted on hover would drag the whole table with it. */
+@utility interactive {
+  transition-property:
+    background-color, border-color, color, opacity, box-shadow,
+    text-decoration-color;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out-soft);
+}
+
+/* A press that acknowledges itself. One pixel, matching what shadcn's own
+   Button does, so a hand-rolled button and a <Button> do not disagree. */
+@utility pressable {
+  &:active:not(:disabled):not([aria-disabled="true"]) {
+    transform: translateY(1px);
+  }
+}
+
+/* The keyboard's hover. Inset, because most of these are full-width rows whose
+   ring would otherwise be clipped by the card holding them — and `:focus-visible`
+   rather than `:focus`, so a mouse click does not leave a ring behind. */
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+  }
+}
+
+/* The same, for a wrapper that holds a native input: the input keeps its own
+   outline off and the box around it shows the focus instead. */
+@utility focus-ring-within {
+  &:focus-within {
+    outline: 2px solid var(--primary);
+    outline-offset: -2px;
+  }
+}
+
 /* Printing is how a report becomes a PDF — every browser can print to one, and
    it costs no dependency. What prints is the page itself, so the shell has to
    get out of the way: chrome, controls and the ledger rails are furniture for

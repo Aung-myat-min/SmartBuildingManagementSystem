@@ -78,7 +78,7 @@ export function DetailDrawerHeader({
           type="button"
           title="Close"
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[17px] leading-none"
+          className="interactive focus-ring text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[17px] leading-none"
         >
           ×
         </button>
@@ -159,7 +159,7 @@ export function SameDevicePanel({
     <button
       type="button"
       onClick={onOpen}
-      className="border-divider bg-surface-subtle hover:bg-surface-hover block w-full cursor-pointer border-b px-4.5 py-3.25 text-left"
+      className="interactive focus-ring pressable border-divider bg-surface-subtle hover:bg-surface-hover block w-full cursor-pointer border-b px-4.5 py-3.25 text-left"
     >
       <div className="text-muted-foreground font-mono text-[9.5px] tracking-[0.07em] uppercase">
         Same physical device
@@ -210,7 +210,7 @@ export function DrawerAction({
       onClick={onClick}
       title={lockedReason ?? caption}
       className={cn(
-        "flex min-h-11 cursor-pointer flex-col items-start justify-center gap-1.25 rounded border px-2.5 py-2.25 text-left transition-colors md:min-h-0",
+        "focus-ring interactive flex min-h-11 cursor-pointer flex-col items-start justify-center gap-1.25 rounded border px-2.5 py-2.25 text-left transition-colors md:min-h-0",
         locked
           ? "border-border cursor-not-allowed opacity-45"
           : tone === "danger"
@@ -282,14 +282,14 @@ export function DrawerInlineForm({
       <div className="mt-0.5 flex gap-1.75">
         <button
           type="submit"
-          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 min-h-9 flex-1 cursor-pointer rounded border px-2 text-[11.5px] leading-none font-medium"
+          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 min-h-9 flex-1 cursor-pointer rounded border px-2 text-[11.5px] leading-none font-medium"
         >
           {submitLabel}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground min-h-9 cursor-pointer rounded border px-3 text-[11.5px] leading-none font-medium"
+          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground min-h-9 cursor-pointer rounded border px-3 text-[11.5px] leading-none font-medium"
         >
           Cancel
         </button>

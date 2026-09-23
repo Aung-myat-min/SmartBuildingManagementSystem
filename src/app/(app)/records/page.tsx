@@ -175,7 +175,7 @@ export default function HistoricalRecordsPage() {
       </div>
 
       <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
+        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
@@ -191,7 +191,7 @@ export default function HistoricalRecordsPage() {
               key={r.days}
               onClick={() => setRange(r.days)}
               className={cn(
-                "rounded px-2.5 py-1 font-mono text-[11px] font-medium",
+                "interactive focus-ring rounded px-2.5 py-1 font-mono text-[11px] font-medium",
                 range === r.days
                   ? "bg-primary text-primary-foreground"
                   : "text-foreground/70",
@@ -259,7 +259,7 @@ export default function HistoricalRecordsPage() {
               `Exported ${filtered.length} record${filtered.length === 1 ? "" : "s"} to CSV`,
             );
           }}
-          className="border-border hover:border-primary hover:text-info-foreground flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium"
+          className="interactive border-border hover:border-primary hover:text-info-foreground flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium"
         >
           <Download className="size-3" /> Export CSV
         </button>
@@ -398,7 +398,7 @@ export default function HistoricalRecordsPage() {
           <button
             type="button"
             onClick={() => setLimit((l) => l + 40)}
-            className="text-primary hover:bg-surface-hover w-full py-2.5 text-center text-[12px] font-medium"
+            className="focus-ring interactive text-primary hover:bg-surface-hover w-full py-2.5 text-center text-[12px] font-medium"
           >
             Load 40 more
           </button>

@@ -69,7 +69,7 @@ export function NotificationsMenu() {
             <button
               type="button"
               onClick={markAllNotificationsRead}
-              className="text-primary cursor-pointer text-[11px] font-medium hover:underline"
+              className="interactive focus-ring text-primary cursor-pointer text-[11px] font-medium hover:underline"
             >
               Mark all read
             </button>
@@ -90,7 +90,7 @@ export function NotificationsMenu() {
                 router.push("/requests");
               }}
               className={cn(
-                "hover:bg-surface-hover border-border/60 flex w-full items-start gap-2.5 border-b px-3.5 py-2.5 text-left last:border-b-0",
+                "focus-ring interactive hover:bg-surface-hover border-border/60 flex w-full items-start gap-2.5 border-b px-3.5 py-2.5 text-left last:border-b-0",
                 !n.read && "bg-accent/40",
               )}
             >

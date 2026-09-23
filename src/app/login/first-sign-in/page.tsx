@@ -125,14 +125,14 @@ function FirstSignInView() {
         </p>
         <Link
           href="/login/forgot-password"
-          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 mt-4.5 block w-full rounded border px-3 py-2 text-center text-[11.5px] font-medium"
+          className="focus-ring interactive border-primary bg-primary text-primary-foreground hover:bg-primary/90 mt-4.5 block w-full rounded border px-3 py-2 text-center text-[11.5px] font-medium"
         >
           Send a new link
         </Link>
         <div className="border-border mt-4 border-t pt-3.5">
           <Link
             href="/login"
-            className="text-primary text-[11.5px] font-medium hover:underline"
+            className="focus-ring interactive text-primary text-[11.5px] font-medium hover:underline"
           >
             Back to sign in
           </Link>

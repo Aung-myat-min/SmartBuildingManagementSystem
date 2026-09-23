@@ -62,19 +62,19 @@ const TONE_META: Record<
     icon: ShieldAlert,
     text: "text-danger",
     border: "border-t-danger",
-    button: "border-danger bg-danger hover:bg-danger/90",
+    button: "interactive border-danger bg-danger hover:bg-danger/90",
   },
   warning: {
     icon: AlertTriangle,
     text: "text-warning",
     border: "border-t-warning",
-    button: "border-warning bg-warning hover:bg-warning/90",
+    button: "interactive border-warning bg-warning hover:bg-warning/90",
   },
   info: {
     icon: Info,
     text: "text-primary",
     border: "border-t-primary",
-    button: "border-primary bg-primary hover:bg-primary/90",
+    button: "interactive border-primary bg-primary hover:bg-primary/90",
   },
 };
 
@@ -176,7 +176,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   placeholder={
                     options?.reasonPlaceholder ?? "Why is this being done?"
                   }
-                  className="border-input focus:border-primary w-full resize-y rounded border px-2.5 py-2.25 text-[12px] leading-relaxed outline-none"
+                  className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary w-full resize-y rounded border px-2.5 py-2.25 text-[12px] leading-relaxed outline-none"
                 />
               </label>
             )}
@@ -217,7 +217,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                       setHasCost(true);
                       if (error) setError(null);
                     }}
-                    className="border-input focus:border-primary w-32 rounded border px-2 py-1.5 text-right font-mono text-[11.5px] outline-none"
+                    className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary w-32 rounded border px-2 py-1.5 text-right font-mono text-[11.5px] outline-none"
                   />
                   <span className="text-muted-foreground font-mono text-[10.5px]">
                     MMK
@@ -236,7 +236,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => close({ confirmed: false })}
-                className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-3.5 py-2.25 text-[11.5px] leading-none font-medium"
+                className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-3.5 py-2.25 text-[11.5px] leading-none font-medium"
               >
                 {options?.cancelLabel ?? "Cancel"}
               </button>
@@ -244,7 +244,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={handleConfirm}
                 className={cn(
-                  "cursor-pointer rounded border px-3.75 py-2.25 text-[11.5px] leading-none font-medium text-white",
+                  "interactive focus-ring cursor-pointer rounded border px-3.75 py-2.25 text-[11.5px] leading-none font-medium text-white",
                   meta.button,
                 )}
               >

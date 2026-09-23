@@ -81,7 +81,7 @@ export function FormDrawer({
               type="button"
               title="Close"
               onClick={() => onOpenChange(false)}
-              className="text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[17px] leading-none"
+              className="interactive focus-ring text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[17px] leading-none"
             >
               ×
             </button>
@@ -105,7 +105,7 @@ export function FormDrawer({
             <button
               type="submit"
               disabled={submitDisabled || saving}
-              className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 min-h-11 flex-1 cursor-pointer rounded border px-2 py-2 text-[11.5px] leading-none font-medium disabled:cursor-not-allowed disabled:opacity-45 md:min-h-0"
+              className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 min-h-11 flex-1 cursor-pointer rounded border px-2 py-2 text-[11.5px] leading-none font-medium disabled:cursor-not-allowed disabled:opacity-45 md:min-h-0"
             >
               {saving ? "Saving…" : submitLabel}
             </button>
@@ -113,7 +113,7 @@ export function FormDrawer({
               type="button"
               disabled={saving}
               onClick={() => onOpenChange(false)}
-              className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground min-h-11 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium md:min-h-0"
+              className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground min-h-11 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium md:min-h-0"
             >
               {cancelLabel}
             </button>
@@ -198,7 +198,7 @@ export function NumberInput({
   placeholder?: string;
 }) {
   return (
-    <span className="border-input focus-within:border-primary bg-card flex items-center gap-2 rounded border pr-2.5">
+    <span className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex items-center gap-2 rounded border pr-2.5">
       <input
         type="number"
         inputMode="numeric"
@@ -259,7 +259,7 @@ export function WideSheet({
               type="button"
               title="Close"
               onClick={() => onOpenChange(false)}
-              className="text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[17px] leading-none"
+              className="interactive focus-ring text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[17px] leading-none"
             >
               ×
             </button>

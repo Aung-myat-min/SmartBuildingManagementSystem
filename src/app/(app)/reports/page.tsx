@@ -238,7 +238,7 @@ export default function ReportsPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
+        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
@@ -483,7 +483,7 @@ function GenerateReportSheet({
                 max={to || undefined}
                 aria-label="Period from"
                 onChange={(e) => setFrom(e.target.value)}
-                className="border-input focus:border-primary bg-card w-full rounded border px-2 py-2 text-[11.5px] font-medium outline-none"
+                className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2 py-2 text-[11.5px] font-medium outline-none"
               />
               <input
                 type="date"
@@ -491,7 +491,7 @@ function GenerateReportSheet({
                 min={from || undefined}
                 aria-label="Period to"
                 onChange={(e) => setTo(e.target.value)}
-                className="border-input focus:border-primary bg-card w-full rounded border px-2 py-2 text-[11.5px] font-medium outline-none"
+                className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2 py-2 text-[11.5px] font-medium outline-none"
               />
             </div>
             <p className="text-muted-foreground mt-1.5 text-[10.5px] leading-relaxed">
@@ -616,7 +616,7 @@ function ReportDetailView({
         <button
           type="button"
           onClick={onBack}
-          className="text-muted-foreground hover:text-primary flex items-center gap-1.5 text-[12px] font-medium"
+          className="focus-ring interactive text-muted-foreground hover:text-primary flex items-center gap-1.5 text-[12px] font-medium"
         >
           <ArrowLeft className="size-3.5" /> Library
         </button>
@@ -627,7 +627,7 @@ function ReportDetailView({
               render={
                 <button
                   type="button"
-                  className="flex cursor-help items-center gap-1.5 text-left"
+                  className="interactive focus-ring flex cursor-help items-center gap-1.5 text-left"
                 />
               }
             >

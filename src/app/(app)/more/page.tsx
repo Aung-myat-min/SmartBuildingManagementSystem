@@ -59,7 +59,7 @@ export default function MorePage() {
             <Link
               key={item.href}
               href={item.href}
-              className="border-rule hover:bg-surface-hover flex items-center gap-3 border-b px-4 py-3 last:border-b-0"
+              className="focus-ring interactive border-rule hover:bg-surface-hover flex items-center gap-3 border-b px-4 py-3 last:border-b-0"
             >
               <item.icon className="text-muted-foreground size-4 shrink-0" />
               <div className="min-w-0 flex-1">
@@ -97,7 +97,7 @@ export default function MorePage() {
         type="button"
         onClick={() => void signOutNow()}
         className={cn(
-          "border-danger/40 text-danger-foreground bg-card hover:bg-danger-muted",
+          "focus-ring interactive border-danger/40 text-danger-foreground bg-card hover:bg-danger-muted",
           "cursor-pointer rounded-[5px] border px-4 py-3 text-[12px] font-medium",
         )}
       >

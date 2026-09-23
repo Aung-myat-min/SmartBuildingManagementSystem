@@ -215,7 +215,7 @@ export default function LogBookPage() {
             type="button"
             onClick={() => setPaused((p) => !p)}
             title={paused ? "Resume live feed" : "Pause live feed"}
-            className="border-border hover:border-primary hover:text-info-foreground flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium"
+            className="focus-ring interactive border-border hover:border-primary hover:text-info-foreground flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium"
           >
             {paused ? (
               <Play className="size-3" />
@@ -227,7 +227,7 @@ export default function LogBookPage() {
         </Card>
 
         <Card className="flex-row flex-wrap items-center gap-2 p-2.5">
-          <div className="border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
+          <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
             <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
             <input
               value={query}
@@ -363,7 +363,7 @@ export default function LogBookPage() {
             type="button"
             onClick={() => setSourceFilter("all")}
             className={cn(
-              "flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left",
+              "focus-ring interactive flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left",
               sourceFilter === "all"
                 ? "bg-accent/50"
                 : "hover:bg-surface-hover",
@@ -381,7 +381,7 @@ export default function LogBookPage() {
               key={source}
               onClick={() => setSourceFilter(source)}
               className={cn(
-                "flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left",
+                "focus-ring interactive flex items-center gap-2 rounded-md px-1.5 py-1.5 text-left",
                 sourceFilter === source
                   ? "bg-accent/50"
                   : "hover:bg-surface-hover",

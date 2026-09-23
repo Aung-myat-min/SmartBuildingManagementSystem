@@ -125,7 +125,7 @@ function LoginView() {
             </span>
             <Link
               href="/login/forgot-password"
-              className="text-primary text-[12px] hover:underline"
+              className="focus-ring interactive text-primary text-[12px] hover:underline"
             >
               Forgot password
             </Link>
@@ -140,7 +140,7 @@ function LoginView() {
           <Button
             type="submit"
             disabled={pending}
-            className="bg-primary hover:bg-primary/90 mt-1 w-full"
+            className="interactive bg-primary hover:bg-primary/90 mt-1 w-full"
           >
             {pending ? "Signing in…" : "Sign in"}
           </Button>

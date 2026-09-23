@@ -181,7 +181,7 @@ export default function DashboardPage() {
               </span>
               <Link
                 href="/equipment"
-                className="text-primary text-[11px] font-medium hover:underline"
+                className="focus-ring interactive text-primary text-[11px] font-medium hover:underline"
               >
                 Open register
               </Link>
@@ -451,7 +451,7 @@ export default function DashboardPage() {
                   disabled={staff}
                   nativeButton={staff}
                   render={staff ? undefined : <Link href="/sensors" />}
-                  className="border-danger text-danger-foreground mt-2 w-full text-[11px]"
+                  className="interactive focus-ring border-danger text-danger-foreground mt-2 w-full text-[11px]"
                 >
                   {staff && <Lock className="size-2.5" />}
                   Acknowledge
@@ -468,7 +468,7 @@ export default function DashboardPage() {
                 key={item.id}
                 href={item.href}
                 className={cn(
-                  "hover:border-primary rounded-md border border-l-3 p-3 transition-colors",
+                  "focus-ring interactive hover:border-primary rounded-md border border-l-3 p-3 transition-colors",
                   item.sev === "alarm"
                     ? "border-danger bg-danger-muted"
                     : "border-border border-l-transparent",
@@ -517,7 +517,7 @@ export default function DashboardPage() {
             ))}
             <Link
               href="/logbook"
-              className="text-primary mt-2.5 text-[11px] hover:underline"
+              className="focus-ring interactive text-primary mt-2.5 text-[11px] hover:underline"
             >
               Open Log Book →
             </Link>

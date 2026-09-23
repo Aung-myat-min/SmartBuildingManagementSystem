@@ -204,7 +204,7 @@ function TabButton({
       title={title}
       onClick={onClick}
       className={cn(
-        "flex cursor-pointer items-center gap-1.5 rounded-[3px] px-3 py-1.75 text-[11.5px] leading-none font-medium",
+        "focus-ring interactive flex cursor-pointer items-center gap-1.5 rounded-[3px] px-3 py-1.75 text-[11.5px] leading-none font-medium",
         active
           ? "bg-primary text-primary-foreground"
           : "text-foreground/70 hover:text-foreground",
@@ -364,7 +364,7 @@ function BuildingsTab({
               key={b.id}
               onClick={() => onSelect(b.id)}
               className={cn(
-                "bg-card cursor-pointer rounded-[5px] border border-l-[3px] px-3.5 py-3 text-left",
+                "focus-ring interactive bg-card cursor-pointer rounded-[5px] border border-l-[3px] px-3.5 py-3 text-left",
                 active
                   ? "border-border border-l-primary"
                   : "border-border hover:border-primary border-l-transparent",
@@ -391,7 +391,7 @@ function BuildingsTab({
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          className="bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground border-input cursor-pointer rounded-[5px] border border-dashed py-2.75 text-[11.5px] leading-none font-medium"
+          className="interactive focus-ring pressable bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground border-input cursor-pointer rounded-[5px] border border-dashed py-2.75 text-[11.5px] leading-none font-medium"
         >
           + Add building
         </button>
@@ -415,7 +415,7 @@ function BuildingsTab({
                 <button
                   type="button"
                   onClick={() => setEditing(selected)}
-                  className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium"
+                  className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium"
                 >
                   Edit
                 </button>
@@ -423,7 +423,7 @@ function BuildingsTab({
                   type="button"
                   onClick={handleDeleteBuilding}
                   title="Delete this building and everything under it"
-                  className="border-danger/40 text-danger-foreground bg-card hover:bg-danger-muted shrink-0 cursor-pointer rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium"
+                  className="interactive focus-ring pressable border-danger/40 text-danger-foreground bg-card hover:bg-danger-muted shrink-0 cursor-pointer rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium"
                 >
                   Delete
                 </button>
@@ -506,7 +506,7 @@ function BuildingsTab({
                 value={newRoomName}
                 onChange={(e) => setNewRoomName(e.target.value)}
                 placeholder="Room name or number"
-                className="border-input focus:border-primary min-w-0 flex-1 rounded border px-2.25 py-2 text-[12px] outline-none"
+                className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary min-w-0 flex-1 rounded border px-2.25 py-2 text-[12px] outline-none"
               />
               <select
                 value={newRoomType}
@@ -533,7 +533,7 @@ function BuildingsTab({
               <button
                 type="button"
                 onClick={handleAddRoom}
-                className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer rounded border px-3.25 py-2 text-[11.5px] leading-none font-medium"
+                className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer rounded border px-3.25 py-2 text-[11.5px] leading-none font-medium"
               >
                 Add room
               </button>
@@ -670,7 +670,7 @@ function BuildingPhoto({ building }: { building: Building }) {
         <div className="absolute right-2 bottom-2 flex gap-1.5">
           <label
             title="Choose a photo of this building"
-            className="border-input bg-card/95 text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium"
+            className="interactive focus-ring pressable border-input bg-card/95 text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium"
           >
             {photo ? "Replace" : "Add photo"}
             <input
@@ -716,7 +716,7 @@ function BuildingPhoto({ building }: { building: Building }) {
                 }
                 setPhoto(null);
               }}
-              className="border-danger/40 bg-card/95 text-danger-foreground hover:bg-danger-muted cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium"
+              className="interactive focus-ring pressable border-danger/40 bg-card/95 text-danger-foreground hover:bg-danger-muted cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium"
             >
               Remove
             </button>
@@ -815,7 +815,7 @@ function NewBuildingDrawer({
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="What this building is for, and anything worth knowing about it."
-          className="border-input focus:border-primary bg-card w-full resize-y rounded border px-2.5 py-2 text-[12px] leading-relaxed outline-none"
+          className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full resize-y rounded border px-2.5 py-2 text-[12px] leading-relaxed outline-none"
         />
       </FormField>
     </FormDrawer>
@@ -898,7 +898,7 @@ function EditBuildingDrawer({
           rows={3}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          className="border-input focus:border-primary bg-card w-full resize-y rounded border px-2.5 py-2 text-[12px] leading-relaxed outline-none"
+          className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full resize-y rounded border px-2.5 py-2 text-[12px] leading-relaxed outline-none"
         />
       </FormField>
     </FormDrawer>
@@ -1047,7 +1047,7 @@ function UsersTab({
   return (
     <div className="flex flex-col gap-3">
       <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="border-input focus-within:border-primary bg-card flex min-w-35 flex-1 items-center gap-1.5 rounded border px-2">
+        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-35 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
@@ -1076,7 +1076,7 @@ function UsersTab({
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3.5 py-2 text-[11.5px] leading-none font-medium"
+          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3.5 py-2 text-[11.5px] leading-none font-medium"
         >
           + New account
         </button>

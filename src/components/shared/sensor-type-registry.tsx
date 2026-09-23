@@ -94,7 +94,7 @@ export function SensorTypeRegistry({ confirm }: { confirm: ConfirmFn }) {
         <button
           type="button"
           onClick={() => setNewOpen(true)}
-          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3.5 py-2 text-[11.5px] leading-none font-medium"
+          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3.5 py-2 text-[11.5px] leading-none font-medium"
         >
           + New sensor type
         </button>
@@ -400,7 +400,7 @@ function SensorTypeDrawer({
                 title={key}
                 onClick={() => setIcon(key)}
                 className={cn(
-                  "flex size-8 cursor-pointer items-center justify-center rounded border",
+                  "focus-ring interactive flex size-8 cursor-pointer items-center justify-center rounded border",
                   active
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-input text-neutral-foreground hover:border-primary",
@@ -513,7 +513,7 @@ function SensorTypeDrawer({
                     ),
                   );
                 }}
-                className="border-input focus:border-primary w-16 rounded border px-2 py-1.5 text-[11.5px] outline-none"
+                className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary w-16 rounded border px-2 py-1.5 text-[11.5px] outline-none"
               />
               <span className="text-muted-foreground text-[10.5px]">
                 minutes · optional
@@ -666,7 +666,7 @@ function EditorSection({
           title={disabled ? "Add a status first." : addLabel}
           onClick={onAdd}
           className={cn(
-            "border-input bg-card text-neutral-foreground hover:border-primary flex cursor-pointer items-center gap-1 rounded border px-2 py-1.25 text-[10.5px] leading-none font-medium",
+            "interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary flex cursor-pointer items-center gap-1 rounded border px-2 py-1.25 text-[10.5px] leading-none font-medium",
             disabled && "cursor-not-allowed opacity-45",
           )}
         >
@@ -716,7 +716,7 @@ function IconButton({
       type="button"
       title={title}
       onClick={onClick}
-      className="border-input bg-card text-muted-foreground hover:border-danger/40 hover:text-danger-foreground flex size-8 shrink-0 cursor-pointer items-center justify-center rounded border"
+      className="interactive focus-ring pressable border-input bg-card text-muted-foreground hover:border-danger/40 hover:text-danger-foreground flex size-8 shrink-0 cursor-pointer items-center justify-center rounded border"
     >
       <Trash2 className="size-3" />
     </button>

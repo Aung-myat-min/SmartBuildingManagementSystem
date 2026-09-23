@@ -223,7 +223,7 @@ export default function EquipmentPage() {
   return (
     <div className="flex flex-col gap-4">
       <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
+        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
             value={query}
@@ -270,7 +270,7 @@ export default function EquipmentPage() {
           title="Decommissioned units are hidden by default"
           onClick={() => setShowDecommissioned((s) => !s)}
           className={cn(
-            "shrink-0 cursor-pointer rounded border px-2.5 py-2 text-[11.5px] leading-none font-medium",
+            "focus-ring interactive shrink-0 cursor-pointer rounded border px-2.5 py-2 text-[11.5px] leading-none font-medium",
             showDecommissioned
               ? "border-primary bg-accent text-accent-foreground"
               : "border-input text-neutral-foreground hover:border-primary",
@@ -314,7 +314,7 @@ export default function EquipmentPage() {
             type="button"
             title="Add, rename or archive the kinds of asset this estate holds"
             onClick={() => setTypesOpen(true)}
-            className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+            className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
           >
             Manage types
           </button>
@@ -323,7 +323,7 @@ export default function EquipmentPage() {
             type="button"
             disabled
             title={EQUIPMENT_TYPE_LOCK_REASON}
-            className="border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
+            className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
           >
             <Lock className="size-2.75" />
             Manage types
@@ -334,7 +334,7 @@ export default function EquipmentPage() {
           type="button"
           title="Add a unit to the register"
           onClick={() => setNewOpen(true)}
-          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
         >
           + New unit
         </button>
@@ -363,7 +363,7 @@ export default function EquipmentPage() {
                 onClick={() => setSelectedId(u.id)}
                 style={staggerStyle(i)}
                 className={cn(
-                  "border-rule hover:bg-surface-hover animate-sb-rise flex w-full items-center border-b px-4 py-2.5 text-left",
+                  "focus-ring interactive border-rule hover:bg-surface-hover animate-sb-rise flex w-full items-center border-b px-4 py-2.5 text-left",
                   condition === "faulty" && "border-l-danger border-l-[3px]",
                   due && "border-l-warning border-l-[3px]",
                 )}
@@ -481,7 +481,7 @@ export default function EquipmentPage() {
                         }}
                         onClick={() => setSelectedId(u.id)}
                         className={cn(
-                          "border-divider hover:border-primary bg-card cursor-pointer rounded border border-l-[3px] px-2.75 py-2.5 text-left",
+                          "interactive focus-ring pressable border-divider hover:border-primary bg-card cursor-pointer rounded border border-l-[3px] px-2.75 py-2.5 text-left",
                           "active:cursor-grabbing",
                           dragId === u.id && "opacity-40",
                           landedId === u.id && "animate-sb-drop",
@@ -640,7 +640,7 @@ function NewUnitDrawer({
           value={tag}
           onChange={(e) => setTag(e.target.value)}
           placeholder="e.g. EQ-216-09"
-          className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-2 font-mono text-[11.5px] outline-none"
+          className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2.25 py-2 font-mono text-[11.5px] outline-none"
         />
       </FormField>
 
@@ -696,7 +696,7 @@ function NewUnitDrawer({
             type="date"
             value={installed}
             onChange={(e) => setInstalled(e.target.value)}
-            className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-2 text-[12px] outline-none"
+            className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2.25 py-2 text-[12px] outline-none"
           />
         </FormField>
         <FormField label="Service interval">
@@ -750,7 +750,7 @@ function ViewButton({
       title={title}
       onClick={onClick}
       className={cn(
-        "cursor-pointer rounded-[3px] px-2.5 py-1.75",
+        "focus-ring interactive cursor-pointer rounded-[3px] px-2.5 py-1.75",
         active
           ? "bg-primary text-primary-foreground"
           : "text-foreground/70 hover:text-foreground",
@@ -876,7 +876,7 @@ function EquipmentDrawer({
               type="button"
               title="Edit this unit's details"
               onClick={() => setForm("edit")}
-              className="border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium"
+              className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium"
             >
               Edit details
             </button>
@@ -890,7 +890,7 @@ function EquipmentDrawer({
               }
               onClick={onDelete}
               className={cn(
-                "bg-card shrink-0 cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
+                "focus-ring interactive bg-card shrink-0 cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
                 canDecommission
                   ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
                   : "border-border text-muted-foreground cursor-not-allowed opacity-45",
@@ -905,7 +905,7 @@ function EquipmentDrawer({
         <div className="mt-3 flex gap-3">
           <label
             title="Choose a photo of this unit"
-            className="border-divider bg-background hover:border-primary relative flex h-21 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded border"
+            className="interactive focus-ring pressable border-divider bg-background hover:border-primary relative flex h-21 w-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded border"
           >
             {photo ? (
               // biome-ignore lint/performance/noImgElement: a local object URL, not a remote asset
@@ -979,7 +979,7 @@ function EquipmentDrawer({
                     }
                     setPhoto(null);
                   }}
-                  className="text-danger-foreground cursor-pointer text-[10.5px] font-medium hover:underline"
+                  className="interactive focus-ring text-danger-foreground cursor-pointer text-[10.5px] font-medium hover:underline"
                 >
                   Remove
                 </button>
@@ -1185,7 +1185,7 @@ function EditUnitForm({
         <input
           value={tag}
           onChange={(e) => setTag(e.target.value)}
-          className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 font-mono text-[11.5px] outline-none"
+          className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 font-mono text-[11.5px] outline-none"
         />
       </DrawerField>
       <DrawerField label="Equipment type">
@@ -1207,7 +1207,7 @@ function EditUnitForm({
             type="date"
             value={installed}
             onChange={(e) => setInstalled(e.target.value)}
-            className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
+            className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
           />
         </DrawerField>
         <DrawerField label="Service interval">
@@ -1256,7 +1256,7 @@ function ServiceForm({
           value={parts}
           onChange={(e) => setParts(e.target.value)}
           placeholder="Lamp module, filter"
-          className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
+          className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
         />
       </DrawerField>
       <DrawerField label="Cost">
@@ -1264,7 +1264,7 @@ function ServiceForm({
           value={cost}
           onChange={(e) => setCost(e.target.value)}
           placeholder="145,000 MMK"
-          className="border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
+          className="interactive focus:ring-3 focus:ring-primary/15 border-input focus:border-primary bg-card w-full rounded border px-2.25 py-1.75 text-[12px] outline-none"
         />
       </DrawerField>
     </DrawerInlineForm>
@@ -1390,7 +1390,7 @@ function EquipmentTypeSheet({
             if (report(await addEquipmentType(draft), `${draft.trim()} added`))
               setDraft("");
           }}
-          className="border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
         >
           Add type
         </button>
@@ -1593,7 +1593,7 @@ function HvacPanel({ unit }: { unit: EquipmentUnit }) {
                 disabled={saving}
                 onClick={() => void write({ ...hvac, fan: speed })}
                 className={cn(
-                  "flex-1 cursor-pointer rounded border px-2 py-1.5 text-[11px] leading-none font-medium",
+                  "focus-ring interactive flex-1 cursor-pointer rounded border px-2 py-1.5 text-[11px] leading-none font-medium",
                   hvac.fan === speed
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-input bg-card text-neutral-foreground hover:border-primary",

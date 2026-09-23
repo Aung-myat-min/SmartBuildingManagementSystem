@@ -38,7 +38,7 @@ export function AppSidebar() {
     <>
       {/* Tablet: icon rail */}
       <aside className="border-border bg-sidebar hidden w-15 shrink-0 flex-col items-center gap-1 border-r py-3.5 md:flex lg:hidden">
-        <Link href="/dashboard" className="mb-2.5">
+        <Link href="/dashboard" className="focus-ring mb-2.5 rounded">
           <BrandMark className="size-6" />
         </Link>
         {items.map((item) => {
@@ -50,7 +50,7 @@ export function AppSidebar() {
               href={item.href}
               title={item.label}
               className={cn(
-                "relative flex size-10 items-center justify-center rounded-[5px]",
+                "focus-ring interactive relative flex size-10 items-center justify-center rounded-[5px]",
                 active
                   ? "bg-accent text-accent-foreground"
                   : "text-foreground/70 hover:bg-surface-hover",
@@ -70,7 +70,10 @@ export function AppSidebar() {
       {/* Desktop: full sidebar */}
       <aside className="border-border bg-sidebar hidden w-(--sidebar-w) shrink-0 flex-col border-r lg:flex">
         <div className="border-border border-b px-4 py-3.5">
-          <Link href="/dashboard" className="flex items-center gap-2.5">
+          <Link
+            href="/dashboard"
+            className="interactive focus-ring flex items-center gap-2.5 rounded"
+          >
             <BrandMark className="size-6" />
             <span className="leading-tight">
               <span className="block text-[12px] font-semibold">
@@ -93,7 +96,7 @@ export function AppSidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex items-center gap-2.25 rounded px-2.5 py-2 text-[12.5px] font-[450]",
+                  "focus-ring interactive flex items-center gap-2.25 rounded px-2.5 py-2 text-[12.5px] font-[450]",
                   active
                     ? "bg-accent text-accent-foreground"
                     : "text-foreground/80 hover:bg-surface-hover",
