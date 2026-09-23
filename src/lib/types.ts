@@ -29,6 +29,13 @@ export interface AppUser {
    */
   phone?: string;
   /**
+   * Notification ids this person has read. On the profile rather than in
+   * localStorage so signing in on another browser does not make every
+   * outstanding decision look new. Pruned to what is still pending on every
+   * write, so it stays bounded.
+   */
+  readNotifications?: string[];
+  /**
    * The mock corpus's id for this person, e.g. "u-hnin". Seeded records carry
    * it in `submittedBy` and `actorUid`, and a real Firebase uid never matches
    * one — without this join, no seeded request would be withdrawable or

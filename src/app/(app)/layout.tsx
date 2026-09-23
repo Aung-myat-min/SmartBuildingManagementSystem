@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/shell/account-menu";
+import { AlarmBanner } from "@/components/shell/alarm-banner";
 import { AppSidebar } from "@/components/shell/app-sidebar";
 import { AuthGate } from "@/components/shell/auth-gate";
 import { MobileTabBar } from "@/components/shell/mobile-tab-bar";
@@ -65,6 +66,8 @@ function AppShell({ children }: { children: React.ReactNode }) {
           <NotificationsMenu />
           <AccountMenu />
         </header>
+
+        <AlarmBanner />
 
         {/* Bottom padding clears the tab bar, which floats over the page. */}
         {dataError && (

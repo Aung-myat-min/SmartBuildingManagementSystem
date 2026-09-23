@@ -39,6 +39,7 @@ interface UserDocData {
   role?: UserRole;
   buildingId?: string | null;
   phone?: string | null;
+  readNotifications?: string[];
   legacyUid?: string | null;
   status?: "active" | "suspended";
   lastActiveAt?: Timestamp;
@@ -53,6 +54,7 @@ function toManagedUser(id: string, data: UserDocData): ManagedUser {
     role: data.role ?? "office-staff",
     buildingId: data.buildingId ?? undefined,
     phone: data.phone ?? undefined,
+    readNotifications: data.readNotifications ?? [],
     legacyUid: data.legacyUid ?? undefined,
     status: data.status ?? "active",
     lastActiveAt: data.lastActiveAt?.toDate().toISOString() ?? "",
@@ -139,6 +141,26 @@ export function setUserStatus(
  * INITIAL_PASSWORD and is also sent a reset link, so it is usable whether or
  * not the email arrives.
  */
+/**
+ * A person marking their own notifications read.
+ *
+ * Deliberately not `updateUser`: that is an administrator editing somebody
+ * else's row, and when firestore.rules are published the two need different
+ * rules — this one is the only write a person makes to their own profile
+ * besides their name and phone.
+ */
+export async function markNotificationsRead(
+  uid: string,
+  ids: string[],
+): Promise<UserResult> {
+  try {
+    await updateDoc(doc(db, "users", uid), { readNotifications: ids });
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: accountError(error) };
+  }
+}
+
 export async function createUser(input: {
   email: string;
   name: string;

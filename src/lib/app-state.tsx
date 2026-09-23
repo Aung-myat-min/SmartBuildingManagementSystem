@@ -42,6 +42,12 @@ import {
   setEstateSource,
   setSensorRegistrySource,
 } from "@/lib/mock-data";
+import {
+  type Notification,
+  pendingDecisions,
+  pruneReadIds,
+} from "@/lib/notifications";
+import { canAdvanceRequest } from "@/lib/permissions";
 import { createReport, useReports } from "@/lib/reports-store";
 import {
   CLEAR,
@@ -75,6 +81,7 @@ import type {
   SensorTypeDef,
   UserRole,
 } from "@/lib/types";
+import { markNotificationsRead } from "@/lib/users-store";
 
 /**
  * Every registry mutation answers the same way, because each one can be
@@ -135,52 +142,6 @@ function validateType(type: SensorTypeDef): RegistryResult {
   if (actionless) return fail("Every action needs a name.");
   return OK;
 }
-
-export interface Notification {
-  id: string;
-  tone: "danger" | "warning" | "info" | "neutral";
-  title: string;
-  detail: string;
-  time: string;
-  read: boolean;
-  pulse?: boolean;
-}
-
-const BASE_NOTIFICATIONS: Notification[] = [
-  {
-    id: "n-alarm-fd-216-14",
-    tone: "danger",
-    title: "Fire alarm triggered",
-    detail: "Building 216 / Room 302 detector — FD-216-14.",
-    time: "now",
-    read: false,
-    pulse: true,
-  },
-  {
-    id: "n-req-4192",
-    tone: "warning",
-    title: "High-priority request opened",
-    detail: "216 / Room 302 — projector won't power on.",
-    time: "13m",
-    read: false,
-  },
-  {
-    id: "n-req-4181",
-    tone: "warning",
-    title: "Request aging past 24h",
-    detail: "Junction Sq / L2-14 — card reader fault, still pending.",
-    time: "1h",
-    read: false,
-  },
-  {
-    id: "n-eq-216-08",
-    tone: "neutral",
-    title: "Equipment marked faulty",
-    detail: "216 / Roof plant room — air handling unit.",
-    time: "3h",
-    read: true,
-  },
-];
 
 export interface AppState {
   role: UserRole;
@@ -386,8 +347,6 @@ export function AppStateProvider({
   const [activeBuildingId, setActiveBuildingIdState] = React.useState(
     () => user.buildingId ?? "b216",
   );
-  const [notifications, setNotifications] =
-    React.useState<Notification[]>(BASE_NOTIFICATIONS);
   // The registry is a collection now. Archiving is still the product's
   // "delete", so an archived type keeps resolving labels on the records that
   // name it — the subscription carries archived rows and the pages filter them.
@@ -435,16 +394,6 @@ export function AppStateProvider({
     [role],
   );
 
-  const markNotificationRead = React.useCallback((id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
-  }, []);
-
-  const markAllNotificationsRead = React.useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
-
   const log = React.useCallback(
     (draft: LogDraft) => {
       // Fire-and-forget: an audit side effect must never block the action that
@@ -474,6 +423,43 @@ export function AppStateProvider({
     () => allRequests.map((r) => r.id),
     [allRequests],
   );
+
+  // The bell. Derived from the one request list rather than stored, so a row
+  // lasts exactly as long as the decision does — approving one clears it.
+  // Read state lives on the profile, which auth.tsx already subscribes to, so
+  // it follows the person to another browser.
+  const notifications = React.useMemo(
+    () =>
+      canAdvanceRequest(role)
+        ? pendingDecisions(requests, user.readNotifications ?? [], {
+            roomLabel,
+            buildingName,
+          })
+        : [],
+    [requests, role, user.readNotifications],
+  );
+
+  const writeRead = React.useCallback(
+    (ids: string[]) => {
+      // Pruned to what is still pending: the stored list would otherwise grow
+      // forever, and an id left behind would silence a later decision.
+      void markNotificationsRead(user.uid, pruneReadIds(ids, notifications));
+    },
+    [user.uid, notifications],
+  );
+
+  const markNotificationRead = React.useCallback(
+    (id: string) => {
+      const already = notifications.filter((n) => n.read).map((n) => n.id);
+      if (already.includes(id)) return;
+      writeRead([...already, id]);
+    },
+    [notifications, writeRead],
+  );
+
+  const markAllNotificationsRead = React.useCallback(() => {
+    writeRead(notifications.map((n) => n.id));
+  }, [notifications, writeRead]);
 
   const scopedRequests = React.useMemo(
     () =>

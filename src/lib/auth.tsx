@@ -82,6 +82,7 @@ interface ProfileDoc {
   buildingId?: string | null;
   legacyUid?: string | null;
   status?: "active" | "suspended";
+  readNotifications?: string[];
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -164,6 +165,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 ? (data.buildingId ?? undefined)
                 : undefined,
             legacyUid: data.legacyUid ?? undefined,
+            // The bell's read state. It lives here rather than in
+            // localStorage so it follows the person to another browser.
+            readNotifications: data.readNotifications ?? [],
           });
           setStatus("signed-in");
           hadSession.current = true;
