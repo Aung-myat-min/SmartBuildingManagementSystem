@@ -199,6 +199,29 @@ export interface SensorAction {
   allowedRoles: UserRole[];
 }
 
+/**
+ * A band of readings that means one status.
+ *
+ * `upTo` is the top of the band, inclusive; the last band in a measurement
+ * must be null, which is the catch-all above every other. Bands map onto
+ * statuses the type already declares, so isAlarm, tone, escalation and the
+ * actions all keep working — nothing here decides what an alarm is.
+ */
+export interface SensorBand {
+  upTo: number | null;
+  statusId: string;
+}
+
+/** What a measuring sensor reads. Absent on a door lock, which has no number. */
+export interface SensorMeasurement {
+  unit: string; // "°C", "%", "ppm"
+  min: number; // the gauge's floor
+  max: number; // the gauge's ceiling
+  decimals: number;
+  /** Ascending by `upTo`, ending with the null catch-all. */
+  bands: SensorBand[];
+}
+
 export interface SensorTypeDef {
   id: string; // slug, generated from the label at creation and immutable after
   label: string;
@@ -206,6 +229,8 @@ export interface SensorTypeDef {
   icon: SensorIconKey;
   statuses: SensorStatusDef[]; // this type's own valid states, never empty
   actions: SensorAction[];
+  /** Present on a type that reads a number; its bands pick the status. */
+  measurement?: SensorMeasurement;
   /** Retired types stay in the registry so existing records still resolve. */
   archived?: boolean;
 }
@@ -252,6 +277,12 @@ export interface EnvironmentalSensor {
    * changed status, where `updatedAt` is the best answer there is.
    */
   statusChangedAt?: string;
+  /**
+   * The last value read, for a type that measures one. Persisted alongside
+   * the status it produced, so a fresh tab shows the right number before the
+   * simulation has ticked — and so the two can never disagree.
+   */
+  reading?: number;
   updatedAt: string;
 }
 

@@ -105,6 +105,7 @@ export function toSensorType(
       : [{ id: "unknown", label: "Unknown", tone: "neutral", isAlarm: false }],
     actions: d.actions ?? [],
     archived: d.archived ?? false,
+    measurement: d.measurement,
   };
 }
 
@@ -121,6 +122,7 @@ export function toSensor(
     status: d.status ?? "",
     linkedEquipmentId: d.linkedEquipmentId,
     statusChangedAt: d.statusChangedAt,
+    reading: d.reading,
     updatedAt: d.updatedAt ?? new Date().toISOString(),
   };
 }
