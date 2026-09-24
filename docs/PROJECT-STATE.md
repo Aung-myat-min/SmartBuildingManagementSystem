@@ -1602,6 +1602,50 @@ which persists until the frame clock runs, so a collapsed form would stay
 collapsed in a background tab. `DrawerInlineForm` uses `animate-sb-rise` for
 exactly this reason.
 
+### The record split, and written reasons
+
+Six actions refuse to proceed until the actor justifies them: declining a
+request, deleting a building, decommissioning a unit, deleting a unit,
+resetting a fire alarm, removing a sensor. Each stores what was typed as
+`LogBookEntry.reason` — a field, not a sentence folded into `detail`, so it can
+be filtered, exported as its own column and read back.
+
+`lib/records.ts` (pure, tested) is what separates the two ledgers, which read
+the same `logBook` collection:
+
+| | Log Book | Historical Records |
+| --- | --- | --- |
+| Who | Admin + CEO | everyone |
+| Shows | every entry, newest first | the significant subset, by default |
+| Filter | `isEstateRecord` only | `isEstateRecord` + `isSignificant` |
+
+`isSignificant` takes anything carrying a reason, every alarm, and anything
+refused, withdrawn, deleted or archived. The reason is the load-bearing part:
+`removeUnit` and a routine condition change both log
+`equipment-status-changed`, so the action type cannot tell a deletion from a
+repair — only the reason can. An **Important / All activity** switch on the
+toolbar turns the filter off.
+
+`isEstateRecord` excludes personnel *actions* rather than the whole `admin`
+source, so a building deleted with a written reason reaches the page it was
+written for, while who was hired, promoted or suspended does not.
+
+### Sensor thresholds
+
+A threshold is the reading at which one status becomes the next.
+`SensorMeasurement` holds the unit, the dial's floor and ceiling, the decimals
+and the ascending `bands`; a reading takes the first band whose `upTo` is null
+or at least the reading, and that band's `statusId` is what the sensor shows.
+Everything downstream — tone, `isAlarm`, the banner, the Log Book — reads the
+status, exactly as it does for a door lock that has no number at all.
+
+They are visible on the Sensors page: each reading card draws its type's bands
+to scale, coloured by tone, with the reading marked and the boundaries
+numbered. They are editable in the sensor type drawer, a sentence per row
+("Up to 18 °C → Cold"), guarded by `bandsRefusal` — ascending limits, a real
+status per band, and a catch-all at the end, without which some readings would
+land in no band and the sensor would silently stop updating.
+
 ### Pending states
 
 `lib/pending.ts` — `withMinDuration(promise, floorMs?)` and `remainingFloor`,
