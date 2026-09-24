@@ -1,10 +1,12 @@
 "use client";
 
 import { Link2, Lock } from "lucide-react";
-import type * as React from "react";
+import * as React from "react";
 import { Hint } from "@/components/shared/hint";
+import { Spinner } from "@/components/shared/spinner";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { withMinDuration } from "@/lib/pending";
 import { cn } from "@/lib/utils";
 
 /**
@@ -46,7 +48,11 @@ export function DetailDrawer({
             <span className="bg-input h-1 w-9 rounded-full" />
           </div>
         )}
-        {children}
+        {/* The panel slid in and its contents were simply already there. The
+            sections now arrive behind it, in the order you read them. */}
+        <div key={String(open)} className="stagger-in contents">
+          {children}
+        </div>
       </SheetContent>
     </Sheet>
   );
@@ -262,13 +268,32 @@ export function DrawerInlineForm({
   error?: string | null;
   children: React.ReactNode;
 }) {
+  const [saving, setSaving] = React.useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (saving) return;
+    const result = onSubmit();
+    if (!(result instanceof Promise)) return;
+    setSaving(true);
+    try {
+      await withMinDuration(result);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
+    // Rises in rather than appearing at the bottom of the drawer fully formed.
+    //
+    // CSS, not the library, even though an unfolding height would read better:
+    // this is *entry*, which is the stylesheet's job here, and a motion
+    // `initial` of `height: 0` is an inline style that persists until the
+    // frame clock runs. On a form — functional content, not decoration — a
+    // collapsed height is a worse failure than a missed animation.
     <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSubmit();
-      }}
-      className="bg-surface-subtle border-divider -mx-4.5 -mb-3.5 flex flex-col gap-2.25 border-t px-4.5 py-3.5"
+      onSubmit={handleSubmit}
+      className="animate-sb-rise bg-surface-subtle border-divider -mx-4.5 -mb-3.5 flex flex-col gap-2.25 border-t px-4.5 py-3.5"
     >
       <div className="text-muted-foreground font-mono text-[10px] font-medium tracking-[0.07em] uppercase">
         {title}
@@ -287,12 +312,15 @@ export function DrawerInlineForm({
       <div className="mt-0.5 flex gap-1.75">
         <button
           type="submit"
-          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 min-h-9 flex-1 cursor-pointer rounded border px-2 text-[11.5px] leading-none font-medium"
+          disabled={saving}
+          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 flex min-h-9 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded border px-2 text-[11.5px] leading-none font-medium disabled:cursor-not-allowed disabled:opacity-45"
         >
-          {submitLabel}
+          {saving && <Spinner />}
+          {saving ? "Saving…" : submitLabel}
         </button>
         <button
           type="button"
+          disabled={saving}
           onClick={onCancel}
           className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground min-h-9 cursor-pointer rounded border px-3 text-[11.5px] leading-none font-medium"
         >

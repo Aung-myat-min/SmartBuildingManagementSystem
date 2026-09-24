@@ -73,9 +73,12 @@ export function FormDrawer({
           "data-[side=right]:w-(--drawer-form-w)",
         )}
       >
+        {/* The fields arrive in the order they are filled in, behind the
+            panel, rather than the whole form being there before it lands. */}
         <form
+          key={String(open)}
           onSubmit={handleSubmit}
-          className="flex h-full flex-col gap-2.75 overflow-y-auto px-5 py-4.5"
+          className="stagger-in flex h-full flex-col gap-2.75 overflow-y-auto px-5 py-4.5"
         >
           <div className="flex items-center gap-2.5">
             <SheetTitle className="text-muted-foreground flex-1 font-mono text-[10px] font-medium tracking-[0.07em] uppercase">

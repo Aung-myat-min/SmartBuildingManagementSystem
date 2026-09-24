@@ -327,6 +327,43 @@
   box-shadow: 0 4px 12px color-mix(in oklch, var(--foreground) 9%, transparent);
 }
 
+/* A container whose children arrive in order.
+ *
+ * The staggered *list* row takes its delay inline from staggerStyle(i), which
+ * needs an index. A drawer's sections have no index — they are written out by
+ * hand — so the delay comes from nth-child instead. Eight is as far as it
+ * counts; past that everything shares the last delay, which is the same cap
+ * lib/motion.ts applies and for the same reason. */
+@utility stagger-in {
+  & > * {
+    animation: sb-rise var(--dur-base) var(--ease-out-soft) backwards;
+  }
+  & > *:nth-child(1) {
+    animation-delay: 0ms;
+  }
+  & > *:nth-child(2) {
+    animation-delay: 22ms;
+  }
+  & > *:nth-child(3) {
+    animation-delay: 44ms;
+  }
+  & > *:nth-child(4) {
+    animation-delay: 66ms;
+  }
+  & > *:nth-child(5) {
+    animation-delay: 88ms;
+  }
+  & > *:nth-child(6) {
+    animation-delay: 110ms;
+  }
+  & > *:nth-child(7) {
+    animation-delay: 132ms;
+  }
+  & > *:nth-child(8) {
+    animation-delay: 154ms;
+  }
+}
+
 /* Interaction recipes.
  *
  * Almost every control in this app is hand-rolled — a row is a full-width
