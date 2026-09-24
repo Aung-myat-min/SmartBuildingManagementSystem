@@ -74,6 +74,8 @@
   --color-auth: var(--auth);
 
   --animate-sb-pulse: sb-pulse 1.4s infinite;
+  --animate-sb-spin: sb-spin 2s linear infinite;
+  --animate-sb-arc: sb-arc 1.4s ease-in-out infinite;
   --animate-sb-drop: sb-drop var(--dur-base) var(--ease-out-soft);
   --animate-sb-rise: sb-rise var(--dur-base) var(--ease-out-soft) backwards;
   --animate-sb-draw: sb-draw var(--dur-slow) var(--ease-out-soft) forwards;
@@ -86,6 +88,33 @@
   --dur-fast: 0.16s;
   --dur-base: 0.24s;
   --dur-slow: 0.5s;
+}
+
+/* The loading ring: the whole thing turns while the arc inside it grows and
+   shrinks. Two keyframes at different lengths, so they drift out of phase and
+   the ring never looks like it is repeating a loop. */
+@keyframes sb-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Circumference of the r=9 circle the loader draws is ~56.5, so the dash
+   numbers below are in those units: a 2-unit dot opening to a 34-unit arc and
+   closing again as it travels the full way round. */
+@keyframes sb-arc {
+  0% {
+    stroke-dasharray: 2 57;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 34 57;
+    stroke-dashoffset: -8;
+  }
+  100% {
+    stroke-dasharray: 2 57;
+    stroke-dashoffset: -55;
+  }
 }
 
 @keyframes sb-pulse {
@@ -471,5 +500,18 @@
     animation-iteration-count: 1;
     transition-duration: 0.01ms;
     scroll-behavior: auto;
+  }
+
+  /* The loading ring is the exception, and the reason is the difference
+     between decoration and information. A status dot that stops pulsing is
+     still a coloured dot saying the same thing. A spinner stopped by the rule
+     above freezes as a 2-unit stub of arc — it does not say "waiting", it says
+     "broken". It keeps turning, slower, because something has to. */
+  .animate-sb-spin {
+    animation: sb-spin 3s linear infinite;
+  }
+  .animate-sb-arc {
+    animation: none;
+    stroke-dasharray: 34 57;
   }
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useTheme } from "next-themes";
 import * as React from "react";
 import { toast } from "sonner";
+import { Loader } from "@/components/shared/loader";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -257,6 +258,7 @@ function ProfileSection({
 
       <div className="mt-4.5 flex items-center gap-3">
         <Button disabled={pending} onClick={save}>
+          {pending && <Loader size="xs" />}
           {pending ? "Saving…" : "Save changes"}
         </Button>
         <span className="text-muted-foreground text-[11px]">
@@ -489,6 +491,7 @@ function SecuritySection() {
         )}
         <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
           <Button onClick={handleChangePassword} disabled={pending}>
+            {pending && <Loader size="xs" />}
             {pending ? "Changing…" : "Change password"}
           </Button>
           <Link

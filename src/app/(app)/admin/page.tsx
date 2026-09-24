@@ -20,7 +20,7 @@ import {
 } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
 import { RowButton, SelectInput, TextInput } from "@/components/shared/inputs";
-import { Spinner } from "@/components/shared/spinner";
+import { Loader } from "@/components/shared/loader";
 import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -688,11 +688,7 @@ function BuildingPhoto({ building }: { building: Building }) {
         />
       ) : (
         <div className="text-muted-foreground flex flex-col items-center gap-2 px-4 text-center">
-          {busy ? (
-            <Spinner className="size-5" />
-          ) : (
-            <Camera className="size-6" />
-          )}
+          {busy ? <Loader size="md" /> : <Camera className="size-6" />}
           <span className="text-[10.5px]">
             {busy ? "Resizing…" : `Drop a photo of ${building.name}`}
           </span>

@@ -3,7 +3,7 @@
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
-import { Spinner } from "@/components/shared/spinner";
+import { Loader } from "@/components/shared/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -103,7 +103,7 @@ export default function ForgotPasswordPage() {
                 disabled={pending}
                 className="mt-2.5 w-full"
               >
-                {pending && <Spinner />}
+                {pending && <Loader size="xs" />}
                 {pending ? "Sending…" : "Send reset link"}
               </Button>
             </form>

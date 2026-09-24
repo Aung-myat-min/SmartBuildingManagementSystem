@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
-import { Spinner } from "@/components/shared/spinner";
+import { Loader } from "@/components/shared/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -144,7 +144,7 @@ function LoginView() {
             disabled={pending}
             className="interactive bg-primary hover:bg-primary/90 mt-1 w-full"
           >
-            {pending && <Spinner />}
+            {pending && <Loader size="xs" />}
             {pending ? "Signing in…" : "Sign in"}
           </Button>
         </form>

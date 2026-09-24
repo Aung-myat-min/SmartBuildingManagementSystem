@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Spinner } from "@/components/shared/spinner";
+import { Loader } from "@/components/shared/loader";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { withMinDuration } from "@/lib/pending";
@@ -114,7 +114,7 @@ export function FormDrawer({
               disabled={submitDisabled || saving}
               className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 flex min-h-11 flex-1 cursor-pointer items-center justify-center gap-1.5 rounded border px-2 py-2 text-[11.5px] leading-none font-medium disabled:cursor-not-allowed disabled:opacity-45 md:min-h-0"
             >
-              {saving && <Spinner />}
+              {saving && <Loader size="xs" />}
               {saving ? "Saving…" : submitLabel}
             </button>
             <button

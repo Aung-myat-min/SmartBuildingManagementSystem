@@ -4,6 +4,7 @@ import { Download, Search } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PageLoader } from "@/components/shared/loader";
 import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
@@ -348,13 +349,16 @@ export default function HistoricalRecordsPage() {
           <span className="flex-1">RECORD</span>
           <span className="w-32">BY</span>
         </div>
-        {grouped.length === 0 && (
-          <EmptyState className="m-4">
-            {loading
-              ? "Loading the estate's record…"
-              : "No records match these filters."}
-          </EmptyState>
-        )}
+        {grouped.length === 0 &&
+          (loading ? (
+            // A wait is not an empty result, and saying "no records" while
+            // they are still arriving is the wrong answer to the question.
+            <PageLoader note="Loading the estate's record…" className="py-14" />
+          ) : (
+            <EmptyState className="m-4">
+              No records match these filters.
+            </EmptyState>
+          ))}
         {grouped.map(([day, records]) => (
           <div key={day}>
             <div className="bg-surface-subtle border-border text-muted-foreground flex items-center gap-2 border-b px-4 py-1.5 text-[11px]">

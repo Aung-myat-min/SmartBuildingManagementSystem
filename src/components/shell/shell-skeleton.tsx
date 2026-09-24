@@ -1,11 +1,16 @@
 "use client";
 
+import { PageLoader } from "@/components/shared/loader";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * The shell's own shape, so there is no layout jump when the app arrives.
- * Shared by the auth gate and, once the data is subscribed, by the wait for
- * the first snapshot — one loading surface rather than one per page.
+ * Shared by the auth gate, the wait for the first snapshot and the gap before
+ * a route module lands — one loading surface rather than three.
+ *
+ * The edges are skeleton blocks because their shape is known; the middle is
+ * the loading ring, because its shape is not. A static line of grey text there
+ * read as a page that had finished loading and was empty.
  */
 export function ShellSkeleton({ note }: { note: string }) {
   return (
@@ -25,9 +30,7 @@ export function ShellSkeleton({ note }: { note: string }) {
           <div className="flex-1" />
           <Skeleton className="size-7 rounded-full" />
         </div>
-        <div className="flex flex-1 items-center justify-center p-(--page-pad)">
-          <span className="text-muted-foreground text-[12px]">{note}</span>
-        </div>
+        <PageLoader note={note} className="p-(--page-pad)" />
       </div>
     </div>
   );

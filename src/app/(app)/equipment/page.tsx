@@ -37,6 +37,7 @@ import {
 } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
 import { RowButton, TextInput } from "@/components/shared/inputs";
+import { Loader } from "@/components/shared/loader";
 import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -993,6 +994,9 @@ function EquipmentDrawer({
               {roomLabel(unit.roomId)} · {buildingName(unit.buildingId)}
             </div>
             <div className="mt-2 flex items-center gap-2">
+              {photoBusy && (
+                <Loader size="xs" className="text-muted-foreground" />
+              )}
               <span className="text-muted-foreground font-mono text-[10.5px]">
                 {photoBusy
                   ? "Resizing…"

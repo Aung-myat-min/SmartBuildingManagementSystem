@@ -10,7 +10,7 @@ import { Check } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
-import { Spinner } from "@/components/shared/spinner";
+import { Loader } from "@/components/shared/loader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -215,7 +215,7 @@ function FirstSignInView() {
           className="mt-1 w-full"
           disabled={!allMet || pending}
         >
-          {pending && <Spinner />}
+          {pending && <Loader size="xs" />}
           {pending ? "Setting password…" : "Set password and sign in"}
         </Button>
       </form>
