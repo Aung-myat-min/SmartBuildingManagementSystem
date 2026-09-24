@@ -1613,8 +1613,18 @@ where the delay buys nothing.
 
 Wrapped around every write with a busy state: `FormDrawer` and
 `DrawerInlineForm` (so every create and edit), the HVAC panel, the account
-form, and all three sign-in screens. `shared/spinner.tsx` is the one spinner,
-riding beside the label so a button keeps its width.
+form, and all three sign-in screens.
+
+`shared/loader.tsx` is the one loading animation — a ring that turns (2s) while
+its arc grows and shrinks (1.4s), the two lengths deliberately different so
+they drift out of phase. Hand-drawn SVG, inheriting `currentColor`, with the
+stroke thinning as the size grows. `PageLoader` adds the label and fills the
+middle of `ShellSkeleton`: skeleton blocks at the edges where the shape is
+known, the ring in the middle where it is not.
+
+It is **the one exception to the reduced-motion rule** (`.animate-sb-spin`
+keeps running, slower). A status dot that stops pulsing is still a coloured dot
+saying the same thing; a spinner frozen mid-arc says "broken", not "waiting".
 
 **`prefers-reduced-motion: reduce` is honoured globally** — a blanket rule at
 the end of `globals.css` cuts every animation and transition, so a transition
