@@ -199,7 +199,12 @@ function SensorsView() {
       requireReason: action.requiresNote,
     });
     if (!result.confirmed) return;
-    const written = await setSensorStatus(s.id, action.resultStatus);
+    const written = await setSensorStatus(
+      s.id,
+      action.resultStatus,
+      undefined,
+      result.reason,
+    );
     if (!written.ok) {
       toast.error(written.message);
       return;
@@ -220,7 +225,7 @@ function SensorsView() {
       requireReason: true,
     });
     if (!result.confirmed) return;
-    const written = await removeSensor(s.id);
+    const written = await removeSensor(s.id, result.reason);
     if (!written.ok) {
       toast.error(written.message);
       return;

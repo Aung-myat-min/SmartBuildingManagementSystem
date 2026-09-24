@@ -358,7 +358,8 @@ function BuildingsTab({
       source: "admin",
       actionType: "building-deleted",
       title: "Building deleted",
-      detail: `${selected.name} removed with its ${roomCount} room${roomCount === 1 ? "" : "s"}. Reason: ${result.reason ?? "—"}`,
+      detail: `${selected.name} removed with its ${roomCount} room${roomCount === 1 ? "" : "s"}.`,
+      reason: result.reason,
       targetType: "building",
       targetId: selected.id,
     });

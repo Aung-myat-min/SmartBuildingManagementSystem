@@ -194,6 +194,7 @@ export default function EquipmentPage() {
       return;
     }
     if (boardColumnFor(unit) === col) return;
+    let reason: string | undefined;
     if (col === "decommissioned") {
       if (!canDecommissionEquipment(role)) {
         toast.error(DECOMMISSION_LOCK_REASON);
@@ -208,8 +209,9 @@ export default function EquipmentPage() {
         requireReason: true,
       });
       if (!result.confirmed) return;
+      reason = result.reason;
     }
-    const written = await setEquipmentCondition(unit.id, col);
+    const written = await setEquipmentCondition(unit.id, col, reason);
     if (!written.ok) {
       toast.error(written.message);
       return;
@@ -804,6 +806,7 @@ function EquipmentDrawer({
   onSetCondition: (
     unitId: string,
     condition: EquipmentCondition,
+    reason?: string,
   ) => Promise<WriteResult>;
   onGoToSensor: (sensorId: string) => void;
   canDecommission: boolean;
@@ -859,7 +862,7 @@ function EquipmentDrawer({
       requireReason: true,
     });
     if (!result.confirmed) return;
-    const written = await removeUnit(unit.id);
+    const written = await removeUnit(unit.id, result.reason);
     if (!written.ok) {
       toast.error(written.message);
       return;
@@ -884,7 +887,7 @@ function EquipmentDrawer({
       requireReason,
     });
     if (!result.confirmed) return;
-    const written = await onSetCondition(unit.id, next);
+    const written = await onSetCondition(unit.id, next, result.reason);
     if (!written.ok) {
       toast.error(written.message);
       return;

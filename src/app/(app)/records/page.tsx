@@ -16,20 +16,25 @@ import { useLogHistory } from "@/lib/logbook-store";
 import { buildingName, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
 import { staggerStyle } from "@/lib/motion";
 import { isBuildingLocked } from "@/lib/permissions";
+import { isEstateRecord, isSignificant } from "@/lib/records";
 import type { LogBookSource } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
- * The estate's own sources. `admin` is deliberately absent: Office Staff can
- * reach this page and cannot reach the Log Book, so account, building and
- * room changes must not surface here.
+ * Every source the record can show. `admin` is here now — a building deleted
+ * with a written reason is exactly the kind of entry this page exists for, and
+ * excluding the whole source to keep personnel out was too blunt. What keeps
+ * personnel out is `isEstateRecord`, which judges the action rather than the
+ * source: who was hired, promoted, suspended or changed their password does
+ * not surface here, and Office Staff can reach this page.
  */
-const TYPE_META: Record<Exclude<LogBookSource, "admin">, { tone: Tone }> = {
+const TYPE_META: Record<LogBookSource, { tone: Tone }> = {
   alert: { tone: "danger" },
   request: { tone: "warning" },
   equipment: { tone: "success" },
   sensor: { tone: "info" },
   access: { tone: "neutral" },
+  admin: { tone: "neutral" },
 };
 type RecordSource = keyof typeof TYPE_META;
 /**
@@ -59,6 +64,7 @@ const TYPE_ORDER: RecordSource[] = [
   "equipment",
   "sensor",
   "access",
+  "admin",
 ];
 const RANGES = [
   { label: "7d", days: 7 },
@@ -81,23 +87,26 @@ export default function HistoricalRecordsPage() {
   );
   const [query, setQuery] = React.useState("");
   const [limit, setLimit] = React.useState(40);
+  // Default on: the page is the record, not the feed. The Log Book is one
+  // click away in the sidebar for anyone who wants every tick, and this
+  // switch is here for the admin who wants them without leaving the filters.
+  const [importantOnly, setImportantOnly] = usePersistedState(
+    "records.importantOnly",
+    true,
+  );
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
   const cutoff = Date.now() - range * DAY_MS;
 
   const { items: history, loading } = useLogHistory();
 
-  // The estate's own record: everything the Log Book holds except the
-  // account and estate changes, which stay behind the Log Book's own gate.
-  const estate = React.useMemo(
-    () =>
-      history.filter(
-        (e): e is typeof e & { source: RecordSource } => e.source !== "admin",
-      ),
-    [history],
-  );
+  // The estate's own record: the Log Book without the personnel entries.
+  const estate = React.useMemo(() => history.filter(isEstateRecord), [history]);
 
   const filtered = estate.filter((r) => {
+    // The split this page is for: the Log Book keeps every status tick, and
+    // the record keeps what somebody would look up months later.
+    if (importantOnly && !isSignificant(r)) return false;
     if (new Date(r.timestamp).getTime() < cutoff) return false;
     if (effectiveBuilding !== "all" && r.buildingId !== effectiveBuilding)
       return false;
@@ -171,9 +180,11 @@ export default function HistoricalRecordsPage() {
           <span className="text-foreground font-[450]">
             The Log Book, filtered.
           </span>{" "}
-          The same record, narrowed to what happened on the estate — alarms,
-          sensors, requests, equipment and access. Account, building and room
-          changes are left out; those are in the Log Book.
+          The same record, kept to what someone would look up months later —
+          anything that needed a written reason, every alarm, and anything
+          refused, withdrawn, deleted or archived. Switch to{" "}
+          <span className="font-medium">All activity</span> for the rest.
+          Personnel changes are never here; those are in the Log Book.
         </span>
       </div>
 
@@ -201,6 +212,31 @@ export default function HistoricalRecordsPage() {
               )}
             >
               {r.label}
+            </button>
+          ))}
+        </div>
+        <div className="border-input bg-card flex shrink-0 items-center rounded border p-[3px]">
+          {[
+            { on: true, label: "Important" },
+            { on: false, label: "All activity" },
+          ].map((opt) => (
+            <button
+              type="button"
+              key={opt.label}
+              onClick={() => setImportantOnly(opt.on)}
+              title={
+                opt.on
+                  ? "Decisions, refusals, alarms and anything that needed a written reason"
+                  : "Every entry the Log Book holds, personnel aside"
+              }
+              className={cn(
+                "interactive focus-ring cursor-pointer rounded-[3px] px-2.5 py-1 text-[11px] font-medium",
+                importantOnly === opt.on
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/70",
+              )}
+            >
+              {opt.label}
             </button>
           ))}
         </div>
@@ -255,6 +291,7 @@ export default function HistoricalRecordsPage() {
               },
               { header: "Record", value: (r) => r.title },
               { header: "Detail", value: (r) => r.detail },
+              { header: "Reason given", value: (r) => r.reason ?? "" },
               { header: "Reference", value: (r) => r.refId ?? "" },
               { header: "Recorded by", value: (r) => r.actorName },
             ]);
@@ -388,11 +425,18 @@ export default function HistoricalRecordsPage() {
                   {r.buildingId ? buildingName(r.buildingId) : "Estate-wide"}
                   {r.refId ? ` · ${r.refId}` : ""}
                 </span>
-                <span
-                  className="min-w-0 flex-1 truncate pr-2.5 text-[12px] font-[450]"
-                  title={r.detail}
-                >
-                  {r.title}
+                <span className="min-w-0 flex-1 pr-2.5" title={r.detail}>
+                  <span className="block truncate text-[12px] font-[450]">
+                    {r.title}
+                  </span>
+                  {/* The reason the actor had to type before the app would do
+                      it. Asking for one and then never showing it back was the
+                      gap this page now closes. */}
+                  {r.reason && (
+                    <span className="text-muted-foreground mt-0.5 block truncate text-[11px] italic">
+                      “{r.reason}”
+                    </span>
+                  )}
                 </span>
                 <span className="text-muted-foreground w-32 truncate text-[11.5px]">
                   {r.actorName}

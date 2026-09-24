@@ -427,6 +427,15 @@ export interface LogBookEntry {
   targetId: string;
   buildingId?: string; // for filtering; absent for user/building-level actions
   refId?: string; // linked REQ-/EQ-/device id, where relevant
+  /**
+   * What the actor typed when the action demanded a justification.
+   *
+   * A field, not a sentence folded into `detail`: the whole point of asking is
+   * that someone can read the answers back later, which means filtering and
+   * exporting them as their own column. An entry with a reason is also what
+   * `isSignificant` treats as a decision rather than an event.
+   */
+  reason?: string;
 }
 
 // Reports

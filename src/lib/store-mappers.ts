@@ -49,6 +49,7 @@ export function toLogEntry(
     targetId: d.targetId ?? "",
     buildingId: d.buildingId,
     refId: d.refId,
+    reason: d.reason,
   };
 }
 

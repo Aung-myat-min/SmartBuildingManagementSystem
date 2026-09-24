@@ -213,11 +213,13 @@ export interface AppState {
     patch: Partial<Omit<EnvironmentalSensor, "id">>,
   ) => Promise<WriteResult>;
   /** Takes a device off the network for good. */
-  removeSensor: (sensorId: string) => Promise<WriteResult>;
+  /** `reason` is what the confirm dialog asked for; it is stored on the entry. */
+  removeSensor: (sensorId: string, reason?: string) => Promise<WriteResult>;
   setSensorStatus: (
     sensorId: string,
     status: string,
     reading?: number,
+    reason?: string,
   ) => Promise<WriteResult>;
   /**
    * The Log Book: what this session wrote, newest first, in front of the seed
@@ -301,7 +303,7 @@ export interface AppState {
     unitId: string,
     patch: Partial<Omit<EquipmentUnit, "id">>,
   ) => Promise<WriteResult>;
-  removeUnit: (unitId: string) => Promise<WriteResult>;
+  removeUnit: (unitId: string, reason?: string) => Promise<WriteResult>;
   /** Stamps the service, advances the next due date, appends the history row. */
   recordService: (
     unitId: string,
@@ -314,6 +316,7 @@ export interface AppState {
   setEquipmentCondition: (
     unitId: string,
     condition: EquipmentCondition,
+    reason?: string,
   ) => Promise<WriteResult>;
 }
 
@@ -561,11 +564,12 @@ export function AppStateProvider({
         source: "request",
         actionType: "request-declined",
         title: "Request sent back",
-        detail: `${id} stays in requested. Reason: ${reason}`,
+        detail: `${id} stays in requested and starts no work.`,
         targetType: "request",
         targetId: id,
         buildingId: base?.buildingId,
         refId: id,
+        reason,
       });
       return written;
     },
@@ -642,7 +646,12 @@ export function AppStateProvider({
   setAssetSource({ units: equipmentUnits, sensors });
 
   const setSensorStatus = React.useCallback(
-    async (sensorId: string, status: string, reading?: number) => {
+    async (
+      sensorId: string,
+      status: string,
+      reading?: number,
+      reason?: string,
+    ) => {
       const sensor = sensors.find((s) => s.id === sensorId);
       // The stamp goes in with the status, not after it: a status whose tone
       // changes with age is measured from it, so the two are one write.
@@ -666,6 +675,7 @@ export function AppStateProvider({
         targetId: sensorId,
         buildingId: sensor?.buildingId,
         refId: sensorId,
+        reason,
       });
       return written;
     },
@@ -960,7 +970,7 @@ export function AppStateProvider({
   );
 
   const removeSensor = React.useCallback(
-    async (sensorId: string) => {
+    async (sensorId: string, reason?: string) => {
       const sensor = sensors.find((s) => s.id === sensorId);
       const written = await deleteSensor(sensorId);
       if (!written.ok) return written;
@@ -975,6 +985,7 @@ export function AppStateProvider({
         targetId: sensorId,
         buildingId: sensor?.buildingId,
         refId: sensorId,
+        reason,
       });
       return written;
     },
@@ -1154,7 +1165,7 @@ export function AppStateProvider({
   );
 
   const removeUnit = React.useCallback(
-    async (unitId: string) => {
+    async (unitId: string, reason?: string) => {
       const unit = equipmentUnits.find((u) => u.id === unitId);
       const written = await deleteUnitWithHistory(unitId);
       if (!written.ok) return written;
@@ -1169,6 +1180,7 @@ export function AppStateProvider({
         targetId: unitId,
         buildingId: unit?.buildingId,
         refId: unit?.tag ?? unitId,
+        reason,
       });
       return written;
     },
@@ -1250,7 +1262,7 @@ export function AppStateProvider({
   );
 
   const setEquipmentCondition = React.useCallback(
-    async (unitId: string, condition: EquipmentCondition) => {
+    async (unitId: string, condition: EquipmentCondition, reason?: string) => {
       const unit = equipmentUnits.find((u) => u.id === unitId);
       const written = await updateUnit(unitId, { condition });
       if (!written.ok) return written;
@@ -1260,7 +1272,9 @@ export function AppStateProvider({
         equipmentUnitId: unitId,
         type: HISTORY_TYPE_FOR_CONDITION[condition],
         at: new Date().toISOString(),
-        summary: `Marked ${condition.replace("-", " ")}`,
+        summary: reason
+          ? `Marked ${condition.replace("-", " ")} — ${reason}`
+          : `Marked ${condition.replace("-", " ")}`,
         actorName,
       });
       log({
@@ -1274,6 +1288,7 @@ export function AppStateProvider({
         targetId: unitId,
         buildingId: unit?.buildingId,
         refId: unit?.tag ?? unitId,
+        reason,
       });
       return written;
     },
