@@ -11,6 +11,7 @@ import {
   Table as TableIcon,
   Wrench,
 } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -107,6 +108,12 @@ function typeLabel(typeId: string) {
   return equipmentTypes().find((t) => t.id === typeId)?.label ?? typeId;
 }
 
+/**
+ * How a card travels between columns. Short, and eased rather than sprung —
+ * this is a register, not a toy.
+ */
+const BOARD_MOVE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
+
 export default function EquipmentPage() {
   const router = useRouter();
   const {
@@ -139,7 +146,6 @@ export default function EquipmentPage() {
   const [newOpen, setNewOpen] = React.useState(false);
   const [typesOpen, setTypesOpen] = React.useState(false);
   const [dragId, setDragId] = React.useState<string | null>(null);
-  const [landedId, setLandedId] = React.useState<string | null>(null);
   const [overCol, setOverCol] = React.useState<EquipmentBoardColumn | null>(
     null,
   );
@@ -206,14 +212,6 @@ export default function EquipmentPage() {
       toast.error(written.message);
       return;
     }
-    // The card unmounts from one column and mounts in another, so there is no
-    // element to move. Marking the one that landed lets it arrive rather than
-    // appear, which is the part that says the drop worked.
-    setLandedId(unit.id);
-    window.setTimeout(
-      () => setLandedId((id) => (id === unit.id ? null : id)),
-      500,
-    );
     toast.success(`${unit.tag} → ${COLUMN_META[col].label}`);
   };
 
@@ -356,62 +354,67 @@ export default function EquipmentPage() {
             <span className="w-18.5 text-right">Detail</span>
           </div>
 
-          {units.map((u, i) => {
-            const condition = u.condition;
-            const due = isDueService(u, condition);
-            return (
-              <button
-                type="button"
-                key={u.id}
-                onClick={() => setSelectedId(u.id)}
-                style={staggerStyle(i)}
-                className={cn(
-                  "focus-ring interactive border-rule hover:bg-surface-hover animate-sb-rise flex w-full items-center border-b px-4 py-2.5 text-left",
-                  condition === "faulty" && "border-l-danger border-l-[3px]",
-                  due && "border-l-warning border-l-[3px]",
-                )}
-              >
-                <span className="text-accent-foreground w-26 font-mono text-[11px] font-medium">
-                  {u.tag}
-                </span>
-                <span className="w-37.5 truncate text-[12px] font-[450]">
-                  {typeLabel(u.typeId)}
-                </span>
-                <span className="text-neutral-foreground min-w-0 flex-1 truncate text-[12px]">
-                  {roomLabel(u.roomId)} · {buildingName(u.buildingId)}
-                </span>
-                <span className="w-33">
-                  <ToneBadge tone={COLUMN_META[condition].tone}>
-                    {COLUMN_META[condition].label}
-                  </ToneBadge>
-                </span>
-                <span className="text-muted-foreground w-24 font-mono text-[11px]">
-                  {formatDate(u.installedAt)}
-                </span>
-                <span
+          <AnimatePresence initial={false}>
+            {units.map((u, i) => {
+              const condition = u.condition;
+              const due = isDueService(u, condition);
+              return (
+                <m.button
+                  type="button"
+                  key={u.id}
+                  layout="position"
+                  exit={{ opacity: 0 }}
+                  transition={BOARD_MOVE}
+                  onClick={() => setSelectedId(u.id)}
+                  style={staggerStyle(i)}
                   className={cn(
-                    "w-29.5 font-mono text-[11px]",
-                    due ? "text-warning-foreground" : "text-muted-foreground",
+                    "focus-ring interactive border-rule hover:bg-surface-hover animate-sb-rise flex w-full items-center border-b px-4 py-2.5 text-left",
+                    condition === "faulty" && "border-l-danger border-l-[3px]",
+                    due && "border-l-warning border-l-[3px]",
                   )}
                 >
-                  {formatDate(u.nextServiceDue)}
-                </span>
-                <span
-                  className={cn(
-                    "w-20.5 text-right font-mono text-[11px] font-medium",
-                    openRequestsForUnit(requests, u.id) > 0
-                      ? "text-warning-foreground"
-                      : "text-muted-foreground",
-                  )}
-                >
-                  {openRequestsForUnit(requests, u.id)}
-                </span>
-                <span className="text-accent-foreground w-18.5 text-right text-[10.5px] font-medium">
-                  Open →
-                </span>
-              </button>
-            );
-          })}
+                  <span className="text-accent-foreground w-26 font-mono text-[11px] font-medium">
+                    {u.tag}
+                  </span>
+                  <span className="w-37.5 truncate text-[12px] font-[450]">
+                    {typeLabel(u.typeId)}
+                  </span>
+                  <span className="text-neutral-foreground min-w-0 flex-1 truncate text-[12px]">
+                    {roomLabel(u.roomId)} · {buildingName(u.buildingId)}
+                  </span>
+                  <span className="w-33">
+                    <ToneBadge tone={COLUMN_META[condition].tone}>
+                      {COLUMN_META[condition].label}
+                    </ToneBadge>
+                  </span>
+                  <span className="text-muted-foreground w-24 font-mono text-[11px]">
+                    {formatDate(u.installedAt)}
+                  </span>
+                  <span
+                    className={cn(
+                      "w-29.5 font-mono text-[11px]",
+                      due ? "text-warning-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {formatDate(u.nextServiceDue)}
+                  </span>
+                  <span
+                    className={cn(
+                      "w-20.5 text-right font-mono text-[11px] font-medium",
+                      openRequestsForUnit(requests, u.id) > 0
+                        ? "text-warning-foreground"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {openRequestsForUnit(requests, u.id)}
+                  </span>
+                  <span className="text-accent-foreground w-18.5 text-right text-[10.5px] font-medium">
+                    Open →
+                  </span>
+                </m.button>
+              );
+            })}
+          </AnimatePresence>
 
           {units.length === 0 && (
             <EmptyState className="m-4">
@@ -470,57 +473,73 @@ export default function EquipmentPage() {
                   {items.map((u) => {
                     const days = daysUntilService(u);
                     return (
-                      <button
-                        type="button"
+                      // layoutId, so a card dropped into another column
+                      // travels there instead of vanishing here and appearing
+                      // over there. It is the one thing the stylesheet could
+                      // not do, and the reason the library is in the project.
+                      //
+                      // The wrapper carries it rather than the button itself,
+                      // because motion claims `onDragStart` for its own
+                      // gesture system and this card uses the native HTML5
+                      // drag the board was already built on.
+                      <m.div
                         key={u.id}
-                        draggable
-                        onDragStart={(e) => {
-                          setDragId(u.id);
-                          e.dataTransfer.effectAllowed = "move";
-                        }}
-                        onDragEnd={() => {
-                          setDragId(null);
-                          setOverCol(null);
-                        }}
-                        onClick={() => setSelectedId(u.id)}
-                        className={cn(
-                          // cursor-grab, not cursor-pointer: the card is
-                          // draggable, and before this it only said so once
-                          // you were already dragging it.
-                          "interactive focus-ring border-divider hover:border-primary hover:shadow-sm bg-card cursor-grab rounded border border-l-[3px] px-2.75 py-2.5 text-left",
-                          "active:cursor-grabbing",
-                          dragId === u.id && "opacity-40 shadow-md",
-                          landedId === u.id && "animate-sb-drop",
-                          col === "faulty"
-                            ? "border-l-danger"
-                            : col === "due-service"
-                              ? "border-l-warning"
-                              : "border-l-transparent",
-                        )}
+                        layoutId={u.id}
+                        transition={BOARD_MOVE}
+                        className="flex"
                       >
-                        <div className="flex items-center gap-1.75">
-                          <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
-                            {u.tag}
-                          </span>
-                          <div className="flex-1" />
-                          <span
-                            className={cn(
-                              "font-mono text-[10px] font-medium",
-                              col === "due-service"
-                                ? "text-warning-foreground"
-                                : "text-muted-foreground",
-                            )}
-                          >
-                            {days < 0 ? `${Math.abs(days)}d over` : `${days}d`}
-                          </span>
-                        </div>
-                        <div className="mt-1.75 text-[12px] leading-snug font-[450]">
-                          {typeLabel(u.typeId)}
-                        </div>
-                        <div className="text-muted-foreground mt-0.75 text-[10.5px] leading-snug">
-                          {roomLabel(u.roomId)}
-                        </div>
-                      </button>
+                        <button
+                          type="button"
+                          draggable
+                          onDragStart={(e) => {
+                            setDragId(u.id);
+                            e.dataTransfer.effectAllowed = "move";
+                          }}
+                          onDragEnd={() => {
+                            setDragId(null);
+                            setOverCol(null);
+                          }}
+                          onClick={() => setSelectedId(u.id)}
+                          className={cn(
+                            // cursor-grab, not cursor-pointer: the card is
+                            // draggable, and before this it only said so once
+                            // you were already dragging it.
+                            "interactive focus-ring border-divider hover:border-primary hover:shadow-sm bg-card w-full cursor-grab rounded border border-l-[3px] px-2.75 py-2.5 text-left",
+                            "active:cursor-grabbing",
+                            dragId === u.id && "opacity-40 shadow-md",
+                            col === "faulty"
+                              ? "border-l-danger"
+                              : col === "due-service"
+                                ? "border-l-warning"
+                                : "border-l-transparent",
+                          )}
+                        >
+                          <div className="flex items-center gap-1.75">
+                            <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
+                              {u.tag}
+                            </span>
+                            <div className="flex-1" />
+                            <span
+                              className={cn(
+                                "font-mono text-[10px] font-medium",
+                                col === "due-service"
+                                  ? "text-warning-foreground"
+                                  : "text-muted-foreground",
+                              )}
+                            >
+                              {days < 0
+                                ? `${Math.abs(days)}d over`
+                                : `${days}d`}
+                            </span>
+                          </div>
+                          <div className="mt-1.75 text-[12px] leading-snug font-[450]">
+                            {typeLabel(u.typeId)}
+                          </div>
+                          <div className="text-muted-foreground mt-0.75 text-[10.5px] leading-snug">
+                            {roomLabel(u.roomId)}
+                          </div>
+                        </button>
+                      </m.div>
                     );
                   })}
                   {items.length === 0 && (

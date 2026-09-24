@@ -1,6 +1,7 @@
 "use client";
 
 import { Link2, Pause, Play, Search } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
 import * as React from "react";
 import { AccessDenied } from "@/components/shared/access-denied";
 import {
@@ -70,6 +71,9 @@ function dayLabel(iso: string) {
     month: "short",
   });
 }
+
+/** A feed row settling into a new position when the filter changes. */
+const FEED_MOVE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
 
 export default function LogBookPage() {
   const { buildings, role, activeBuildingId, logBook, logBookLoading } =
@@ -285,46 +289,51 @@ export default function LogBookPage() {
                   · {entries.length} entries
                 </span>
               </div>
-              {entries.map((e, i) => (
-                <div
-                  key={e.id}
-                  style={staggerStyle(i)}
-                  className="border-border animate-sb-rise flex gap-2.5 border-b px-4 py-2.5 last:border-b-0"
-                >
-                  <span className="text-muted-foreground w-11 shrink-0 pt-0.5 font-mono text-[10.5px]">
-                    {formatTime(e.timestamp)}
-                  </span>
-                  <PulseDot
-                    tone={SOURCE_TONE[e.source]}
-                    pulse={e.source === "alert"}
-                    className="mt-1.5"
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="text-[12.5px] font-[450]">
-                        {e.title}
-                      </span>
-                      <ToneBadge tone={SOURCE_TONE[e.source]}>
-                        {LOG_BOOK_SOURCE_META[e.source].label}
-                      </ToneBadge>
-                      {e.refId && (
-                        <span
-                          className="text-primary flex items-center gap-1 text-[10.5px]"
-                          title="Linked record"
-                        >
-                          <Link2 className="size-2.5" /> {e.refId}
+              <AnimatePresence initial={false}>
+                {entries.map((e, i) => (
+                  <m.div
+                    key={e.id}
+                    layout="position"
+                    exit={{ opacity: 0 }}
+                    transition={FEED_MOVE}
+                    style={staggerStyle(i)}
+                    className="border-border animate-sb-rise flex gap-2.5 border-b px-4 py-2.5 last:border-b-0"
+                  >
+                    <span className="text-muted-foreground w-11 shrink-0 pt-0.5 font-mono text-[10.5px]">
+                      {formatTime(e.timestamp)}
+                    </span>
+                    <PulseDot
+                      tone={SOURCE_TONE[e.source]}
+                      pulse={e.source === "alert"}
+                      className="mt-1.5"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[12.5px] font-[450]">
+                          {e.title}
                         </span>
-                      )}
+                        <ToneBadge tone={SOURCE_TONE[e.source]}>
+                          {LOG_BOOK_SOURCE_META[e.source].label}
+                        </ToneBadge>
+                        {e.refId && (
+                          <span
+                            className="text-primary flex items-center gap-1 text-[10.5px]"
+                            title="Linked record"
+                          >
+                            <Link2 className="size-2.5" /> {e.refId}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-muted-foreground mt-0.5 text-[11.5px] leading-snug">
+                        {e.detail}
+                      </div>
                     </div>
-                    <div className="text-muted-foreground mt-0.5 text-[11.5px] leading-snug">
-                      {e.detail}
-                    </div>
-                  </div>
-                  <span className="text-muted-foreground w-32 shrink-0 truncate text-right text-[11px]">
-                    {e.actorName}
-                  </span>
-                </div>
-              ))}
+                    <span className="text-muted-foreground w-32 shrink-0 truncate text-right text-[11px]">
+                      {e.actorName}
+                    </span>
+                  </m.div>
+                ))}
+              </AnimatePresence>
             </Card>
           ))}
         </div>

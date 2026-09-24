@@ -14,6 +14,7 @@ import {
   Table as TableIcon,
   Undo2,
 } from "lucide-react";
+import { m } from "motion/react";
 import * as React from "react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -684,6 +685,9 @@ function MoveButtons({
   );
 }
 
+/** How a request card travels when it advances a step. */
+const CARD_MOVE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
+
 function RequestCard({
   request,
   actions,
@@ -693,7 +697,12 @@ function RequestCard({
 }) {
   const aging = isEscalated(request);
   return (
-    <div
+    // layoutId, so a request advancing a step slides to its new column. The
+    // five-stage lifecycle is what this board is for; watching a card make the
+    // move is the clearest statement of it the app can give.
+    <m.div
+      layoutId={request.id}
+      transition={CARD_MOVE}
       className={cn(
         "border-divider bg-card rounded border border-l-[3px] px-2.75 py-2.5",
         aging
@@ -781,7 +790,7 @@ function RequestCard({
       <div className="mt-2.5 flex flex-wrap gap-1.5">
         <MoveButtons request={request} actions={actions} />
       </div>
-    </div>
+    </m.div>
   );
 }
 

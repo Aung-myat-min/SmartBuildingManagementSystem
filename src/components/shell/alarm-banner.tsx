@@ -1,6 +1,7 @@
 "use client";
 
 import { ShieldAlert } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
 import { useRouter } from "next/navigation";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { useAppState } from "@/lib/app-state";
@@ -24,6 +25,9 @@ import { isBuildingLocked } from "@/lib/permissions";
  * Unlike the bell this is for everyone. Office Staff see their own building's
  * alarms; a fire is not an approver's concern.
  */
+/** The banner arriving and leaving. Same beat as everything else. */
+const BANNER_MOVE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
+
 export function AlarmBanner() {
   const { sensors, role, activeBuildingId } = useAppState();
   const router = useRouter();
@@ -42,36 +46,49 @@ export function AlarmBanner() {
         b.statusChangedAt ?? b.updatedAt,
       ),
     );
-  if (alarming.length === 0) return null;
-
   const first = alarming[0];
   const others = alarming.length - 1;
-  const label = sensorType(first.typeId)?.label ?? "Sensor";
-  const status = statusDef(first.typeId, first.status)?.label ?? first.status;
+  const label = first ? (sensorType(first.typeId)?.label ?? "Sensor") : "";
+  const status = first
+    ? (statusDef(first.typeId, first.status)?.label ?? first.status)
+    : "";
 
   return (
-    <button
-      type="button"
-      onClick={() => router.push(`/sensors?device=${first.id}`)}
-      className="interactive focus-ring pressable bg-danger-muted text-danger-foreground border-danger/30 hover:bg-danger-muted/70 animate-sb-drop flex w-full cursor-pointer items-center gap-2.5 border-b px-4 py-2 text-left lg:px-5"
-    >
-      <PulseDot tone="danger" pulse className="shrink-0" />
-      <ShieldAlert className="size-3.5 shrink-0" />
-      <span className="text-[11.5px] leading-snug font-semibold">
-        {label} {status.toLowerCase()}
-      </span>
-      <span className="truncate text-[11.5px] leading-snug">
-        {first.id} — {roomLabel(first.roomId)}, {buildingName(first.buildingId)}
-      </span>
-      {others > 0 && (
-        <span className="bg-danger shrink-0 rounded-[3px] px-1.5 py-1 font-mono text-[9.5px] leading-none font-semibold text-white">
-          +{others} more
-        </span>
+    // It dropped in on mount and then returned null, so it arrived gracefully
+    // and vanished. AnimatePresence gives the last alarm clearing the exit it
+    // never had — which is the moment worth seeing.
+    <AnimatePresence>
+      {first && (
+        <m.button
+          key="alarm"
+          type="button"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: "auto", opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={BANNER_MOVE}
+          onClick={() => router.push(`/sensors?device=${first.id}`)}
+          className="interactive focus-ring pressable bg-danger-muted text-danger-foreground border-danger/30 hover:bg-danger-muted/70 flex w-full cursor-pointer items-center gap-2.5 overflow-hidden border-b px-4 py-2 text-left lg:px-5"
+        >
+          <PulseDot tone="danger" pulse className="shrink-0" />
+          <ShieldAlert className="size-3.5 shrink-0" />
+          <span className="text-[11.5px] leading-snug font-semibold">
+            {label} {status.toLowerCase()}
+          </span>
+          <span className="truncate text-[11.5px] leading-snug">
+            {first.id} — {roomLabel(first.roomId)},{" "}
+            {buildingName(first.buildingId)}
+          </span>
+          {others > 0 && (
+            <span className="bg-danger shrink-0 rounded-[3px] px-1.5 py-1 font-mono text-[9.5px] leading-none font-semibold text-white">
+              +{others} more
+            </span>
+          )}
+          <span className="flex-1" />
+          <span className="shrink-0 font-mono text-[10.5px]">
+            {formatAge(first.statusChangedAt ?? first.updatedAt)}
+          </span>
+        </m.button>
       )}
-      <span className="flex-1" />
-      <span className="shrink-0 font-mono text-[10.5px]">
-        {formatAge(first.statusChangedAt ?? first.updatedAt)}
-      </span>
-    </button>
+    </AnimatePresence>
   );
 }

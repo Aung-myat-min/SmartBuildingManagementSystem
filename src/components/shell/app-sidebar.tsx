@@ -1,5 +1,6 @@
 "use client";
 
+import { m } from "motion/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAppState } from "@/lib/app-state";
@@ -25,6 +26,9 @@ function BrandMark({ className }: { className?: string }) {
  * rail on a tablet, and nothing at phone width — where MobileTabBar takes
  * over along the bottom.
  */
+/** How the active-item marker travels between nav entries. */
+const NAV_MOVE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { role, openRequestCount } = useAppState();
@@ -52,11 +56,18 @@ export function AppSidebar() {
               className={cn(
                 "focus-ring interactive relative flex size-10 items-center justify-center rounded-[5px]",
                 active
-                  ? "bg-accent text-accent-foreground"
+                  ? "text-accent-foreground"
                   : "text-foreground/70 hover:bg-surface-hover",
               )}
             >
-              <item.icon className="size-4.25" />
+              {active && (
+                <m.span
+                  layoutId="nav-rail-active"
+                  transition={NAV_MOVE}
+                  className="bg-accent absolute inset-0 rounded-[5px]"
+                />
+              )}
+              <item.icon className="relative size-4.25" />
               {badge > 0 && (
                 <span className="bg-warning absolute top-1 right-1 flex h-3.5 min-w-3.5 items-center justify-center rounded-full px-0.75 font-mono text-[8.5px] leading-none font-semibold text-white">
                   {badge}
@@ -96,16 +107,29 @@ export function AppSidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "focus-ring interactive flex items-center gap-2.25 rounded px-2.5 py-2 text-[12.5px] font-[450]",
+                  "focus-ring interactive relative flex items-center gap-2.25 rounded px-2.5 py-2 text-[12.5px] font-[450]",
                   active
-                    ? "bg-accent text-accent-foreground"
+                    ? "text-accent-foreground"
                     : "text-foreground/80 hover:bg-surface-hover",
                 )}
               >
-                <item.icon className="size-4 shrink-0" />
+                {/* One indicator that travels between items, rather than each
+                    item painting its own background the instant it is picked.
+                    It is behind the label, hence the relative siblings. */}
+                {active && (
+                  <m.span
+                    layoutId="nav-active"
+                    transition={NAV_MOVE}
+                    className="bg-accent absolute inset-0 rounded"
+                  />
+                )}
+                <item.icon className="relative size-4 shrink-0" />
                 {/* "Maintenance Requests" is the one label 196px cannot hold
                     beside a badge, so it truncates and keeps its tooltip. */}
-                <span className="min-w-0 flex-1 truncate" title={item.label}>
+                <span
+                  className="relative min-w-0 flex-1 truncate"
+                  title={item.label}
+                >
                   {item.label}
                 </span>
                 {badge > 0 && (
