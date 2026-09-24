@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatePresence, m } from "motion/react";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "@/components/shell/account-menu";
 import { AlarmBanner } from "@/components/shell/alarm-banner";
@@ -12,6 +13,9 @@ import { useAppState } from "@/lib/app-state";
 import { MOBILE_TABS, MORE_ITEMS, NAV_ITEMS } from "@/lib/nav";
 
 const TITLES = [...NAV_ITEMS, ...MORE_ITEMS, ...MOBILE_TABS];
+
+/** The shell resolving over its skeleton. */
+const SHELL_FADE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   // Everything below needs a resolved identity, so the gate wraps the shell
@@ -43,7 +47,15 @@ function AppShell({ children }: { children: React.ReactNode }) {
   if (dataLoading) return <ShellSkeleton note="Loading your estate…" />;
 
   return (
-    <div className="flex min-h-screen">
+    // The shell fades in over the skeleton it replaces, so the app arrives
+    // rather than swapping. The skeleton already has the shell's geometry, so
+    // nothing moves — only the content resolves.
+    <m.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={SHELL_FADE}
+      className="flex min-h-screen"
+    >
       <AppSidebar />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -70,11 +82,20 @@ function AppShell({ children }: { children: React.ReactNode }) {
         <AlarmBanner />
 
         {/* Bottom padding clears the tab bar, which floats over the page. */}
-        {dataError && (
-          <div className="bg-warning-muted text-warning-foreground border-divider border-b px-4 py-2 text-[11.5px] lg:px-5">
-            {dataError}
-          </div>
-        )}
+        <AnimatePresence>
+          {dataError && (
+            <m.div
+              key="data-error"
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={SHELL_FADE}
+              className="bg-warning-muted text-warning-foreground border-divider overflow-hidden border-b px-4 py-2 text-[11.5px] lg:px-5"
+            >
+              {dataError}
+            </m.div>
+          )}
+        </AnimatePresence>
 
         <main className="flex flex-1 flex-col gap-4 p-4 pb-24 md:pb-4 lg:p-5 lg:pb-5">
           {children}
@@ -82,6 +103,6 @@ function AppShell({ children }: { children: React.ReactNode }) {
       </div>
 
       <MobileTabBar />
-    </div>
+    </m.div>
   );
 }

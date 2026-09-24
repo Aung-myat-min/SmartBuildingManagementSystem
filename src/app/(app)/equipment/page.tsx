@@ -937,9 +937,12 @@ function EquipmentDrawer({
           >
             {photo ? (
               // biome-ignore lint/performance/noImgElement: a local object URL, not a remote asset
-              <img
+              <m.img
                 src={photo}
                 alt={`${unit.tag} — ${equipmentUnitLabel(unit)}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={BOARD_MOVE}
                 className="size-full object-cover"
               />
             ) : (

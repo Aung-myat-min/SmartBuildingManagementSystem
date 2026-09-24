@@ -1554,15 +1554,49 @@ One curve and three durations, so nothing carries its own number:
 | Token | Used as | Where |
 | --- | --- | --- |
 | `--animate-sb-pulse` | `animate-sb-pulse` | the live dot |
-| `--animate-sb-slide` | `animate-sb-slide` | popover entry |
 | `--animate-sb-drop` | `animate-sb-drop` | the alarm banner; the board card that just landed |
 | `--animate-sb-rise` | `animate-sb-rise` | a row entering a list, delayed by `staggerStyle(i)` |
 | `--animate-sb-draw` | `animate-sb-draw` | a sparkline drawing itself in, once |
 
 Numbers are JavaScript, not CSS: `useCountUp(value, decimals)` walks a figure
-to its new value (KPI tiles, sensor readings) and `useReducedMotion()` tells it
-to skip. `lib/motion.ts` holds `staggerMs` / `staggerStyle`, capped at twelve
-rows so a long list does not take seconds to appear.
+to its new value (KPI tiles, sensor readings), taking its duration from
+`--dur-slow`, and `useReducedMotion()` tells it to skip. `lib/motion.ts` holds
+`staggerMs` / `staggerStyle`, capped at twelve rows so a long list does not
+take seconds to appear.
+
+**Write a token duration as `duration-(--dur-base)`.** The bracket form
+`duration-[--dur-base]` compiles without complaint to `transition-duration:
+--dur-base`, which is invalid, so the transition is silently 0s.
+
+### Interaction recipes
+
+Three `@utility` rules, because almost every control here is hand-rolled — a
+row is a full-width `<button>`, a chip is a `<button>` — and what they share is
+how they feel, not how they are laid out.
+
+| Utility | What it does |
+| --- | --- |
+| `interactive` | background, border, colour, opacity and shadow ease over `--dur-fast`. No transform: a row that shifted on hover would drag the table with it |
+| `pressable` | 1px down on press, skipped for `:disabled` and `[aria-disabled]` |
+| `focus-ring` / `focus-ring-within` | a 2px inset outline on `:focus-visible`, inset so a full-width row's ring is not clipped by its card |
+| `stuck-shadow` | the lift a pinned toolbar gets, via `useStuck()` |
+| `scroll-x-edges` | four layered gradients that reveal a shadow only when a table has more to scroll to — two covers in the card's colour scrolling with the content, two shadows pinned to the box |
+
+### The library
+
+`motion` (LazyMotion, `domMax`, `m.*` components) is mounted in
+`providers.tsx` with `MotionConfig reducedMotion="user"`. It costs **51 KB
+gzipped**, measured against a build without it, and it is there for two things
+CSS cannot do:
+
+- **`layoutId`** — an element moving between places in the DOM: an equipment
+  card dropped into another board column, a request advancing a kanban step,
+  the sidebar's one active marker travelling between nav items.
+- **`AnimatePresence`** — an element animating as it unmounts: the alarm banner
+  when the last alarm clears, a notification row, the Sensors page's building
+  expander (height to `auto` is the other thing CSS cannot transition).
+
+Everything else is the stylesheet. A hover never gets a `motion` component.
 
 **`prefers-reduced-motion: reduce` is honoured globally** — a blanket rule at
 the end of `globals.css` cuts every animation and transition, so a transition

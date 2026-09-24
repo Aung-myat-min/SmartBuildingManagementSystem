@@ -8,6 +8,7 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
+import { AnimatePresence, m } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
@@ -104,6 +105,9 @@ type Filter = "all" | "alarms" | "offline";
 
 // useSearchParams opts the subtree into client rendering, so the deep-link
 // read sits behind its own boundary rather than blocking the whole route.
+/** The building panel opening and closing. */
+const PANEL_MOVE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
+
 export default function SensorsPage() {
   return (
     <React.Suspense fallback={null}>
@@ -364,120 +368,141 @@ function SensorsView() {
               </span>
             </button>
 
-            {isOpen && (
-              <div className="grid grid-cols-2 max-lg:grid-cols-1">
-                {sensorTypes().map((type) => {
-                  const items = group.filter((s) => s.typeId === type.id);
-                  const Icon = sensorIcon(type.icon);
-                  return (
-                    <div
-                      key={type.id}
-                      className="border-divider border-r last:border-r-0 max-lg:border-r-0 max-lg:border-b"
-                    >
-                      <div className="border-divider text-muted-foreground flex items-center gap-2 border-b px-4 py-2.25">
-                        <Icon className="size-3.25" />
-                        <span className="flex-1 font-mono text-[10px] tracking-[0.06em] uppercase">
-                          {type.label}
-                        </span>
-                        <span className="font-mono text-[10.5px]">
-                          {items.length}
-                        </span>
-                      </div>
-
-                      {items.map((s) => {
-                        const status = s.status;
-                        const view = viewOf(s);
-                        const alarm = view.alarm;
-                        const offline = isSensorOffline(status);
-                        const actions = type.actions.filter(
-                          (a) => a.resultStatus !== status,
-                        );
-                        return (
-                          <div
-                            key={s.id}
-                            className={cn(
-                              "border-rule border-b px-4 py-2.75 last:border-b-0",
-                              // Alarm states lift out and break the row rhythm.
-                              alarm &&
-                                "bg-danger-muted/50 border-l-danger border-l-[3px]",
-                            )}
-                          >
-                            <button
-                              type="button"
-                              title="Open this sensor"
-                              onClick={() => setOpenId(s.id)}
-                              className="interactive focus-ring flex w-full items-center gap-2.5 text-left"
-                            >
-                              <PulseDot tone={view.tone} pulse={view.pulse} />
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-[12.5px] font-[450]">
-                                  {s.id}
-                                </div>
-                                <div className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug">
-                                  {roomLabel(s.roomId)} ·{" "}
-                                  {formatRelative(changedAtOf(s))}
-                                </div>
-                              </div>
-                              <ToneBadge tone={view.tone}>
-                                {view.label}
-                              </ToneBadge>
-                            </button>
-
-                            {(alarm || offline) && (
-                              <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                                {actions.map((a) => {
-                                  // The registry's own per-action roles, not a
-                                  // blanket page-level gate.
-                                  const allowed = a.allowedRoles.includes(role);
-                                  return (
-                                    <Hint
-                                      key={a.id}
-                                      text={
-                                        allowed ? a.caption : SENSOR_LOCK_REASON
-                                      }
-                                    >
-                                      <button
-                                        type="button"
-                                        aria-disabled={!allowed}
-                                        onClick={() =>
-                                          allowed && runAction(s, a)
-                                        }
-                                        className={cn(
-                                          "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
-                                          allowed
-                                            ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
-                                            : "border-border cursor-not-allowed opacity-45",
-                                        )}
-                                      >
-                                        {!allowed && (
-                                          <Lock className="size-2.5" />
-                                        )}
-                                        {a.label}
-                                      </button>
-                                    </Hint>
-                                  );
-                                })}
-                                <span className="text-muted-foreground text-[10.5px]">
-                                  {offline
-                                    ? "Offline devices raise no alarms."
-                                    : "Recorded in the Log Book."}
-                                </span>
-                              </div>
-                            )}
+            {/* The chevron rotated and the panel it controls just appeared —
+                half the interaction animated and half did not. Height is the
+                one property CSS cannot transition to `auto`, so this is the
+                library's job. */}
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <m.div
+                  key="panel"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={PANEL_MOVE}
+                  className="overflow-hidden"
+                >
+                  <div className="grid grid-cols-2 max-lg:grid-cols-1">
+                    {sensorTypes().map((type) => {
+                      const items = group.filter((s) => s.typeId === type.id);
+                      const Icon = sensorIcon(type.icon);
+                      return (
+                        <div
+                          key={type.id}
+                          className="border-divider border-r last:border-r-0 max-lg:border-r-0 max-lg:border-b"
+                        >
+                          <div className="border-divider text-muted-foreground flex items-center gap-2 border-b px-4 py-2.25">
+                            <Icon className="size-3.25" />
+                            <span className="flex-1 font-mono text-[10px] tracking-[0.06em] uppercase">
+                              {type.label}
+                            </span>
+                            <span className="font-mono text-[10.5px]">
+                              {items.length}
+                            </span>
                           </div>
-                        );
-                      })}
 
-                      {items.length === 0 && (
-                        <div className="text-muted-foreground px-4 py-6 text-center text-[11px]">
-                          No devices match this filter.
+                          {items.map((s) => {
+                            const status = s.status;
+                            const view = viewOf(s);
+                            const alarm = view.alarm;
+                            const offline = isSensorOffline(status);
+                            const actions = type.actions.filter(
+                              (a) => a.resultStatus !== status,
+                            );
+                            return (
+                              <div
+                                key={s.id}
+                                className={cn(
+                                  "border-rule border-b px-4 py-2.75 last:border-b-0",
+                                  // Alarm states lift out and break the row rhythm.
+                                  alarm &&
+                                    "bg-danger-muted/50 border-l-danger border-l-[3px]",
+                                )}
+                              >
+                                <button
+                                  type="button"
+                                  title="Open this sensor"
+                                  onClick={() => setOpenId(s.id)}
+                                  className="interactive focus-ring flex w-full items-center gap-2.5 text-left"
+                                >
+                                  <PulseDot
+                                    tone={view.tone}
+                                    pulse={view.pulse}
+                                  />
+                                  <div className="min-w-0 flex-1">
+                                    <div className="truncate text-[12.5px] font-[450]">
+                                      {s.id}
+                                    </div>
+                                    <div className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug">
+                                      {roomLabel(s.roomId)} ·{" "}
+                                      {formatRelative(changedAtOf(s))}
+                                    </div>
+                                  </div>
+                                  <ToneBadge tone={view.tone}>
+                                    {view.label}
+                                  </ToneBadge>
+                                </button>
+
+                                {(alarm || offline) && (
+                                  <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                                    {actions.map((a) => {
+                                      // The registry's own per-action roles, not a
+                                      // blanket page-level gate.
+                                      const allowed =
+                                        a.allowedRoles.includes(role);
+                                      return (
+                                        <Hint
+                                          key={a.id}
+                                          text={
+                                            allowed
+                                              ? a.caption
+                                              : SENSOR_LOCK_REASON
+                                          }
+                                        >
+                                          <button
+                                            type="button"
+                                            aria-disabled={!allowed}
+                                            onClick={() =>
+                                              allowed && runAction(s, a)
+                                            }
+                                            className={cn(
+                                              "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
+                                              allowed
+                                                ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
+                                                : "border-border cursor-not-allowed opacity-45",
+                                            )}
+                                          >
+                                            {!allowed && (
+                                              <Lock className="size-2.5" />
+                                            )}
+                                            {a.label}
+                                          </button>
+                                        </Hint>
+                                      );
+                                    })}
+                                    <span className="text-muted-foreground text-[10.5px]">
+                                      {offline
+                                        ? "Offline devices raise no alarms."
+                                        : "Recorded in the Log Book."}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+
+                          {items.length === 0 && (
+                            <div className="text-muted-foreground px-4 py-6 text-center text-[11px]">
+                              No devices match this filter.
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                      );
+                    })}
+                  </div>
+                </m.div>
+              )}
+            </AnimatePresence>
           </div>
         );
       })}

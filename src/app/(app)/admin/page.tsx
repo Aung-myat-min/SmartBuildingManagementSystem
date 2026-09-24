@@ -7,6 +7,7 @@ import {
   Search,
   Users as UsersIcon,
 } from "lucide-react";
+import { m } from "motion/react";
 import * as React from "react";
 import { toast } from "sonner";
 import { AccessDenied } from "@/components/shared/access-denied";
@@ -183,6 +184,9 @@ export default function AdministrationPage() {
     </div>
   );
 }
+
+/** A photo arriving in its frame. */
+const PHOTO_FADE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;
 
 function TabButton({
   icon: Icon,
@@ -656,10 +660,15 @@ function BuildingPhoto({ building }: { building: Building }) {
   return (
     <div className="border-divider bg-background relative flex min-h-49 flex-1 items-center justify-center overflow-hidden rounded border">
       {photo ? (
+        // A stored photo arrives whole, from a document rather than a
+        // network fetch, so it popped. It fades instead.
         // biome-ignore lint/performance/noImgElement: a stored data URL, not a remote asset
-        <img
+        <m.img
           src={photo}
           alt={building.name}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={PHOTO_FADE}
           className="size-full object-cover"
         />
       ) : (

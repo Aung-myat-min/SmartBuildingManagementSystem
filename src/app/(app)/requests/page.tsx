@@ -43,6 +43,7 @@ import {
   roomLabel,
   roomsForBuilding,
 } from "@/lib/mock-data";
+import { staggerStyle } from "@/lib/motion";
 import {
   canAdvanceRequest,
   canRequestVerification,
@@ -503,13 +504,14 @@ export default function RequestsPage() {
             <span className="w-40 text-right">Action</span>
           </div>
 
-          {filtered.map((r) => {
+          {filtered.map((r, i) => {
             const aging = isEscalated(r);
             return (
               <div
                 key={r.id}
+                style={staggerStyle(i)}
                 className={cn(
-                  "border-rule flex min-w-300 items-center border-b px-4 py-2.5",
+                  "animate-sb-rise border-rule flex min-w-300 items-center border-b px-4 py-2.5",
                   aging && "border-l-danger border-l-[3px]",
                 )}
               >

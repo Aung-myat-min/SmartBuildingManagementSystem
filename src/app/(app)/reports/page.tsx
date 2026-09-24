@@ -48,6 +48,7 @@ const SECTIONS: Record<ReportKind, readonly Section[]> = {
 };
 type Section = "kpis" | "weeks" | "faultTypes" | "offenders" | "costs";
 
+import { staggerStyle } from "@/lib/motion";
 import { canAccessReports, roleLabel } from "@/lib/permissions";
 import type {
   Report,
@@ -306,14 +307,15 @@ export default function ReportsPage() {
             </span>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {g.items.map((r) => {
+            {g.items.map((r, i) => {
               const statusMeta = STATUS_META[r.status];
               const disabled = r.status !== "ready";
               return (
                 <Card
                   key={r.id}
+                  style={staggerStyle(i)}
                   className={cn(
-                    "gap-2.5 border-l-[3px] p-3.5",
+                    "animate-sb-rise gap-2.5 border-l-[3px] p-3.5",
                     TONE_BORDER_L[KIND_TONE[r.kind]],
                   )}
                 >
