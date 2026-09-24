@@ -74,7 +74,6 @@
   --color-auth: var(--auth);
 
   --animate-sb-pulse: sb-pulse 1.4s infinite;
-  --animate-sb-slide: sb-slide var(--dur-fast) var(--ease-out-soft);
   --animate-sb-drop: sb-drop var(--dur-base) var(--ease-out-soft);
   --animate-sb-rise: sb-rise var(--dur-base) var(--ease-out-soft) backwards;
   --animate-sb-draw: sb-draw var(--dur-slow) var(--ease-out-soft) forwards;
@@ -127,17 +126,6 @@
 @keyframes sb-draw {
   to {
     stroke-dashoffset: 0;
-  }
-}
-
-@keyframes sb-slide {
-  from {
-    transform: translateY(-6px);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
   }
 }
 

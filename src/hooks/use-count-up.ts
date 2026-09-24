@@ -3,8 +3,20 @@
 import * as React from "react";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 
-/** How long a number takes to travel to its new value. */
-const DURATION_MS = 420;
+/**
+ * How long a number takes to travel to its new value, read from the same
+ * token the stylesheet animates on. Restating it here was how the app came to
+ * have four different durations; the fallback is for the server and for a test
+ * with no document.
+ */
+function durationMs(): number {
+  if (typeof document === "undefined") return 500;
+  const raw = getComputedStyle(document.documentElement)
+    .getPropertyValue("--dur-slow")
+    .trim();
+  const seconds = Number.parseFloat(raw);
+  return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 500;
+}
 
 /**
  * A number that walks to its new value instead of snapping to it.
@@ -35,9 +47,10 @@ export function useCountUp(value: number, decimals = 0): number {
     const start = performance.now();
     const origin = at.current;
     const factor = 10 ** decimals;
+    const span = durationMs();
 
     const step = (now: number) => {
-      const t = Math.min(1, (now - start) / DURATION_MS);
+      const t = Math.min(1, (now - start) / span);
       // Ease out, matching --ease-out-soft closely enough for a number.
       const eased = 1 - (1 - t) ** 3;
       at.current = origin + (value - origin) * eased;
