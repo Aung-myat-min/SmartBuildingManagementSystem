@@ -24,9 +24,12 @@ import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { type RegistryResult, slugify, useAppState } from "@/lib/app-state";
 import { SENSOR_ICON_KEYS, sensorIcon } from "@/lib/icons";
 import { roleLabel } from "@/lib/permissions";
+import { bandsRefusal } from "@/lib/sensor-readings";
 import type {
   SensorAction,
+  SensorBand,
   SensorIconKey,
+  SensorMeasurement,
   SensorStatusDef,
   SensorTypeDef,
   UserRole,
@@ -234,6 +237,52 @@ export function SensorTypeRegistry({ confirm }: { confirm: ConfirmFn }) {
 type StatusDraft = SensorStatusDef & { isNew?: boolean };
 type ActionDraft = SensorAction & { isNew?: boolean };
 
+/**
+ * The thresholds while they are being typed.
+ *
+ * Numbers are held as strings because a half-typed one is not a number — a
+ * field you cannot clear to retype is the classic numeric-input bug, and
+ * `Number("")` is 0, which would silently set a threshold to zero.
+ */
+type MeasurementDraft = {
+  unit: string;
+  min: string;
+  max: string;
+  decimals: string;
+  /** The last band's `upTo` is ignored; it is always the catch-all. */
+  bands: { upTo: string; statusId: string }[];
+};
+
+function toDraft(m: SensorMeasurement | undefined): MeasurementDraft | null {
+  if (!m) return null;
+  return {
+    unit: m.unit,
+    min: String(m.min),
+    max: String(m.max),
+    decimals: String(m.decimals),
+    bands: m.bands.map((b) => ({
+      upTo: b.upTo === null ? "" : String(b.upTo),
+      statusId: b.statusId,
+    })),
+  };
+}
+
+/** Sensible starting thresholds, so turning this on is not a blank form. */
+function blankMeasurement(statuses: StatusDraft[]): MeasurementDraft {
+  const first = statuses[0]?.id ?? "";
+  const last = statuses[statuses.length - 1]?.id ?? first;
+  return {
+    unit: "°C",
+    min: "0",
+    max: "50",
+    decimals: "1",
+    bands: [
+      { upTo: "25", statusId: first },
+      { upTo: "", statusId: last },
+    ],
+  };
+}
+
 function SensorTypeDrawer({
   open,
   editing,
@@ -251,6 +300,9 @@ function SensorTypeDrawer({
   const [icon, setIcon] = React.useState<SensorIconKey>("activity");
   const [statuses, setStatuses] = React.useState<StatusDraft[]>([]);
   const [actions, setActions] = React.useState<ActionDraft[]>([]);
+  const [measurement, setMeasurement] = React.useState<MeasurementDraft | null>(
+    null,
+  );
   const [error, setError] = React.useState<string | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: reseed when the drawer opens
@@ -260,6 +312,7 @@ function SensorTypeDrawer({
     setIcon(editing?.icon ?? "activity");
     setStatuses(editing?.statuses.map((st) => ({ ...st })) ?? []);
     setActions(editing?.actions.map((a) => ({ ...a })) ?? []);
+    setMeasurement(toDraft(editing?.measurement));
     setError(null);
   }, [open, editing?.id]);
 
@@ -348,10 +401,51 @@ function SensorTypeDrawer({
         const remap = new Map(
           statuses.map((st, i) => [st.id, cleaned[i]?.id ?? st.id]),
         );
+        // Thresholds are judged before anything is written: a set of bands
+        // that does not end in a catch-all leaves some readings with no status
+        // at all, and the sensor silently stops updating.
+        let reading: SensorMeasurement | undefined;
+        if (measurement) {
+          const bands = measurement.bands.map((b, i) => ({
+            upTo:
+              i === measurement.bands.length - 1
+                ? null
+                : Number(b.upTo === "" ? Number.NaN : b.upTo),
+            statusId: remap.get(b.statusId) ?? b.statusId,
+          })) satisfies SensorBand[];
+          const refusal = bandsRefusal(
+            bands,
+            cleaned.map((st) => st.id),
+          );
+          if (refusal) {
+            setError(refusal);
+            return;
+          }
+          const min = Number(measurement.min);
+          const max = Number(measurement.max);
+          if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+            setError(
+              "The dial needs a low and a high, with the high above it.",
+            );
+            return;
+          }
+          if (measurement.unit.trim().length === 0) {
+            setError("Give the reading a unit — °C, %, ppm.");
+            return;
+          }
+          reading = {
+            unit: measurement.unit.trim(),
+            min,
+            max,
+            decimals: Number(measurement.decimals) || 0,
+            bands,
+          };
+        }
         const outcome = await onSubmit({
           label: label.trim(),
           icon,
           statuses: cleaned,
+          measurement: reading,
           actions: actions.map(({ isNew, ...a }) => ({
             ...a,
             label: a.label.trim(),
@@ -528,6 +622,12 @@ function SensorTypeDrawer({
         )}
       </EditorSection>
 
+      <ThresholdsSection
+        statuses={statuses}
+        value={measurement}
+        onChange={setMeasurement}
+      />
+
       <EditorSection
         label="Actions"
         hint="What an operator can do to a sensor of this type, and who may do it."
@@ -636,6 +736,200 @@ function SensorTypeDrawer({
         )}
       </EditorSection>
     </FormDrawer>
+  );
+}
+
+/**
+ * Thresholds, in the words an operator would use.
+ *
+ * A "threshold" here is the reading at which one status becomes the next. The
+ * type already owns the statuses — Cold, Comfortable, Warm, Overheating — and
+ * this says where the boundaries between them sit, so a number coming off a
+ * device turns into one of them. Nothing else in the app has to know: the
+ * badge, the tone, the alarm banner and the Log Book all read the status, as
+ * they always did for a door lock that never had a number at all.
+ *
+ * Written as a sentence per row — "Up to 18 °C → Cold" — because a table of
+ * `upTo` values against status ids is the shape of the data, not the shape of
+ * the question.
+ */
+function ThresholdsSection({
+  statuses,
+  value,
+  onChange,
+}: {
+  statuses: StatusDraft[];
+  value: MeasurementDraft | null;
+  onChange: (next: MeasurementDraft | null) => void;
+}) {
+  const on = value !== null;
+
+  const patch = (over: Partial<MeasurementDraft>) => {
+    if (!value) return;
+    onChange({ ...value, ...over });
+  };
+
+  const patchBand = (
+    i: number,
+    over: Partial<MeasurementDraft["bands"][0]>,
+  ) => {
+    if (!value) return;
+    onChange({
+      ...value,
+      bands: value.bands.map((b, j) => (j === i ? { ...b, ...over } : b)),
+    });
+  };
+
+  return (
+    <div className="border-divider flex flex-col gap-1.75 border-t pt-2.5">
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground flex-1 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
+          Readings and thresholds
+        </span>
+        <button
+          type="button"
+          onClick={() => onChange(on ? null : blankMeasurement(statuses))}
+          disabled={statuses.length === 0}
+          className={cn(
+            "interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary cursor-pointer rounded border px-2 py-1.25 text-[10.5px] leading-none font-medium",
+            statuses.length === 0 && "cursor-not-allowed opacity-45",
+          )}
+        >
+          {on ? "This type has no readings" : "This type reads a number"}
+        </button>
+      </div>
+      <p className="text-muted-foreground text-[10.5px] leading-relaxed">
+        {on
+          ? "A reading lands in the first band it fits, and that band's status is the one the sensor shows. The last band catches everything above the rest."
+          : "Leave this off for a device with no number to read — a door lock is open or closed, not 23.4 of anything."}
+      </p>
+
+      {on && value && (
+        <>
+          <div className="mt-1 grid grid-cols-3 gap-1.75">
+            <ThresholdField label="Unit">
+              <TextInput
+                value={value.unit}
+                onChange={(e) => patch({ unit: e.target.value })}
+                placeholder="°C"
+              />
+            </ThresholdField>
+            <ThresholdField label="Dial low">
+              <TextInput
+                inputMode="decimal"
+                value={value.min}
+                onChange={(e) => patch({ min: e.target.value })}
+              />
+            </ThresholdField>
+            <ThresholdField label="Dial high">
+              <TextInput
+                inputMode="decimal"
+                value={value.max}
+                onChange={(e) => patch({ max: e.target.value })}
+              />
+            </ThresholdField>
+          </div>
+
+          <div className="mt-1.5 flex flex-col gap-1.25">
+            {value.bands.map((band, i) => {
+              const last = i === value.bands.length - 1;
+              return (
+                <div
+                  key={`band-${i + 1}`}
+                  className="border-divider bg-surface-subtle flex items-center gap-1.5 rounded border px-2 py-1.5"
+                >
+                  {last ? (
+                    <span className="text-muted-foreground w-24.5 shrink-0 text-[10.5px]">
+                      Anything higher
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-muted-foreground shrink-0 text-[10.5px]">
+                        Up to
+                      </span>
+                      <input
+                        inputMode="decimal"
+                        value={band.upTo}
+                        onChange={(e) => patchBand(i, { upTo: e.target.value })}
+                        aria-label={`Band ${i + 1} upper limit`}
+                        className="interactive focus-ring border-input bg-card w-14 shrink-0 rounded border px-1.5 py-1 text-center font-mono text-[11px] outline-none"
+                      />
+                      <span className="text-muted-foreground w-7 shrink-0 font-mono text-[10px]">
+                        {value.unit}
+                      </span>
+                    </>
+                  )}
+                  <span className="text-muted-foreground shrink-0 text-[11px]">
+                    →
+                  </span>
+                  <SelectInput
+                    value={band.statusId}
+                    onChange={(e) => patchBand(i, { statusId: e.target.value })}
+                    aria-label={`Band ${i + 1} status`}
+                    className="min-w-0 flex-1"
+                  >
+                    {statuses.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.label.trim() || st.id}
+                      </option>
+                    ))}
+                  </SelectInput>
+                  <RowButton
+                    danger
+                    // The catch-all is what makes every reading land
+                    // somewhere, so it is the one row that cannot go.
+                    disabled={last || value.bands.length <= 2}
+                    onClick={() =>
+                      patch({
+                        bands: value.bands.filter((_, j) => j !== i),
+                      })
+                    }
+                  >
+                    <Trash2 className="size-2.75" />
+                  </RowButton>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              onClick={() =>
+                patch({
+                  bands: [
+                    ...value.bands.slice(0, -1),
+                    { upTo: "", statusId: statuses[0]?.id ?? "" },
+                    ...value.bands.slice(-1),
+                  ],
+                })
+              }
+              className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary flex w-fit cursor-pointer items-center gap-1 rounded border px-2 py-1.25 text-[10.5px] leading-none font-medium"
+            >
+              <Plus className="size-2.75" />
+              Add a band
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** A small labelled cell, for the three-across row above the bands. */
+function ThresholdField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    // A div rather than a label: the control inside is a component, so there
+    // is nothing here for `for` to point at.
+    <div className="flex flex-col gap-1">
+      <span className="text-muted-foreground font-mono text-[9.5px] tracking-[0.06em] uppercase">
+        {label}
+      </span>
+      {children}
+    </div>
   );
 }
 

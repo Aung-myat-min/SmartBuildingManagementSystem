@@ -56,8 +56,17 @@ import {
   SENSOR_LOCK_REASON,
   SENSOR_TYPE_LOCK_REASON,
 } from "@/lib/permissions";
-import { bandFor, formatReading, isMeasuring } from "@/lib/sensor-readings";
-import type { EnvironmentalSensor, SensorAction } from "@/lib/types";
+import {
+  bandFor,
+  formatReading,
+  gaugeFraction,
+  isMeasuring,
+} from "@/lib/sensor-readings";
+import type {
+  EnvironmentalSensor,
+  SensorAction,
+  SensorTypeDef,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -1083,23 +1092,18 @@ function ReadingCard({
         <Sparkline values={history} tone={tone} />
       </div>
 
-      <label className="flex items-center gap-2">
-        <span className="text-muted-foreground shrink-0 font-mono text-[9.5px]">
-          {m.min}
-        </span>
-        <input
-          type="range"
-          min={m.min}
-          max={m.max}
-          step={m.decimals > 0 ? 0.1 : 1}
-          value={value}
-          onChange={(e) => onHold(Number(e.target.value))}
-          className="accent-primary min-w-0 flex-1 cursor-pointer"
-        />
-        <span className="text-muted-foreground shrink-0 font-mono text-[9.5px]">
-          {m.max}
-        </span>
-      </label>
+      <BandScale type={type} value={value} />
+
+      <input
+        type="range"
+        aria-label={`Force a reading for ${sensor.id}`}
+        min={m.min}
+        max={m.max}
+        step={m.decimals > 0 ? 0.1 : 1}
+        value={value}
+        onChange={(e) => onHold(Number(e.target.value))}
+        className="accent-primary -mt-0.5 w-full cursor-pointer"
+      />
 
       <div className="flex items-center gap-2">
         <span className="text-muted-foreground text-[10.5px]">
@@ -1125,6 +1129,93 @@ function ReadingCard({
  * offsetting by it hides the line completely.
  */
 const SPARK_DASH = 260;
+
+/**
+ * The type's thresholds, drawn to scale, with the reading marked on them.
+ *
+ * This is the piece that was missing. A card showed a number and a status
+ * chip, and the number turned from one status into another at boundaries
+ * nobody could see — so "STUFFY" was a word the app asserted rather than a
+ * reading you could place. The bar is the type's own bands, each segment as
+ * wide as the range it covers, so where the reading sits and how far it is
+ * from the next band are both just visible.
+ */
+function BandScale({
+  type,
+  value,
+}: {
+  type: SensorTypeDef | undefined;
+  value: number;
+}) {
+  const m = type?.measurement;
+  if (!m) return null;
+  const span = m.max - m.min || 1;
+
+  // A band runs from the previous band's ceiling to its own; the last has no
+  // ceiling, so it runs to the top of the dial.
+  let from = m.min;
+  const segments = m.bands.map((b) => {
+    const to = b.upTo ?? m.max;
+    const seg = {
+      statusId: b.statusId,
+      upTo: b.upTo,
+      width: (Math.max(0, Math.min(m.max, to) - from) / span) * 100,
+    };
+    from = to;
+    return seg;
+  });
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="relative flex h-1.5 overflow-hidden rounded-full">
+        {segments.map((seg) => {
+          const def = type?.statuses.find((st) => st.id === seg.statusId);
+          return (
+            <span
+              key={seg.statusId}
+              title={`${def?.label ?? seg.statusId}${
+                seg.upTo === null ? ` — above ${from}` : ` — up to ${seg.upTo}`
+              } ${m.unit}`}
+              style={{ width: `${seg.width}%` }}
+              className={BAND_FILL[def?.tone ?? "neutral"]}
+            />
+          );
+        })}
+        <span
+          aria-hidden
+          style={{ left: `${gaugeFraction(type, value) * 100}%` }}
+          className="border-foreground bg-card absolute top-[-1px] h-[calc(100%+2px)] w-[3px] -translate-x-1/2 rounded-full border"
+        />
+      </div>
+      <div className="text-muted-foreground relative h-2.5 font-mono text-[9px]">
+        <span className="absolute left-0">{m.min}</span>
+        {segments.slice(0, -1).map((seg, i) => (
+          <span
+            key={seg.statusId}
+            style={{
+              left: `${segments.slice(0, i + 1).reduce((a, x) => a + x.width, 0)}%`,
+            }}
+            className="absolute -translate-x-1/2"
+          >
+            {seg.upTo}
+          </span>
+        ))}
+        <span className="absolute right-0">
+          {m.max} {m.unit}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Tone → the fill a band segment takes. */
+const BAND_FILL: Record<Tone, string> = {
+  success: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-danger",
+  info: "bg-info",
+  neutral: "bg-neutral-foreground/40",
+};
 
 /** A hand-drawn line, as the Dashboard's bars are — no chart dependency. */
 function Sparkline({ values, tone }: { values: number[]; tone: Tone }) {
