@@ -3,10 +3,12 @@
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import * as React from "react";
+import { Spinner } from "@/components/shared/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
+import { withMinDuration } from "@/lib/pending";
 
 function BrandMark() {
   return (
@@ -56,7 +58,7 @@ export default function ForgotPasswordPage() {
     setPending(true);
     // An address the system does not hold reports success too — anything else
     // turns this form into a way of testing whether somebody has an account.
-    if (await send()) setSent(true);
+    if (await withMinDuration(send())) setSent(true);
     setPending(false);
   };
 
@@ -101,6 +103,7 @@ export default function ForgotPasswordPage() {
                 disabled={pending}
                 className="mt-2.5 w-full"
               >
+                {pending && <Spinner />}
                 {pending ? "Sending…" : "Send reset link"}
               </Button>
             </form>

@@ -20,8 +20,10 @@ import {
 } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
 import { RowButton, SelectInput, TextInput } from "@/components/shared/inputs";
+import { Spinner } from "@/components/shared/spinner";
 import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
 import { countOpenRequests } from "@/lib/derive";
@@ -32,6 +34,7 @@ import {
   writeBuildingPhoto,
 } from "@/lib/estate-store";
 import { formatRelative } from "@/lib/format";
+import { withMinDuration } from "@/lib/pending";
 import {
   canEditUser,
   canManageAccounts,
@@ -644,14 +647,24 @@ function BuildingPhoto({ building }: { building: Building }) {
   const mayEdit = canManageEstate(role);
   const [photo, setPhoto] = React.useState<string | null>(null);
   const [busy, setBusy] = React.useState(false);
+  // A photo lives in a subcollection, so it arrives after the building does.
+  // Without this the frame said "Drop a photo" while one was still loading —
+  // an empty state standing in for a loading state, which is a lie about the
+  // record.
+  const [loadingPhoto, setLoadingPhoto] = React.useState(true);
 
   const id = building.id;
   React.useEffect(() => {
     setPhoto(null);
+    setLoadingPhoto(true);
     let live = true;
-    readBuildingPhoto(id).then((found) => {
-      if (live) setPhoto(found);
-    });
+    readBuildingPhoto(id)
+      .then((found) => {
+        if (live) setPhoto(found);
+      })
+      .finally(() => {
+        if (live) setLoadingPhoto(false);
+      });
     return () => {
       live = false;
     };
@@ -659,7 +672,9 @@ function BuildingPhoto({ building }: { building: Building }) {
 
   return (
     <div className="border-divider bg-background relative flex min-h-49 flex-1 items-center justify-center overflow-hidden rounded border">
-      {photo ? (
+      {loadingPhoto ? (
+        <Skeleton className="size-full rounded-none" />
+      ) : photo ? (
         // A stored photo arrives whole, from a document rather than a
         // network fetch, so it popped. It fades instead.
         // biome-ignore lint/performance/noImgElement: a stored data URL, not a remote asset
@@ -673,7 +688,11 @@ function BuildingPhoto({ building }: { building: Building }) {
         />
       ) : (
         <div className="text-muted-foreground flex flex-col items-center gap-2 px-4 text-center">
-          <Camera className="size-6" />
+          {busy ? (
+            <Spinner className="size-5" />
+          ) : (
+            <Camera className="size-6" />
+          )}
           <span className="text-[10.5px]">
             {busy ? "Resizing…" : `Drop a photo of ${building.name}`}
           </span>
@@ -1332,12 +1351,14 @@ function UserDrawer({
           return;
         }
         setSaving(true);
-        const written = await onSave({
-          name: name.trim(),
-          email: email.trim(),
-          role,
-          buildingId: buildingLocked ? undefined : buildingId,
-        });
+        const written = await withMinDuration(
+          onSave({
+            name: name.trim(),
+            email: email.trim(),
+            role,
+            buildingId: buildingLocked ? undefined : buildingId,
+          }),
+        );
         setSaving(false);
         // An email already in use, or a role the actor may not assign, has to
         // stay on screen rather than vanish with the drawer.

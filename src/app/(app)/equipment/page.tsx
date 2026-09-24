@@ -63,6 +63,7 @@ import {
   sensorForEquipment,
 } from "@/lib/mock-data";
 import { staggerStyle } from "@/lib/motion";
+import { withMinDuration } from "@/lib/pending";
 import {
   canDecommissionEquipment,
   canManageEquipmentTypes,
@@ -1564,7 +1565,7 @@ function HvacPanel({ unit }: { unit: EquipmentUnit }) {
 
   const write = async (next: NonNullable<EquipmentUnit["hvac"]>) => {
     setSaving(true);
-    const written = await editUnit(unit.id, { hvac: next });
+    const written = await withMinDuration(editUnit(unit.id, { hvac: next }));
     setSaving(false);
     if (!written.ok) {
       toast.error(written.message);

@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
+import { Spinner } from "@/components/shared/spinner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
+import { withMinDuration } from "@/lib/pending";
 
 /** Why the gate sent someone back here, if it did. */
 const REASONS: Record<string, string> = {
@@ -53,7 +55,7 @@ function LoginView() {
     if (pending) return;
     setPending(true);
     setError(null);
-    const result = await signIn(email, password);
+    const result = await withMinDuration(signIn(email, password));
     if (!result.ok) {
       setError(result.message);
       setPending(false);
@@ -142,6 +144,7 @@ function LoginView() {
             disabled={pending}
             className="interactive bg-primary hover:bg-primary/90 mt-1 w-full"
           >
+            {pending && <Spinner />}
             {pending ? "Signing in…" : "Sign in"}
           </Button>
         </form>
