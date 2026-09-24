@@ -17,6 +17,7 @@ import {
   FormFieldLocked,
   NumberInput,
 } from "@/components/shared/form-drawer";
+import { Hint } from "@/components/shared/hint";
 import { RowButton, SelectInput, TextInput } from "@/components/shared/inputs";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -198,22 +199,25 @@ function TabButton({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      title={title}
-      onClick={onClick}
-      className={cn(
-        "focus-ring interactive flex cursor-pointer items-center gap-1.5 rounded-[3px] px-3 py-1.75 text-[11.5px] leading-none font-medium",
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-foreground/70 hover:text-foreground",
-        disabled && "cursor-not-allowed opacity-45",
-      )}
-    >
-      <Icon className="size-3.25" />
-      {label}
-    </button>
+    // aria-disabled rather than disabled, so a locked tab can still be hovered
+    // and tabbed to — that is how its reason gets read.
+    <Hint text={title}>
+      <button
+        type="button"
+        aria-disabled={disabled}
+        onClick={() => !disabled && onClick()}
+        className={cn(
+          "focus-ring interactive flex cursor-pointer items-center gap-1.5 rounded-[3px] px-3 py-1.75 text-[11.5px] leading-none font-medium",
+          active
+            ? "bg-primary text-primary-foreground"
+            : "text-foreground/70 hover:text-foreground",
+          disabled && "cursor-not-allowed opacity-45",
+        )}
+      >
+        <Icon className="size-3.25" />
+        {label}
+      </button>
+    </Hint>
   );
 }
 

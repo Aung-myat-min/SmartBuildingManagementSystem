@@ -2,6 +2,7 @@
 
 import { Link2, Lock } from "lucide-react";
 import type * as React from "react";
+import { Hint } from "@/components/shared/hint";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -204,30 +205,34 @@ export function DrawerAction({
 }) {
   const locked = Boolean(lockedReason);
   return (
-    <button
-      type="button"
-      disabled={locked}
-      onClick={onClick}
-      title={lockedReason ?? caption}
-      className={cn(
-        "focus-ring interactive flex min-h-11 cursor-pointer flex-col items-start justify-center gap-1.25 rounded border px-2.5 py-2.25 text-left transition-colors md:min-h-0",
-        locked
-          ? "border-border cursor-not-allowed opacity-45"
-          : tone === "danger"
-            ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
-            : "border-border hover:border-primary hover:bg-accent/40",
-      )}
-    >
-      <span className="flex items-center gap-1.5 text-[11px] font-medium">
-        {locked ? <Lock className="size-3" /> : <Icon className="size-3" />}
-        {label}
-      </span>
-      {caption && (
-        <span className="text-muted-foreground text-[10px] leading-snug">
-          {caption}
+    // aria-disabled, not disabled: a disabled button takes no pointer events
+    // and leaves the tab order, so the reason it is locked could be reached by
+    // neither a mouse nor a keyboard — which is the padlock's whole job.
+    <Hint text={lockedReason ?? caption}>
+      <button
+        type="button"
+        aria-disabled={locked}
+        onClick={() => !locked && onClick()}
+        className={cn(
+          "focus-ring interactive flex min-h-11 cursor-pointer flex-col items-start justify-center gap-1.25 rounded border px-2.5 py-2.25 text-left transition-colors md:min-h-0",
+          locked
+            ? "border-border cursor-not-allowed opacity-45"
+            : tone === "danger"
+              ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
+              : "border-border hover:border-primary hover:bg-accent/40",
+        )}
+      >
+        <span className="flex items-center gap-1.5 text-[11px] font-medium">
+          {locked ? <Lock className="size-3" /> : <Icon className="size-3" />}
+          {label}
         </span>
-      )}
-    </button>
+        {caption && (
+          <span className="text-muted-foreground text-[10px] leading-snug">
+            {caption}
+          </span>
+        )}
+      </button>
+    </Hint>
   );
 }
 

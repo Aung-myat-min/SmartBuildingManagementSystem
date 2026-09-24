@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { FormDrawer, FormField } from "@/components/shared/form-drawer";
+import { Hint } from "@/components/shared/hint";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
@@ -661,21 +662,22 @@ function MoveButtons({
         </button>
       )}
       {nextLabel && (
-        <button
-          type="button"
-          disabled={!mayAdvance}
-          title={mayAdvance ? nextLabel : REQUEST_ADVANCE_LOCK_REASON}
-          onClick={() => onMove(request, "next")}
-          className={cn(
-            "focus-ring interactive bg-card flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium",
-            mayAdvance
-              ? "border-primary text-accent-foreground hover:bg-accent/40"
-              : "border-border text-muted-foreground cursor-not-allowed opacity-45",
-          )}
-        >
-          {!mayAdvance && <Lock className="size-2.5" />}
-          {nextLabel}
-        </button>
+        <Hint text={mayAdvance ? nextLabel : REQUEST_ADVANCE_LOCK_REASON}>
+          <button
+            type="button"
+            aria-disabled={!mayAdvance}
+            onClick={() => mayAdvance && onMove(request, "next")}
+            className={cn(
+              "focus-ring interactive bg-card flex flex-1 cursor-pointer items-center justify-center gap-1 rounded-[3px] border px-2 py-2 text-[11px] leading-none font-medium",
+              mayAdvance
+                ? "border-primary text-accent-foreground hover:bg-accent/40"
+                : "border-border text-muted-foreground cursor-not-allowed opacity-45",
+            )}
+          >
+            {!mayAdvance && <Lock className="size-2.5" />}
+            {nextLabel}
+          </button>
+        </Hint>
       )}
     </>
   );

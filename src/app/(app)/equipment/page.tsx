@@ -34,6 +34,7 @@ import {
   NumberInput,
   WideSheet,
 } from "@/components/shared/form-drawer";
+import { Hint } from "@/components/shared/hint";
 import { RowButton, TextInput } from "@/components/shared/inputs";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -319,15 +320,16 @@ export default function EquipmentPage() {
             Manage types
           </button>
         ) : (
-          <button
-            type="button"
-            disabled
-            title={EQUIPMENT_TYPE_LOCK_REASON}
-            className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
-          >
-            <Lock className="size-2.75" />
-            Manage types
-          </button>
+          <Hint text={EQUIPMENT_TYPE_LOCK_REASON}>
+            <button
+              type="button"
+              aria-disabled
+              className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
+            >
+              <Lock className="size-2.75" />
+              Manage types
+            </button>
+          </Hint>
         )}
 
         <button
@@ -481,9 +483,12 @@ export default function EquipmentPage() {
                         }}
                         onClick={() => setSelectedId(u.id)}
                         className={cn(
-                          "interactive focus-ring pressable border-divider hover:border-primary bg-card cursor-pointer rounded border border-l-[3px] px-2.75 py-2.5 text-left",
+                          // cursor-grab, not cursor-pointer: the card is
+                          // draggable, and before this it only said so once
+                          // you were already dragging it.
+                          "interactive focus-ring border-divider hover:border-primary hover:shadow-sm bg-card cursor-grab rounded border border-l-[3px] px-2.75 py-2.5 text-left",
                           "active:cursor-grabbing",
-                          dragId === u.id && "opacity-40",
+                          dragId === u.id && "opacity-40 shadow-md",
                           landedId === u.id && "animate-sb-drop",
                           col === "faulty"
                             ? "border-l-danger"
@@ -880,24 +885,27 @@ function EquipmentDrawer({
             >
               Edit details
             </button>
-            <button
-              type="button"
-              disabled={!canDecommission}
-              title={
+            <Hint
+              text={
                 canDecommission
                   ? "Delete this unit from the register"
                   : DECOMMISSION_LOCK_REASON
               }
-              onClick={onDelete}
-              className={cn(
-                "focus-ring interactive bg-card shrink-0 cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
-                canDecommission
-                  ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
-                  : "border-border text-muted-foreground cursor-not-allowed opacity-45",
-              )}
             >
-              Delete
-            </button>
+              <button
+                type="button"
+                aria-disabled={!canDecommission}
+                onClick={() => canDecommission && onDelete()}
+                className={cn(
+                  "focus-ring interactive bg-card shrink-0 cursor-pointer rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
+                  canDecommission
+                    ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
+                    : "border-border text-muted-foreground cursor-not-allowed opacity-45",
+                )}
+              >
+                Delete
+              </button>
+            </Hint>
           </>
         }
         onClose={onClose}

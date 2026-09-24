@@ -26,6 +26,7 @@ import {
 } from "@/components/shared/detail-drawer";
 import { EmptyState } from "@/components/shared/empty-state";
 import { FormDrawer, WideSheet } from "@/components/shared/form-drawer";
+import { Hint } from "@/components/shared/hint";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { SensorTypeRegistry } from "@/components/shared/sensor-type-registry";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
@@ -294,15 +295,16 @@ function SensorsView() {
             Manage types
           </button>
         ) : (
-          <button
-            type="button"
-            disabled
-            title={SENSOR_TYPE_LOCK_REASON}
-            className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
-          >
-            <Lock className="size-2.75" />
-            Manage types
-          </button>
+          <Hint text={SENSOR_TYPE_LOCK_REASON}>
+            <button
+              type="button"
+              aria-disabled
+              className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
+            >
+              <Lock className="size-2.75" />
+              Manage types
+            </button>
+          </Hint>
         )}
 
         {canAct(role) && (
@@ -427,26 +429,31 @@ function SensorsView() {
                                   // blanket page-level gate.
                                   const allowed = a.allowedRoles.includes(role);
                                   return (
-                                    <button
+                                    <Hint
                                       key={a.id}
-                                      type="button"
-                                      disabled={!allowed}
-                                      title={
+                                      text={
                                         allowed ? a.caption : SENSOR_LOCK_REASON
                                       }
-                                      onClick={() => runAction(s, a)}
-                                      className={cn(
-                                        "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
-                                        allowed
-                                          ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
-                                          : "border-border cursor-not-allowed opacity-45",
-                                      )}
                                     >
-                                      {!allowed && (
-                                        <Lock className="size-2.5" />
-                                      )}
-                                      {a.label}
-                                    </button>
+                                      <button
+                                        type="button"
+                                        aria-disabled={!allowed}
+                                        onClick={() =>
+                                          allowed && runAction(s, a)
+                                        }
+                                        className={cn(
+                                          "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
+                                          allowed
+                                            ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
+                                            : "border-border cursor-not-allowed opacity-45",
+                                        )}
+                                      >
+                                        {!allowed && (
+                                          <Lock className="size-2.5" />
+                                        )}
+                                        {a.label}
+                                      </button>
+                                    </Hint>
                                   );
                                 })}
                                 <span className="text-muted-foreground text-[10.5px]">
@@ -645,36 +652,40 @@ function SensorDrawer({
           </DetailDrawerSection>
 
           <DetailDrawerSection className="flex gap-1.75">
-            <button
-              type="button"
-              disabled={!mayAct}
-              title={mayAct ? "Edit this sensor's details" : SENSOR_LOCK_REASON}
-              onClick={() => setEditing(true)}
-              className={cn(
-                "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
-                mayAct
-                  ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
-                  : "border-border cursor-not-allowed opacity-45",
-              )}
+            <Hint
+              text={mayAct ? "Edit this sensor's details" : SENSOR_LOCK_REASON}
             >
-              {!mayAct && <Lock className="size-2.5" />}
-              Edit details
-            </button>
-            <button
-              type="button"
-              disabled={!mayAct}
-              title={mayAct ? "Remove this sensor" : SENSOR_LOCK_REASON}
-              onClick={() => onRemove(sensor)}
-              className={cn(
-                "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
-                mayAct
-                  ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
-                  : "border-border cursor-not-allowed opacity-45",
-              )}
-            >
-              <Trash2 className="size-2.5" />
-              Remove
-            </button>
+              <button
+                type="button"
+                aria-disabled={!mayAct}
+                onClick={() => mayAct && setEditing(true)}
+                className={cn(
+                  "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
+                  mayAct
+                    ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
+                    : "border-border cursor-not-allowed opacity-45",
+                )}
+              >
+                {!mayAct && <Lock className="size-2.5" />}
+                Edit details
+              </button>
+            </Hint>
+            <Hint text={mayAct ? "Remove this sensor" : SENSOR_LOCK_REASON}>
+              <button
+                type="button"
+                aria-disabled={!mayAct}
+                onClick={() => mayAct && onRemove(sensor)}
+                className={cn(
+                  "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.75 py-1.75 text-[11px] leading-none font-medium",
+                  mayAct
+                    ? "border-danger/40 text-danger-foreground hover:bg-danger-muted"
+                    : "border-border cursor-not-allowed opacity-45",
+                )}
+              >
+                <Trash2 className="size-2.5" />
+                Remove
+              </button>
+            </Hint>
           </DetailDrawerSection>
         </>
       )}
