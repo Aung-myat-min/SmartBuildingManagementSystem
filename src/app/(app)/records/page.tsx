@@ -4,6 +4,7 @@ import { Download, Search } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
+import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -12,6 +13,7 @@ import { downloadCsv, stampedFilename } from "@/lib/export";
 import { formatDayLabel, formatTime } from "@/lib/format";
 import { useLogHistory } from "@/lib/logbook-store";
 import { buildingName, LOG_BOOK_SOURCE_META } from "@/lib/mock-data";
+import { staggerStyle } from "@/lib/motion";
 import { isBuildingLocked } from "@/lib/permissions";
 import type { LogBookSource } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -174,7 +176,7 @@ export default function HistoricalRecordsPage() {
         </span>
       </div>
 
-      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
@@ -263,7 +265,7 @@ export default function HistoricalRecordsPage() {
         >
           <Download className="size-3" /> Export CSV
         </button>
-      </div>
+      </StickyToolbar>
 
       <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
         {kpis.map((k) => (
@@ -361,11 +363,12 @@ export default function HistoricalRecordsPage() {
               </span>
               <span>· {records.length} records</span>
             </div>
-            {records.map((r) => (
+            {records.map((r, i) => (
               <div
                 key={r.id}
+                style={staggerStyle(i)}
                 className={cn(
-                  "border-rule flex items-center border-b border-l-[3px] px-4 py-2 text-[12px] last:border-b-0",
+                  "animate-sb-rise border-rule flex items-center border-b border-l-[3px] px-4 py-2 text-[12px] last:border-b-0",
                   TONE_BORDER_L[TYPE_META[r.source].tone],
                 )}
               >

@@ -20,6 +20,7 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
+import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
@@ -279,7 +280,7 @@ export default function RequestsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
@@ -392,7 +393,7 @@ export default function RequestsPage() {
         >
           New request
         </button>
-      </div>
+      </StickyToolbar>
 
       {view === "board" ? (
         <div
@@ -486,7 +487,7 @@ export default function RequestsPage() {
           })}
         </div>
       ) : (
-        <div className="border-border bg-card overflow-x-auto rounded-[5px] border">
+        <div className="border-border scroll-x-edges overflow-x-auto rounded-[5px] border">
           <div className="bg-surface-subtle border-divider text-muted-foreground flex min-w-300 border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
             <span className="w-22">Id</span>
             <span className="w-28">Building</span>

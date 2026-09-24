@@ -100,7 +100,7 @@ export function SensorTypeRegistry({ confirm }: { confirm: ConfirmFn }) {
         </button>
       </div>
 
-      <div className="border-border bg-card overflow-x-auto rounded-[5px] border">
+      <div className="border-border scroll-x-edges overflow-x-auto rounded-[5px] border">
         <div className="bg-surface-subtle border-divider text-muted-foreground flex min-w-230 border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
           <span className="w-55">Type</span>
           <span className="flex-1">Id</span>

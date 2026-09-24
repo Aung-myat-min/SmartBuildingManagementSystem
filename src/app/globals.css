@@ -264,6 +264,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    /* Anchor jumps and any scrollTo glide rather than teleport. Cut by the
+       reduced-motion rule at the end of this file. */
+    scroll-behavior: smooth;
+  }
   body {
     @apply bg-background text-foreground;
   }
@@ -276,6 +281,50 @@
   .font-tabular {
     font-variant-numeric: tabular-nums;
   }
+}
+
+/* An edge fade on a table that scrolls sideways.
+ *
+ * Four layered gradients: two covers painted in the card's own colour that
+ * scroll *with* the content (`local`), and two shadows pinned to the box
+ * (`scroll`). At the left edge the cover sits over the shadow and hides it; as
+ * you scroll the cover moves away and the shadow appears. So the hint shows up
+ * only when there is actually more to see, with no JavaScript measuring
+ * anything. */
+@utility scroll-x-edges {
+  background-color: var(--card);
+  background-image:
+    linear-gradient(to right, var(--card) 40%, transparent),
+    linear-gradient(to left, var(--card) 40%, transparent),
+    radial-gradient(
+      farthest-side at 0 50%,
+      color-mix(in oklch, var(--foreground) 13%, transparent),
+      transparent
+    ),
+    radial-gradient(
+      farthest-side at 100% 50%,
+      color-mix(in oklch, var(--foreground) 13%, transparent),
+      transparent
+    );
+  background-position:
+    left center,
+    right center,
+    left center,
+    right center;
+  background-size:
+    28px 100%,
+    28px 100%,
+    12px 100%,
+    12px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+
+/* The lift a pinned toolbar gets once it is floating over the page rather than
+   sitting in it. Tokenised rather than an inline rgba, like every other colour
+   here. */
+@utility stuck-shadow {
+  box-shadow: 0 4px 12px color-mix(in oklch, var(--foreground) 9%, transparent);
 }
 
 /* Interaction recipes.

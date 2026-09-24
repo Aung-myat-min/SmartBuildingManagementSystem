@@ -36,6 +36,7 @@ import {
 } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
 import { RowButton, TextInput } from "@/components/shared/inputs";
+import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
@@ -223,7 +224,7 @@ export default function EquipmentPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
@@ -340,7 +341,7 @@ export default function EquipmentPage() {
         >
           + New unit
         </button>
-      </div>
+      </StickyToolbar>
 
       {view === "register" ? (
         <div className="border-border bg-card overflow-hidden rounded-[5px] border">

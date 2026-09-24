@@ -82,7 +82,7 @@ export default function SettingsPage() {
         })}
       </Card>
 
-      <div className="flex gap-1.5 overflow-x-auto lg:hidden">
+      <div className="scroll-x-edges flex gap-1.5 overflow-x-auto lg:hidden">
         {SECTIONS.map((s) => (
           <button
             key={s.id}

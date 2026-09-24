@@ -29,6 +29,7 @@ import { FormDrawer, WideSheet } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { SensorTypeRegistry } from "@/components/shared/sensor-type-registry";
+import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { useCountUp } from "@/hooks/use-count-up";
 import { useLiveClock } from "@/hooks/use-live-clock";
@@ -226,7 +227,7 @@ function SensorsView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <span className="text-muted-foreground font-mono text-[10px] tracking-[0.07em] uppercase">
           Show
         </span>
@@ -317,7 +318,7 @@ function SensorsView() {
             + New sensor
           </button>
         )}
-      </div>
+      </StickyToolbar>
 
       <MonitoringStrip />
 

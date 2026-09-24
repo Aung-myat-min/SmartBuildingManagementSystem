@@ -19,6 +19,7 @@ import {
 } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
 import { RowButton, SelectInput, TextInput } from "@/components/shared/inputs";
+import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
@@ -131,7 +132,7 @@ export default function AdministrationPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <div className="bg-secondary border-border flex items-center gap-1 rounded-[5px] border p-[3px]">
           <TabButton
             icon={mayEstate ? Building2 : Lock}
@@ -156,7 +157,7 @@ export default function AdministrationPage() {
         <span className="bg-primary text-primary-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium">
           {tabCount}
         </span>
-      </div>
+      </StickyToolbar>
 
       {tab === "buildings" ? (
         <BuildingsTab
@@ -462,7 +463,7 @@ function BuildingsTab({
 
           {/* Below a tablet the room table keeps its column widths and
               scrolls inside the card, rather than pushing the page sideways. */}
-          <div className="overflow-x-auto">
+          <div className="scroll-x-edges overflow-x-auto">
             <div className="bg-surface-subtle border-divider text-muted-foreground flex min-w-140 border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
               <span className="flex-1">Room</span>
               <span className="w-30">Type</span>
@@ -1050,7 +1051,7 @@ function UsersTab({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
         <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-35 flex-1 items-center gap-1.5 rounded border px-2">
           <Search className="text-muted-foreground size-3.25 shrink-0" />
           <input
@@ -1084,9 +1085,9 @@ function UsersTab({
         >
           + New account
         </button>
-      </div>
+      </StickyToolbar>
 
-      <div className="border-border bg-card overflow-x-auto rounded-[5px] border">
+      <div className="border-border scroll-x-edges overflow-x-auto rounded-[5px] border">
         <div className="bg-surface-subtle border-divider text-muted-foreground flex min-w-260 border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
           <span className="w-47.5">Name</span>
           <span className="flex-1">Email</span>

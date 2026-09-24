@@ -11,6 +11,7 @@ import {
 } from "@/components/shared/date-range-filter";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PulseDot } from "@/components/shared/pulse-dot";
+import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -226,44 +227,46 @@ export default function LogBookPage() {
           </button>
         </Card>
 
-        <Card className="flex-row flex-wrap items-center gap-2 p-2.5">
-          <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
-            <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search entries"
-              className="w-full bg-transparent py-1.5 pr-3 pl-8 text-[12px] outline-none"
-            />
-          </div>
-          <Select
-            value={effectiveBuilding}
-            onValueChange={(v) => setBuildingFilter(v ?? "all")}
-            disabled={locked}
-          >
-            <SelectTrigger size="sm" className="text-[12px] font-medium">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All buildings</SelectItem>
-              {buildings.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <DateRangeFilter value={range} onChange={setRange} withTime />
-          <div className="bg-border h-5.5 w-px" />
-          <ToneBadge tone="info" title="Entries shown">
-            {filtered.length} shown
-          </ToneBadge>
-          {alertCount > 0 && (
-            <ToneBadge tone="danger" title="Alert-level entries in view">
-              {alertCount} alerts
+        <StickyToolbar>
+          <Card className="flex-row flex-wrap items-center gap-2 p-2.5">
+            <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
+              <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search entries"
+                className="w-full bg-transparent py-1.5 pr-3 pl-8 text-[12px] outline-none"
+              />
+            </div>
+            <Select
+              value={effectiveBuilding}
+              onValueChange={(v) => setBuildingFilter(v ?? "all")}
+              disabled={locked}
+            >
+              <SelectTrigger size="sm" className="text-[12px] font-medium">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All buildings</SelectItem>
+                {buildings.map((b) => (
+                  <SelectItem key={b.id} value={b.id}>
+                    {b.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <DateRangeFilter value={range} onChange={setRange} withTime />
+            <div className="bg-border h-5.5 w-px" />
+            <ToneBadge tone="info" title="Entries shown">
+              {filtered.length} shown
             </ToneBadge>
-          )}
-        </Card>
+            {alertCount > 0 && (
+              <ToneBadge tone="danger" title="Alert-level entries in view">
+                {alertCount} alerts
+              </ToneBadge>
+            )}
+          </Card>
+        </StickyToolbar>
 
         <div className="flex flex-col gap-3">
           {grouped.length === 0 &&
