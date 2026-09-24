@@ -1596,7 +1596,25 @@ CSS cannot do:
   when the last alarm clears, a notification row, the Sensors page's building
   expander (height to `auto` is the other thing CSS cannot transition).
 
-Everything else is the stylesheet. A hover never gets a `motion` component.
+Everything else is the stylesheet. A hover never gets a `motion` component, and
+**functional content never gets a motion `initial`** — that is an inline style
+which persists until the frame clock runs, so a collapsed form would stay
+collapsed in a background tab. `DrawerInlineForm` uses `animate-sb-rise` for
+exactly this reason.
+
+### Pending states
+
+`lib/pending.ts` — `withMinDuration(promise, floorMs?)` and `remainingFloor`,
+both pure and tested. Firestore answers in 40–80ms, which is faster than
+anyone reads "Saving…", so the label used to appear and vanish inside a frame
+or two. The floor is 400ms and it is a *floor*: a write that takes a second is
+not slowed, and a rejection is never held, because waiting one out is the case
+where the delay buys nothing.
+
+Wrapped around every write with a busy state: `FormDrawer` and
+`DrawerInlineForm` (so every create and edit), the HVAC panel, the account
+form, and all three sign-in screens. `shared/spinner.tsx` is the one spinner,
+riding beside the label so a button keeps its width.
 
 **`prefers-reduced-motion: reduce` is honoured globally** — a blanket rule at
 the end of `globals.css` cuts every animation and transition, so a transition
