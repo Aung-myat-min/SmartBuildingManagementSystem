@@ -43,13 +43,29 @@ const SETTLE_PER_SECOND = 0.02;
 const HVAC_PER_SECOND = 0.05;
 
 /**
- * Where a reading sits when nothing is acting on it — a third of the way up
- * the range rather than the middle, so a sensor at rest reads "comfortable"
- * rather than hovering on a band edge and flapping between two statuses.
+ * Where a reading sits when nothing is acting on it: the middle of the band
+ * the type calls good.
+ *
+ * It used to be a third of the way up the dial, which is not a fact about
+ * anything. For CO2 on a 350–2500 dial that put the resting point at 1102 —
+ * above the fresh threshold — so every room in the estate drifted to "stuffy"
+ * and stayed there, and the thresholds took the blame for the model.
+ *
+ * The good band is a real statement about the measure and every measuring type
+ * has one, so it is the honest anchor. The old fraction stays as the fallback
+ * for a type whose statuses carry no `success` tone at all.
  */
 function restingValue(type: SensorTypeDef): number {
   const m = type.measurement;
   if (!m) return 0;
+
+  let from = m.min;
+  for (const band of m.bands) {
+    const to = band.upTo ?? m.max;
+    const def = type.statuses.find((st) => st.id === band.statusId);
+    if (def?.tone === "success") return (from + Math.min(to, m.max)) / 2;
+    from = to;
+  }
   return m.min + (m.max - m.min) * 0.35;
 }
 

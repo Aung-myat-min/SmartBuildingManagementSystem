@@ -42,6 +42,8 @@ export function ReadingChart({
   mode,
   setpoint,
   height = 168,
+  compact = false,
+  keepInView,
 }: {
   type: SensorTypeDef | undefined;
   points: ReadingPoint[];
@@ -51,10 +53,19 @@ export function ReadingChart({
   /** An HVAC setpoint, in the same unit as the series, so it shares the axis. */
   setpoint?: number;
   height?: number;
+  /**
+   * The card's default state: the shape of the reading and the band it is in,
+   * with no axes, no ticks and no hover. At this size there is no room for
+   * them and no question they answer — the number is printed above the chart,
+   * and the full one is a click away.
+   */
+  compact?: boolean;
+  /** A value that must stay on the axis even when the data never reaches it. */
+  keepInView?: number;
 }) {
   const reduced = useReducedMotion();
   const m = type?.measurement;
-  const domain = readingDomain(type, points, setpoint);
+  const domain = readingDomain(type, points, setpoint ?? keepInView);
   const unit = m?.unit ?? "";
   const decimals = m?.decimals ?? 0;
 
@@ -64,11 +75,21 @@ export function ReadingChart({
     <ResponsiveContainer width="100%" height={height}>
       <LineChart
         data={points}
-        margin={{ top: 6, right: 46, bottom: 2, left: 2 }}
+        margin={
+          compact
+            ? { top: 2, right: 2, bottom: 0, left: 2 }
+            : { top: 6, right: 46, bottom: 2, left: 2 }
+        }
       >
         {/* Solid hairlines, one shade off the surface. A dashed grid reads as
             a threshold or a projection, and this chart has real thresholds. */}
-        <CartesianGrid stroke="var(--rule)" strokeWidth={1} vertical={false} />
+        {!compact && (
+          <CartesianGrid
+            stroke="var(--rule)"
+            strokeWidth={1}
+            vertical={false}
+          />
+        )}
 
         {zones.map((z) => {
           const tone =
@@ -90,12 +111,16 @@ export function ReadingChart({
               // the opposite corner: a horizontal line's label and a band
               // label both centred on the right-hand edge landed on top of
               // each other the first time this drew.
-              label={{
-                value: label,
-                position: "insideTopRight",
-                fill: "var(--muted-foreground)",
-                fontSize: 9,
-              }}
+              label={
+                compact
+                  ? undefined
+                  : {
+                      value: label,
+                      position: "insideTopRight",
+                      fill: "var(--muted-foreground)",
+                      fontSize: 9,
+                    }
+              }
             />
           );
         })}
@@ -106,16 +131,21 @@ export function ReadingChart({
             stroke="var(--primary)"
             strokeWidth={1.5}
             strokeDasharray="4 3"
-            label={{
-              value: `Setpoint ${setpoint} ${unit}`,
-              position: "insideBottomLeft",
-              fill: "var(--primary)",
-              fontSize: 9.5,
-            }}
+            label={
+              compact
+                ? undefined
+                : {
+                    value: `Setpoint ${setpoint} ${unit}`,
+                    position: "insideBottomLeft",
+                    fill: "var(--primary)",
+                    fontSize: 9.5,
+                  }
+            }
           />
         )}
 
         <XAxis
+          hide={compact}
           dataKey="at"
           type="number"
           scale="time"
@@ -127,6 +157,7 @@ export function ReadingChart({
           minTickGap={44}
         />
         <YAxis
+          hide={compact}
           domain={domain}
           width={34}
           tick={{ fill: "var(--muted-foreground)", fontSize: 9.5 }}
@@ -135,34 +166,36 @@ export function ReadingChart({
           tickFormatter={(v: number) => v.toFixed(0)}
         />
 
-        <Tooltip
-          cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1 }}
-          content={({ active, payload }) => {
-            const point = payload?.[0]?.payload as ReadingPoint | undefined;
-            if (!active || !point) return null;
-            return (
-              <div className="border-border bg-card rounded border px-2 py-1.5 shadow-sm">
-                <div className="font-mono text-[11px] font-semibold tabular-nums">
-                  {point.value.toFixed(decimals)} {unit}
+        {!compact && (
+          <Tooltip
+            cursor={{ stroke: "var(--muted-foreground)", strokeWidth: 1 }}
+            content={({ active, payload }) => {
+              const point = payload?.[0]?.payload as ReadingPoint | undefined;
+              if (!active || !point) return null;
+              return (
+                <div className="border-border bg-card rounded border px-2 py-1.5 shadow-sm">
+                  <div className="font-mono text-[11px] font-semibold tabular-nums">
+                    {point.value.toFixed(decimals)} {unit}
+                  </div>
+                  <div className="text-muted-foreground text-[10px]">
+                    {new Date(point.at).toLocaleString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </div>
                 </div>
-                <div className="text-muted-foreground text-[10px]">
-                  {new Date(point.at).toLocaleString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    day: "numeric",
-                    month: "short",
-                  })}
-                </div>
-              </div>
-            );
-          }}
-        />
+              );
+            }}
+          />
+        )}
 
         <Line
           type={mode === "live" ? "monotone" : "stepAfter"}
           dataKey="value"
           stroke="var(--foreground)"
-          strokeWidth={2}
+          strokeWidth={compact ? 1.75 : 2}
           // No dot per point — a marker on every reading is noise at this
           // density. The hover state is where a single point gets one.
           dot={false}

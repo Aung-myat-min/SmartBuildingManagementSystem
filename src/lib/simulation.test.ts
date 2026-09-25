@@ -151,8 +151,11 @@ describe("the walk", () => {
     for (let i = 0; i < 400; i += 1) {
       current = run({ current, seconds: 3 }) as { S1: number };
     }
-    // Rest is 35% up a 5–45 range, i.e. 19 °C.
-    expect(current.S1).toBeCloseTo(19, 0);
+    // Rest is the middle of the band the type calls good — comfortable runs
+    // 18–26, so 22. Not a fraction of the dial, which for CO2 on a 350–2500
+    // range put the resting point above the fresh threshold and left every
+    // room permanently stuffy.
+    expect(current.S1).toBeCloseTo(22, 0);
   });
 });
 
@@ -211,7 +214,7 @@ describe("HVAC", () => {
   });
 
   it("holds the setpoint instead of sliding back to ambient", () => {
-    // Rest is 19 °C. A cooler sitting on 21 cannot pull the room back up, so
+    // Rest is 22 °C. A cooler sitting on 21 cannot pull the room back up, so
     // without damping the settle term the room would drift to 19 and the unit
     // would have nothing to say about it.
     let current = { S1: 21 };
@@ -294,6 +297,71 @@ describe("crossings", () => {
       statusFor,
     );
     expect(rows[0].reading).toBe(33.4);
+  });
+});
+
+describe("where a reading rests", () => {
+  it("settles in the middle of the band the type calls good", () => {
+    // CO2 on a 350–2500 dial is the case that made this matter: a third of the
+    // way up is 1102, above the fresh threshold, so every room drifted to
+    // "stuffy" and stayed there and the thresholds took the blame.
+    const co2: SensorTypeDef = {
+      id: "co2",
+      label: "Air quality",
+      icon: "wind",
+      statuses: [
+        { id: "fresh", label: "Fresh", tone: "success", isAlarm: false },
+        { id: "stuffy", label: "Stuffy", tone: "warning", isAlarm: false },
+      ],
+      actions: [],
+      measurement: {
+        unit: "ppm",
+        min: 350,
+        max: 2500,
+        decimals: 0,
+        bands: [
+          { upTo: 1000, statusId: "fresh" },
+          { upTo: null, statusId: "stuffy" },
+        ],
+      },
+    };
+    let current: Record<string, number> = { C1: 2000 };
+    for (let i = 0; i < 600; i += 1) {
+      current = stepReadings({
+        sensors: [sensor("C1", { typeId: "co2", status: "stuffy" })],
+        types: [co2],
+        units: [],
+        current,
+        manual: {},
+        seconds: 3,
+        random: still,
+      });
+    }
+    // Middle of 350–1000, not 35% of 350–2500.
+    expect(current.C1).toBeCloseTo(675, 0);
+  });
+
+  it("falls back to a fraction of the dial when no band is good", () => {
+    const grim: SensorTypeDef = {
+      ...temperature,
+      statuses: temperature.statuses.map((st) => ({
+        ...st,
+        tone: "warning" as const,
+      })),
+    };
+    let current: Record<string, number> = { S1: 44 };
+    for (let i = 0; i < 600; i += 1) {
+      current = stepReadings({
+        sensors: [sensor("S1")],
+        types: [grim],
+        units: [],
+        current,
+        manual: {},
+        seconds: 3,
+        random: still,
+      });
+    }
+    expect(current.S1).toBeCloseTo(19, 0); // 35% of 5–45
   });
 });
 

@@ -1,3 +1,11 @@
+import {
+  CircleCheck,
+  CircleDashed,
+  Info,
+  type LucideIcon,
+  OctagonAlert,
+  TriangleAlert,
+} from "lucide-react";
 import type * as React from "react";
 import type { Tone } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -44,4 +52,24 @@ export function toneDotClass(tone: Tone): string {
       neutral: "bg-neutral-foreground",
     } satisfies Record<Tone, string>
   )[tone];
+}
+
+/**
+ * The glyph that goes with a tone.
+ *
+ * Status colour never carries meaning on its own: the app's amber and green
+ * measure ΔE 6.2 apart under protanopia, so wherever a tone is the whole
+ * message it ships as icon **and** word. This is that icon, in one place, so
+ * "danger" does not become a different shape on a different screen.
+ */
+export const TONE_ICONS: Record<Tone, LucideIcon> = {
+  success: CircleCheck,
+  warning: TriangleAlert,
+  danger: OctagonAlert,
+  info: Info,
+  neutral: CircleDashed,
+};
+
+export function toneIcon(tone: Tone): LucideIcon {
+  return TONE_ICONS[tone];
 }

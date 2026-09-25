@@ -2,11 +2,17 @@
 
 import {
   Bell,
+  Building2,
   ChevronDown,
+  Gauge,
   Lock,
   LockOpen,
+  type LucideIcon,
   RotateCcw,
+  Thermometer,
   Trash2,
+  TriangleAlert,
+  Wind,
 } from "lucide-react";
 import { AnimatePresence, m } from "motion/react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -34,7 +40,7 @@ import { ReadingChart } from "@/components/shared/reading-chart";
 import { SensorTypeRegistry } from "@/components/shared/sensor-type-registry";
 import { StatusDonut } from "@/components/shared/status-donut";
 import { StickyToolbar } from "@/components/shared/sticky-toolbar";
-import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
+import { type Tone, ToneBadge, toneIcon } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import { useCountUp } from "@/hooks/use-count-up";
 import { useLiveClock } from "@/hooks/use-live-clock";
@@ -51,7 +57,7 @@ import {
 } from "@/lib/climate";
 import { isSensorOffline, statusTone } from "@/lib/derive";
 import { formatAge, formatRelative } from "@/lib/format";
-import { sensorIcon } from "@/lib/icons";
+import { ROOM_TYPE_ICONS, sensorIcon } from "@/lib/icons";
 import {
   buildingName,
   equipmentForSensor,
@@ -392,8 +398,6 @@ function SensorsView() {
 
           <ClimateOverview onRoomPicked={setOpenId} />
 
-          <MonitoringStrip />
-
           {visibleBuildings.map((b) => {
             const group = visible.filter((s) => s.buildingId === b.id);
             const groupAlarms = group.filter((s) => viewOf(s).alarm).length;
@@ -452,125 +456,129 @@ function SensorsView() {
                       transition={PANEL_MOVE}
                       className="overflow-hidden"
                     >
+                      <BuildingReadings sensors={group} />
+
                       <div className="grid grid-cols-2 max-lg:grid-cols-1">
-                        {sensorTypes().map((type) => {
-                          const items = group.filter(
-                            (s) => s.typeId === type.id,
-                          );
-                          const Icon = sensorIcon(type.icon);
-                          return (
-                            <div
-                              key={type.id}
-                              className="border-divider border-r last:border-r-0 max-lg:border-r-0 max-lg:border-b"
-                            >
-                              <div className="border-divider text-muted-foreground flex items-center gap-2 border-b px-4 py-2.25">
-                                <Icon className="size-3.25" />
-                                <span className="flex-1 font-mono text-[10px] tracking-[0.06em] uppercase">
-                                  {type.label}
-                                </span>
-                                <span className="font-mono text-[10.5px]">
-                                  {items.length}
-                                </span>
-                              </div>
-
-                              {items.map((s) => {
-                                const status = s.status;
-                                const view = viewOf(s);
-                                const alarm = view.alarm;
-                                const offline = isSensorOffline(status);
-                                const actions = type.actions.filter(
-                                  (a) => a.resultStatus !== status,
-                                );
-                                return (
-                                  <div
-                                    key={s.id}
-                                    className={cn(
-                                      "border-rule border-b px-4 py-2.75 last:border-b-0",
-                                      // Alarm states lift out and break the row rhythm.
-                                      alarm &&
-                                        "bg-danger-muted/50 border-l-danger border-l-[3px]",
-                                    )}
-                                  >
-                                    <button
-                                      type="button"
-                                      title="Open this sensor"
-                                      onClick={() => setOpenId(s.id)}
-                                      className="interactive focus-ring flex w-full items-center gap-2.5 text-left"
-                                    >
-                                      <PulseDot
-                                        tone={view.tone}
-                                        pulse={view.pulse}
-                                      />
-                                      <div className="min-w-0 flex-1">
-                                        <div className="truncate text-[12.5px] font-[450]">
-                                          {s.id}
-                                        </div>
-                                        <div className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug">
-                                          {roomLabel(s.roomId)} ·{" "}
-                                          {formatRelative(changedAtOf(s))}
-                                        </div>
-                                      </div>
-                                      <ToneBadge tone={view.tone}>
-                                        {view.label}
-                                      </ToneBadge>
-                                    </button>
-
-                                    {(alarm || offline) && (
-                                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                                        {actions.map((a) => {
-                                          // The registry's own per-action roles, not a
-                                          // blanket page-level gate.
-                                          const allowed =
-                                            a.allowedRoles.includes(role);
-                                          return (
-                                            <Hint
-                                              key={a.id}
-                                              text={
-                                                allowed
-                                                  ? a.caption
-                                                  : SENSOR_LOCK_REASON
-                                              }
-                                            >
-                                              <button
-                                                type="button"
-                                                aria-disabled={!allowed}
-                                                onClick={() =>
-                                                  allowed && runAction(s, a)
-                                                }
-                                                className={cn(
-                                                  "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
-                                                  allowed
-                                                    ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
-                                                    : "border-border cursor-not-allowed opacity-45",
-                                                )}
-                                              >
-                                                {!allowed && (
-                                                  <Lock className="size-2.5" />
-                                                )}
-                                                {a.label}
-                                              </button>
-                                            </Hint>
-                                          );
-                                        })}
-                                        <span className="text-muted-foreground text-[10.5px]">
-                                          {offline
-                                            ? "Offline devices raise no alarms."
-                                            : "Recorded in the Log Book."}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-
-                              {items.length === 0 && (
-                                <div className="text-muted-foreground px-4 py-6 text-center text-[11px]">
-                                  No devices match this filter.
+                        {sensorTypes()
+                          .filter((t) => !isMeasuring(t))
+                          .map((type) => {
+                            const items = group.filter(
+                              (s) => s.typeId === type.id,
+                            );
+                            const Icon = sensorIcon(type.icon);
+                            return (
+                              <div
+                                key={type.id}
+                                className="border-divider border-r last:border-r-0 max-lg:border-r-0 max-lg:border-b"
+                              >
+                                <div className="border-divider text-muted-foreground flex items-center gap-2 border-b px-4 py-2.25">
+                                  <Icon className="size-3.25" />
+                                  <span className="flex-1 font-mono text-[10px] tracking-[0.06em] uppercase">
+                                    {type.label}
+                                  </span>
+                                  <span className="font-mono text-[10.5px]">
+                                    {items.length}
+                                  </span>
                                 </div>
-                              )}
-                            </div>
-                          );
-                        })}
+
+                                {items.map((s) => {
+                                  const status = s.status;
+                                  const view = viewOf(s);
+                                  const alarm = view.alarm;
+                                  const offline = isSensorOffline(status);
+                                  const actions = type.actions.filter(
+                                    (a) => a.resultStatus !== status,
+                                  );
+                                  return (
+                                    <div
+                                      key={s.id}
+                                      className={cn(
+                                        "border-rule border-b px-4 py-2.75 last:border-b-0",
+                                        // Alarm states lift out and break the row rhythm.
+                                        alarm &&
+                                          "bg-danger-muted/50 border-l-danger border-l-[3px]",
+                                      )}
+                                    >
+                                      <button
+                                        type="button"
+                                        title="Open this sensor"
+                                        onClick={() => setOpenId(s.id)}
+                                        className="interactive focus-ring flex w-full items-center gap-2.5 text-left"
+                                      >
+                                        <PulseDot
+                                          tone={view.tone}
+                                          pulse={view.pulse}
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                          <div className="truncate text-[12.5px] font-[450]">
+                                            {s.id}
+                                          </div>
+                                          <div className="text-muted-foreground mt-0.5 text-[10.5px] leading-snug">
+                                            {roomLabel(s.roomId)} ·{" "}
+                                            {formatRelative(changedAtOf(s))}
+                                          </div>
+                                        </div>
+                                        <ToneBadge tone={view.tone}>
+                                          {view.label}
+                                        </ToneBadge>
+                                      </button>
+
+                                      {(alarm || offline) && (
+                                        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                                          {actions.map((a) => {
+                                            // The registry's own per-action roles, not a
+                                            // blanket page-level gate.
+                                            const allowed =
+                                              a.allowedRoles.includes(role);
+                                            return (
+                                              <Hint
+                                                key={a.id}
+                                                text={
+                                                  allowed
+                                                    ? a.caption
+                                                    : SENSOR_LOCK_REASON
+                                                }
+                                              >
+                                                <button
+                                                  type="button"
+                                                  aria-disabled={!allowed}
+                                                  onClick={() =>
+                                                    allowed && runAction(s, a)
+                                                  }
+                                                  className={cn(
+                                                    "focus-ring interactive bg-card flex cursor-pointer items-center gap-1 rounded border px-2.25 py-1.25 text-[10.5px] leading-none font-medium",
+                                                    allowed
+                                                      ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
+                                                      : "border-border cursor-not-allowed opacity-45",
+                                                  )}
+                                                >
+                                                  {!allowed && (
+                                                    <Lock className="size-2.5" />
+                                                  )}
+                                                  {a.label}
+                                                </button>
+                                              </Hint>
+                                            );
+                                          })}
+                                          <span className="text-muted-foreground text-[10.5px]">
+                                            {offline
+                                              ? "Offline devices raise no alarms."
+                                              : "Recorded in the Log Book."}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+
+                                {items.length === 0 && (
+                                  <div className="text-muted-foreground px-4 py-6 text-center text-[11px]">
+                                    No devices match this filter.
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                       </div>
                     </m.div>
                   )}
@@ -1139,13 +1147,19 @@ function ThresholdsTab() {
               </span>
             </div>
 
-            <BandTable type={type} bands={m.bands} caption="Everywhere" />
+            <BandTable
+              type={type}
+              bands={m.bands}
+              icon={Building2}
+              caption="Everywhere"
+            />
 
             {exceptions.map((rt) => (
               <BandTable
                 key={rt.id}
                 type={type}
                 bands={bandsFor(type, rt.id)}
+                icon={ROOM_TYPE_ICONS[rt.id]}
                 caption={`${rt.label} — ${roomsOfType(rt.id)} room${
                   roomsOfType(rt.id) === 1 ? "" : "s"
                 }`}
@@ -1173,11 +1187,13 @@ function BandTable({
   type,
   bands,
   caption,
+  icon: Icon,
   exception = false,
 }: {
   type: SensorTypeDef;
   bands: SensorBand[];
   caption: string;
+  icon: LucideIcon;
   exception?: boolean;
 }) {
   const m = type.measurement;
@@ -1191,7 +1207,8 @@ function BandTable({
         exception && "border-l-warning border-l-[3px]",
       )}
     >
-      <div className="bg-surface-subtle border-divider text-muted-foreground flex items-center gap-2 border-b px-2.5 py-1.5 font-mono text-[10px] tracking-[0.06em] uppercase">
+      <div className="bg-surface-subtle border-divider text-muted-foreground flex items-center gap-1.5 border-b px-2.5 py-1.5 font-mono text-[10px] tracking-[0.06em] uppercase">
+        <Icon aria-hidden className="size-3 shrink-0" />
         <span className="flex-1">{caption}</span>
         {exception && (
           <span className="text-warning-foreground">Exception</span>
@@ -1211,8 +1228,12 @@ function BandTable({
               key={band.statusId}
               className="border-rule flex items-center gap-2 border-b px-2.5 py-1.5 last:border-b-0"
             >
-              <span className="w-34 shrink-0">
+              <span className="w-38 shrink-0">
                 <ToneBadge tone={def?.tone ?? "neutral"}>
+                  {React.createElement(toneIcon(def?.tone ?? "neutral"), {
+                    "aria-hidden": true,
+                    className: "size-2.5 shrink-0",
+                  })}
                   {def?.label ?? band.statusId}
                 </ToneBadge>
               </span>
@@ -1228,6 +1249,92 @@ function BandTable({
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+/** One room that wants something doing, with how long it has wanted it. */
+function AttentionRow({
+  climate,
+  onOpen,
+  onRaise,
+}: {
+  climate: RoomClimate;
+  onOpen: () => void;
+  onRaise: () => void;
+}) {
+  const worst = climate.worst;
+  if (!worst) return null;
+  return (
+    <li
+      className={cn(
+        "flex flex-col gap-1.5 rounded border border-l-[3px] px-2.5 py-2",
+        worst.isAlarm
+          ? "border-divider border-l-danger bg-danger-muted/30"
+          : "border-divider border-l-warning",
+      )}
+    >
+      <div className="flex items-baseline gap-1.5">
+        <span className="min-w-0 flex-1 truncate text-[12px] font-[450]">
+          {roomLabel(climate.roomId)}
+        </span>
+        <span className="font-mono text-[13px] font-semibold tabular-nums">
+          {worst.value.toFixed(worst.decimals)}
+        </span>
+        <span className="text-muted-foreground text-[10px]">{worst.unit}</span>
+      </div>
+      <div className="text-muted-foreground flex items-center gap-1.5 text-[10.5px]">
+        <ToneBadge tone={worst.tone}>{worst.statusLabel}</ToneBadge>
+        {worst.since && <span>for {formatAge(worst.since)}</span>}
+      </div>
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          onClick={onOpen}
+          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-2 py-1 text-[10.5px] leading-none font-medium"
+        >
+          Open device
+        </button>
+        <button
+          type="button"
+          onClick={onRaise}
+          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-2 py-1 text-[10.5px] leading-none font-medium"
+        >
+          Raise a request
+        </button>
+      </div>
+    </li>
+  );
+}
+
+/**
+ * A building's measuring devices, as cards with their own graph.
+ *
+ * These used to live in one "Live monitoring" strip above every building at
+ * once, which meant the estate's readings were in a different place from the
+ * estate. They belong to the building, so they are in it — and the categorical
+ * devices below keep the compact list they were always right for, because a
+ * door is locked or it is not and a chart of that says nothing.
+ */
+function BuildingReadings({ sensors }: { sensors: EnvironmentalSensor[] }) {
+  const { simulation } = useAppState();
+  const { readings, series, manual, hold, release } = simulation;
+  const measuring = sensors.filter((s) => isMeasuring(sensorType(s.typeId)));
+  if (measuring.length === 0) return null;
+
+  return (
+    <div className="border-divider grid gap-2.5 border-b p-3 sm:grid-cols-2 xl:grid-cols-3">
+      {measuring.map((s) => (
+        <ReadingCard
+          key={s.id}
+          sensor={s}
+          reading={readings[s.id] ?? s.reading}
+          history={series[s.id] ?? []}
+          held={manual[s.id] !== undefined}
+          onHold={(v) => hold(s.id, v)}
+          onRelease={() => release(s.id)}
+        />
+      ))}
     </div>
   );
 }
@@ -1284,6 +1391,7 @@ function ClimateOverview({
     <div className="flex flex-col gap-3">
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
+          icon={Gauge}
           label="Comfortable"
           value={
             summary.comfortable + summary.warning + summary.alarm === 0
@@ -1306,6 +1414,7 @@ function ClimateOverview({
           }
         />
         <Kpi
+          icon={TriangleAlert}
           label="Needs attention"
           value={String(summary.warning + summary.alarm)}
           note={
@@ -1320,6 +1429,7 @@ function ClimateOverview({
           }
         />
         <Kpi
+          icon={Thermometer}
           label="Avg temperature"
           value={
             avgTemp
@@ -1330,6 +1440,7 @@ function ClimateOverview({
           tone="neutral"
         />
         <Kpi
+          icon={Wind}
           label="Avg air quality"
           value={avgCo2 ? `${Math.round(avgCo2.value)} ${avgCo2.unit}` : "—"}
           note={avgCo2 ? "Across reporting rooms" : "Nothing reporting"}
@@ -1419,11 +1530,13 @@ function ClimateOverview({
 }
 
 function Kpi({
+  icon: Icon,
   label,
   value,
   note,
   tone,
 }: {
+  icon: LucideIcon;
   label: string;
   value: string;
   note: string;
@@ -1431,7 +1544,8 @@ function Kpi({
 }) {
   return (
     <Card className="gap-1 p-3.5">
-      <span className="text-muted-foreground font-mono text-[10px] tracking-[0.06em] uppercase">
+      <span className="text-muted-foreground flex items-center gap-1.5 font-mono text-[10px] tracking-[0.06em] uppercase">
+        <Icon aria-hidden className={cn("size-3 shrink-0", KPI_TONE[tone])} />
         {label}
       </span>
       <span
@@ -1454,125 +1568,6 @@ const KPI_TONE: Record<Tone, string> = {
   info: "text-info-foreground",
   neutral: "text-foreground",
 };
-
-/** One room that wants something doing, with how long it has wanted it. */
-function AttentionRow({
-  climate,
-  onOpen,
-  onRaise,
-}: {
-  climate: RoomClimate;
-  onOpen: () => void;
-  onRaise: () => void;
-}) {
-  const worst = climate.worst;
-  if (!worst) return null;
-  return (
-    <li
-      className={cn(
-        "flex flex-col gap-1.5 rounded border border-l-[3px] px-2.5 py-2",
-        worst.isAlarm
-          ? "border-divider border-l-danger bg-danger-muted/30"
-          : "border-divider border-l-warning",
-      )}
-    >
-      <div className="flex items-baseline gap-1.5">
-        <span className="min-w-0 flex-1 truncate text-[12px] font-[450]">
-          {roomLabel(climate.roomId)}
-        </span>
-        <span className="font-mono text-[13px] font-semibold tabular-nums">
-          {worst.value.toFixed(worst.decimals)}
-        </span>
-        <span className="text-muted-foreground text-[10px]">{worst.unit}</span>
-      </div>
-      <div className="text-muted-foreground flex items-center gap-1.5 text-[10.5px]">
-        <ToneBadge tone={worst.tone}>{worst.statusLabel}</ToneBadge>
-        {worst.since && <span>for {formatAge(worst.since)}</span>}
-      </div>
-      <div className="flex gap-1.5">
-        <button
-          type="button"
-          onClick={onOpen}
-          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-2 py-1 text-[10.5px] leading-none font-medium"
-        >
-          Open device
-        </button>
-        <button
-          type="button"
-          onClick={onRaise}
-          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground cursor-pointer rounded border px-2 py-1 text-[10.5px] leading-none font-medium"
-        >
-          Raise a request
-        </button>
-      </div>
-    </li>
-  );
-}
-
-function MonitoringStrip() {
-  const { sensors, role, activeBuildingId, simulation, rooms } = useAppState();
-  const locked = isBuildingLocked(role);
-  const roomTypeOf = (roomId: string) =>
-    rooms.find((r) => r.id === roomId)?.type;
-  const { readings, series, manual, paused, setPaused, hold, release } =
-    simulation;
-
-  const measuring = sensors.filter(
-    (s) =>
-      (!locked || s.buildingId === activeBuildingId) &&
-      isMeasuring(sensorType(s.typeId)),
-  );
-  if (measuring.length === 0) return null;
-
-  // The summary the strip leads with: how many are not in a success band.
-  // Twelve cards is a wall; one number in front of them is a glance.
-  const attention = measuring.filter((s) => {
-    const type = sensorType(s.typeId);
-    const value = readings[s.id] ?? s.reading;
-    if (value === undefined) return false;
-    const def = type?.statuses.find(
-      (st) => st.id === bandFor(type, value, roomTypeOf(s.roomId))?.statusId,
-    );
-    return def ? def.tone !== "success" : false;
-  }).length;
-
-  return (
-    <div className="border-border bg-card flex flex-col gap-3 rounded-[5px] border p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <PulseDot tone={paused ? "neutral" : "success"} pulse={!paused} />
-        <span className="text-[12.5px] font-semibold">Live monitoring</span>
-        <span className="text-muted-foreground text-[11.5px] leading-snug">
-          {attention === 0
-            ? `All ${measuring.length} rooms reading normally.`
-            : `${attention} of ${measuring.length} need attention.`}{" "}
-          Open a card for its device, scale and manual control.
-        </span>
-        <div className="flex-1" />
-        <button
-          type="button"
-          onClick={() => setPaused(!paused)}
-          className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-2.75 py-1.5 text-[11px] leading-none font-medium"
-        >
-          {paused ? "Resume" : "Pause"}
-        </button>
-      </div>
-
-      <div className="grid items-start gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
-        {measuring.map((s) => (
-          <ReadingCard
-            key={s.id}
-            sensor={s}
-            reading={readings[s.id] ?? s.reading}
-            history={series[s.id] ?? []}
-            held={manual[s.id] !== undefined}
-            onHold={(v) => hold(s.id, v)}
-            onRelease={() => release(s.id)}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
 
 /**
  * One measuring device, read the way somebody actually asks about it.
@@ -1619,11 +1614,19 @@ function ReadingCard({
   // reading look like it is being measured rather than re-fetched. Called
   // before the guard below, because a hook cannot sit after a return.
   const shown = useCountUp(value, m?.decimals ?? 0);
-  if (!m) return null;
-
   // Judged by this room's limits, which may not be the estate's — a server
   // rack and a lecture hall do not agree about 27 °C.
   const roomType = rooms.find((r) => r.id === sensor.roomId)?.type;
+  const zones = React.useMemo(
+    () => bandZones(type, roomType),
+    [type, roomType],
+  );
+  const livePoints = React.useMemo(
+    () => liveSeries(history, TICK_SECONDS, Date.now()),
+    [history],
+  );
+  if (!m) return null;
+
   const band = bandFor(type, value, roomType);
   const def = type?.statuses.find((st) => st.id === band?.statusId);
   const tone = def?.tone ?? "neutral";
@@ -1693,12 +1696,27 @@ function ReadingCard({
         <ToneBadge tone={tone}>{def?.label ?? "—"}</ToneBadge>
       </div>
 
-      <BandScale
-        type={type}
-        value={value}
-        roomType={roomType}
-        showNumbers={open}
-      />
+      {/* The graph is the default now, not the number alone. Until a couple
+          of readings are in there is no shape to draw, so the band strip
+          stands in — it needs one reading, not two. */}
+      {livePoints.length >= 2 ? (
+        <ReadingChart
+          type={type}
+          points={livePoints}
+          zones={zones}
+          mode="live"
+          setpoint={setpoint}
+          // Keep the next boundary in frame. Without it the domain hugs the
+          // reading, only the band it is already in is on screen, and the
+          // chart is a flat tinted block that says nothing the badge did not.
+          // With it you can see the line travelling towards the edge.
+          keepInView={next?.at}
+          height={56}
+          compact
+        />
+      ) : (
+        <BandScale type={type} value={value} roomType={roomType} />
+      )}
 
       {/* The line that replaces reading a scale: not where you are, but what
           happens next and when. */}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Cell, Pie, PieChart, ResponsiveContainer } from "recharts";
+import { toneIcon } from "@/components/shared/tone-badge";
 import { useReducedMotion } from "@/hooks/use-reduced-motion";
 import type { Tone } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -75,21 +76,27 @@ export function StatusDonut({
       </div>
 
       <ul className="flex min-w-0 flex-1 flex-col gap-1.25">
-        {slices.map((s) => (
-          <li key={s.label} className="flex items-center gap-2 text-[11.5px]">
-            <span
-              aria-hidden
-              className={cn("size-2 shrink-0 rounded-full", TONE_DOT[s.tone])}
-            />
-            <span className="min-w-0 flex-1 truncate">{s.label}</span>
-            <span className="font-mono font-medium tabular-nums">
-              {s.value}
-            </span>
-            <span className="text-muted-foreground w-9 text-right font-mono text-[10.5px] tabular-nums">
-              {total === 0 ? "—" : `${Math.round((s.value / total) * 100)}%`}
-            </span>
-          </li>
-        ))}
+        {slices.map((s) => {
+          const Icon = toneIcon(s.tone);
+          return (
+            <li key={s.label} className="flex items-center gap-2 text-[11.5px]">
+              {/* Icon as well as colour. A legend is where a status has to be
+                readable by someone who cannot tell the amber from the green,
+                and the two sit 6.2 ΔE apart under protanopia. */}
+              <Icon
+                aria-hidden
+                className={cn("size-3 shrink-0", TONE_INK[s.tone])}
+              />
+              <span className="min-w-0 flex-1 truncate">{s.label}</span>
+              <span className="font-mono font-medium tabular-nums">
+                {s.value}
+              </span>
+              <span className="text-muted-foreground w-9 text-right font-mono text-[10.5px] tabular-nums">
+                {total === 0 ? "—" : `${Math.round((s.value / total) * 100)}%`}
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
@@ -103,10 +110,10 @@ const TONE_VAR: Record<Tone, string> = {
   neutral: "var(--muted-foreground)",
 };
 
-const TONE_DOT: Record<Tone, string> = {
-  success: "bg-success",
-  warning: "bg-warning",
-  danger: "bg-danger",
-  info: "bg-info",
-  neutral: "bg-muted-foreground",
+const TONE_INK: Record<Tone, string> = {
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-danger",
+  info: "text-info",
+  neutral: "text-muted-foreground",
 };
