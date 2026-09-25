@@ -773,11 +773,24 @@ export const SENSOR_TYPES: SensorTypeDef[] = [
       min: 350,
       max: 2500,
       decimals: 0,
+      // 1000 / 1500 rather than 800 / 1400. Outdoor air is around 420 ppm and
+      // an occupied room sits comfortably in the 700–1000 band; calling 805
+      // "stuffy" made every monitored room on the estate read as a problem at
+      // once, which is a threshold saying more about itself than the air.
       bands: [
-        { upTo: 800, statusId: "fresh" },
-        { upTo: 1400, statusId: "stuffy" },
+        { upTo: 1000, statusId: "fresh" },
+        { upTo: 1500, statusId: "stuffy" },
         { upTo: null, statusId: "poor" },
       ],
+      // A server room is not occupied, so CO2 there is a ventilation check
+      // rather than a comfort one, and it should complain sooner.
+      overrides: {
+        plant: [
+          { upTo: 800, statusId: "fresh" },
+          { upTo: 1200, statusId: "stuffy" },
+          { upTo: null, statusId: "poor" },
+        ],
+      },
     },
   },
   {

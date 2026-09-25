@@ -49,7 +49,9 @@ export interface RoomClimate {
   tone: Tone;
   /** The reading driving that tone, if any measuring sensor reported. */
   worst?: RoomReading;
-  /** No measuring sensor in this room is reporting. */
+  /** This room has at least one sensor that reads a number. */
+  monitored: boolean;
+  /** It has measuring sensors and every one of them is dark. */
   offline: boolean;
   /** Any sensor in the room sitting in an alarm status. */
   hasAlarm: boolean;
@@ -128,6 +130,7 @@ export function roomClimates(
       // one answer that is worse than saying nothing.
       tone: worst ? worst.tone : "neutral",
       worst,
+      monitored: measuring,
       offline: measuring && resolved.length === 0,
       hasAlarm: resolved.some((r) => r.isAlarm),
     };
@@ -135,7 +138,10 @@ export function roomClimates(
 }
 
 export interface ClimateSummary {
+  /** Every room in scope, including the ones nothing watches. */
   total: number;
+  /** Rooms with at least one measuring sensor — the denominator that matters. */
+  monitored: number;
   comfortable: number;
   warning: number;
   alarm: number;
@@ -167,6 +173,7 @@ export function summarise(climates: RoomClimate[]): ClimateSummary {
   const reporting = comfortable + warning + alarm;
   return {
     total: climates.length,
+    monitored: climates.filter((c) => c.monitored).length,
     comfortable,
     warning,
     alarm,

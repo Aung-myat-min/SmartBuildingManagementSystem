@@ -197,6 +197,7 @@ describe("summarise", () => {
     const s = summarise(roomClimates(rooms, sensors, TYPES, readings));
     expect(s).toMatchObject({
       total: 5,
+      monitored: 5,
       comfortable: 2,
       warning: 1,
       alarm: 1,
@@ -214,6 +215,38 @@ describe("summarise", () => {
   it("does not divide by zero when nothing reports", () => {
     const s = summarise(roomClimates([room("r1")], [], TYPES, {}));
     expect(s.comfortPct).toBe(0);
+  });
+});
+
+describe("rooms nothing watches", () => {
+  it("counts them in the total but not as monitored", () => {
+    // A coverage gap is not a comfortable room and not a broken one.
+    const s = summarise(
+      roomClimates(
+        [room("watched"), room("bare")],
+        [sensor("t1", "watched", "temperature")],
+        TYPES,
+        { t1: 21 },
+      ),
+    );
+    expect(s).toMatchObject({
+      total: 2,
+      monitored: 1,
+      comfortable: 1,
+      offline: 0,
+    });
+  });
+
+  it("does not let them drag the comfort share down", () => {
+    const s = summarise(
+      roomClimates(
+        [room("watched"), room("bare1"), room("bare2")],
+        [sensor("t1", "watched", "temperature")],
+        TYPES,
+        { t1: 21 },
+      ),
+    );
+    expect(s.comfortPct).toBe(100);
   });
 });
 

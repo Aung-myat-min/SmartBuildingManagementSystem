@@ -69,9 +69,16 @@ function RoomTile({
   onSelect?: (roomId: string) => void;
 }) {
   const tone: Tone = climate.offline ? "neutral" : climate.tone;
-  const status = climate.offline
-    ? "Not reporting"
-    : (climate.worst?.statusLabel ?? "No readings");
+  // Three different things, and they are not interchangeable: a room with no
+  // sensors is a coverage gap, a room whose sensors are dark is a fault, and a
+  // room with a reading is neither. The first is much the most common and has
+  // to recede or it buries the other two.
+  const unwatched = !climate.monitored;
+  const status = unwatched
+    ? "No sensors"
+    : climate.offline
+      ? "Not reporting"
+      : (climate.worst?.statusLabel ?? "No readings");
 
   return (
     <button
@@ -89,7 +96,7 @@ function RoomTile({
       }
       className={cn(
         "interactive focus-ring pressable flex min-w-0 cursor-pointer flex-col items-start gap-0.5 rounded border px-2 py-1.75 text-left",
-        TILE[tone],
+        unwatched ? TILE_UNWATCHED : TILE[tone],
         selected && "ring-primary ring-2 ring-offset-1",
       )}
     >
@@ -116,6 +123,11 @@ function floorRank(floor: string): number {
   const n = Number.parseInt(f, 10);
   return Number.isFinite(n) ? n : 0;
 }
+
+/** A room nothing watches: present, because coverage gaps are worth seeing,
+ *  but recessive, because on this estate they outnumber the rest four to one. */
+const TILE_UNWATCHED =
+  "border-border/60 bg-transparent text-muted-foreground/70";
 
 const TILE: Record<Tone, string> = {
   success: "border-success/35 bg-success-muted text-success-foreground",

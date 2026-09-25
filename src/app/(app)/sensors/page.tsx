@@ -1285,9 +1285,25 @@ function ClimateOverview({
       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
         <Kpi
           label="Comfortable"
-          value={`${summary.comfortPct}%`}
-          note={`${summary.comfortable} of ${summary.comfortable + summary.warning + summary.alarm} rooms reporting`}
-          tone={summary.comfortPct >= 80 ? "success" : "warning"}
+          value={
+            summary.comfortable + summary.warning + summary.alarm === 0
+              ? "—"
+              : `${summary.comfortPct}%`
+          }
+          note={
+            summary.monitored === 0
+              ? "No room on this estate has a sensor yet"
+              : `${summary.comfortable} of ${
+                  summary.comfortable + summary.warning + summary.alarm
+                } monitored rooms · ${summary.total - summary.monitored} unwatched`
+          }
+          tone={
+            summary.comfortPct >= 80
+              ? "success"
+              : summary.alarm > 0
+                ? "danger"
+                : "warning"
+          }
         />
         <Kpi
           label="Needs attention"
@@ -1321,7 +1337,7 @@ function ClimateOverview({
         />
       </div>
 
-      <div className="grid gap-2.5 xl:grid-cols-[1.6fr_1fr]">
+      <div className="grid items-start gap-2.5 xl:grid-cols-[1.6fr_1fr]">
         <Card className="gap-3 p-3.5">
           <div>
             <div className="text-[12.5px] font-semibold">Building climate</div>
