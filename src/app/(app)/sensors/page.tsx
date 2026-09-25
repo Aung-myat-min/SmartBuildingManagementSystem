@@ -61,6 +61,7 @@ import {
 } from "@/lib/permissions";
 import {
   bandFor,
+  bandsFor,
   gaugeFraction,
   isMeasuring,
   nextThreshold,
@@ -68,6 +69,7 @@ import {
 } from "@/lib/sensor-readings";
 import type {
   EnvironmentalSensor,
+  RoomType,
   SensorAction,
   SensorTypeDef,
 } from "@/lib/types";
@@ -993,8 +995,10 @@ function SensorTypeSheet({
  * here writes once rather than every tick.
  */
 function MonitoringStrip() {
-  const { sensors, role, activeBuildingId, simulation } = useAppState();
+  const { sensors, role, activeBuildingId, simulation, rooms } = useAppState();
   const locked = isBuildingLocked(role);
+  const roomTypeOf = (roomId: string) =>
+    rooms.find((r) => r.id === roomId)?.type;
   const { readings, series, manual, paused, setPaused, hold, release } =
     simulation;
 
@@ -1012,7 +1016,7 @@ function MonitoringStrip() {
     const value = readings[s.id] ?? s.reading;
     if (value === undefined) return false;
     const def = type?.statuses.find(
-      (st) => st.id === bandFor(type, value)?.statusId,
+      (st) => st.id === bandFor(type, value, roomTypeOf(s.roomId))?.statusId,
     );
     return def ? def.tone !== "success" : false;
   }).length;
@@ -1092,7 +1096,7 @@ function ReadingCard({
 }) {
   const [open, setOpen] = React.useState(false);
   const [range, setRange] = React.useState<Range>("live");
-  const { equipmentUnits } = useAppState();
+  const { equipmentUnits, rooms } = useAppState();
   const type = sensorType(sensor.typeId);
   const m = type?.measurement;
   const value = reading ?? m?.min ?? 0;
@@ -1102,7 +1106,10 @@ function ReadingCard({
   const shown = useCountUp(value, m?.decimals ?? 0);
   if (!m) return null;
 
-  const band = bandFor(type, value);
+  // Judged by this room's limits, which may not be the estate's — a server
+  // rack and a lecture hall do not agree about 27 °C.
+  const roomType = rooms.find((r) => r.id === sensor.roomId)?.type;
+  const band = bandFor(type, value, roomType);
   const def = type?.statuses.find((st) => st.id === band?.statusId);
   const tone = def?.tone ?? "neutral";
   const Icon = sensorIcon(type?.icon ?? "activity");
@@ -1171,7 +1178,12 @@ function ReadingCard({
         <ToneBadge tone={tone}>{def?.label ?? "—"}</ToneBadge>
       </div>
 
-      <BandScale type={type} value={value} showNumbers={open} />
+      <BandScale
+        type={type}
+        value={value}
+        roomType={roomType}
+        showNumbers={open}
+      />
 
       {/* The line that replaces reading a scale: not where you are, but what
           happens next and when. */}
@@ -1196,6 +1208,7 @@ function ReadingCard({
           <ReadingHistory
             sensor={sensor}
             type={type}
+            roomType={roomType}
             range={range}
             live={history}
             setpoint={setpoint}
@@ -1286,18 +1299,23 @@ function RangeSwitch({
 function ReadingHistory({
   sensor,
   type,
+  roomType,
   range,
   live,
   setpoint,
 }: {
   sensor: EnvironmentalSensor;
   type: SensorTypeDef | undefined;
+  roomType?: RoomType;
   range: Range;
   live: number[];
   setpoint?: number;
 }) {
   const { logBook } = useAppState();
-  const zones = React.useMemo(() => bandZones(type), [type]);
+  const zones = React.useMemo(
+    () => bandZones(type, roomType),
+    [type, roomType],
+  );
 
   const points = React.useMemo(() => {
     if (range === "live") return liveSeries(live, TICK_SECONDS, Date.now());
@@ -1350,22 +1368,24 @@ const BAND_EDGE: Record<Tone, string> = {
 function BandScale({
   type,
   value,
+  roomType,
   showNumbers = false,
 }: {
   type: SensorTypeDef | undefined;
   value: number;
+  roomType?: RoomType;
   /** Off by default: the colours answer the question, the numbers only add. */
   showNumbers?: boolean;
 }) {
   const m = type?.measurement;
   if (!m) return null;
   const span = m.max - m.min || 1;
-  const current = bandFor(type, value)?.statusId;
+  const current = bandFor(type, value, roomType)?.statusId;
 
   // A band runs from the previous band's ceiling to its own; the last has no
   // ceiling, so it runs to the top of the dial.
   let from = m.min;
-  const segments = m.bands.map((b) => {
+  const segments = bandsFor(type, roomType).map((b) => {
     const to = b.upTo ?? m.max;
     const seg = {
       statusId: b.statusId,

@@ -6,6 +6,7 @@ import { crossings, stepReadings } from "@/lib/simulation";
 import type {
   EnvironmentalSensor,
   EquipmentUnit,
+  RoomType,
   SensorTypeDef,
 } from "@/lib/types";
 
@@ -48,6 +49,8 @@ export function useSimulation(input: {
   sensors: EnvironmentalSensor[];
   types: SensorTypeDef[];
   units: EquipmentUnit[];
+  /** A room's kind decides which limits judge it — see `bandsFor`. */
+  roomTypeOf: (roomId: string) => RoomType | undefined;
   onCrossing: (sensorId: string, status: string, reading: number) => void;
   enabled: boolean;
 }): SimulationState {
@@ -70,7 +73,7 @@ export function useSimulation(input: {
 
     const tick = () => {
       if (document.hidden) return;
-      const { sensors, types, units, onCrossing } = latest.current;
+      const { sensors, types, units, onCrossing, roomTypeOf } = latest.current;
 
       // The readings are stepped from a ref rather than inside a setState
       // updater. A side effect in an updater runs twice under StrictMode, and
@@ -94,7 +97,13 @@ export function useSimulation(input: {
         return updated;
       });
 
-      for (const row of crossings(sensors, types, next, statusForReading)) {
+      for (const row of crossings(
+        sensors,
+        types,
+        next,
+        statusForReading,
+        roomTypeOf,
+      )) {
         onCrossing(row.sensor.id, row.status, row.reading);
       }
     };

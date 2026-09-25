@@ -1117,6 +1117,7 @@ export function AppStateProvider({
     sensors,
     types: sensorTypeRegistry,
     units: equipmentUnits,
+    roomTypeOf: (roomId) => estateRooms.find((r) => r.id === roomId)?.type,
     enabled: canActOnSensor(role),
     onCrossing: (sensorId, status, reading) => {
       void setSensorStatusRef.current(sensorId, status, reading);

@@ -4,16 +4,31 @@
 import { describe, expect, it } from "vitest";
 import {
   bandFor,
+  bandsFor,
   bandsRefusal,
   clampToRange,
   formatReading,
   gaugeFraction,
+  hasOverride,
   isMeasuring,
   nextThreshold,
   statusForReading,
   trendOf,
 } from "./sensor-readings";
 import type { SensorTypeDef } from "./types";
+
+const MEASURE = {
+  unit: "°C",
+  min: 0,
+  max: 50,
+  decimals: 1,
+  bands: [
+    { upTo: 18, statusId: "cold" },
+    { upTo: 27, statusId: "normal" },
+    { upTo: 32, statusId: "warm" },
+    { upTo: null, statusId: "overheat" },
+  ],
+} satisfies SensorTypeDef["measurement"];
 
 const temperature: SensorTypeDef = {
   id: "temperature",
@@ -26,18 +41,7 @@ const temperature: SensorTypeDef = {
     { id: "overheat", label: "Overheating", tone: "danger", isAlarm: true },
   ],
   actions: [],
-  measurement: {
-    unit: "°C",
-    min: 0,
-    max: 50,
-    decimals: 1,
-    bands: [
-      { upTo: 18, statusId: "cold" },
-      { upTo: 27, statusId: "normal" },
-      { upTo: 32, statusId: "warm" },
-      { upTo: null, statusId: "overheat" },
-    ],
-  },
+  measurement: MEASURE,
 };
 
 const doorLock: SensorTypeDef = {
@@ -208,5 +212,62 @@ describe("trendOf", () => {
 
   it("is steady for a type that does not measure", () => {
     expect(trendOf(doorLock, series(1, 2, 3, 4, 5, 6))).toBe("steady");
+  });
+});
+
+describe("room-type exceptions", () => {
+  // One set of limits cannot serve a lecture hall and a server rack: at 27 the
+  // hall is uncomfortable and the rack is in trouble.
+  const strictServerRoom: SensorTypeDef = {
+    ...temperature,
+    measurement: {
+      ...MEASURE,
+      overrides: {
+        plant: [
+          { upTo: 18, statusId: "cold" },
+          { upTo: 22, statusId: "normal" },
+          { upTo: 25, statusId: "warm" },
+          { upTo: null, statusId: "overheat" },
+        ],
+      },
+    },
+  };
+
+  it("judges an excepted room by its own limits", () => {
+    expect(statusForReading(strictServerRoom, 24, "plant")).toBe("warm");
+  });
+
+  it("judges every other room by the estate default", () => {
+    // The same 24 °C is merely normal in an office.
+    expect(statusForReading(strictServerRoom, 24, "office")).toBe("normal");
+    expect(statusForReading(strictServerRoom, 24)).toBe("normal");
+  });
+
+  it("alarms an excepted room where the default would not", () => {
+    // The point of the whole feature, in one line: 27 °C is unremarkable in an
+    // office and an emergency in a server rack. Without the exception the rack
+    // reads "normal" and nobody is told.
+    expect(statusForReading(strictServerRoom, 27, "plant")).toBe("overheat");
+    expect(statusForReading(strictServerRoom, 27, "office")).toBe("normal");
+  });
+
+  it("falls back to the default for a room type with no exception", () => {
+    expect(bandsFor(strictServerRoom, "lecture")).toEqual(MEASURE.bands);
+    expect(bandsFor(strictServerRoom, "plant")).not.toEqual(MEASURE.bands);
+  });
+
+  it("ignores an exception that is present but empty", () => {
+    const empty: SensorTypeDef = {
+      ...temperature,
+      measurement: { ...MEASURE, overrides: { plant: [] } },
+    };
+    expect(bandsFor(empty, "plant")).toEqual(MEASURE.bands);
+    expect(hasOverride(empty, "plant")).toBe(false);
+  });
+
+  it("reports which room types have one", () => {
+    expect(hasOverride(strictServerRoom, "plant")).toBe(true);
+    expect(hasOverride(strictServerRoom, "office")).toBe(false);
+    expect(hasOverride(temperature, "plant")).toBe(false);
   });
 });

@@ -15,6 +15,7 @@ import { clampToRange } from "@/lib/sensor-readings";
 import type {
   EnvironmentalSensor,
   EquipmentUnit,
+  RoomType,
   SensorTypeDef,
 } from "@/lib/types";
 
@@ -164,10 +165,18 @@ export function crossings(
   sensors: EnvironmentalSensor[],
   types: SensorTypeDef[],
   readings: Record<string, number>,
+  /**
+   * Takes the room type as well as the reading, because a server room is
+   * judged by stricter limits than a lecture hall — see `bandsFor`. Passing
+   * the room is what makes an override actually fire an alarm rather than
+   * only change what the screen says.
+   */
   statusFor: (
     type: SensorTypeDef | undefined,
     reading: number,
+    roomType?: RoomType,
   ) => string | null,
+  roomTypeOf?: (roomId: string) => RoomType | undefined,
 ): { sensor: EnvironmentalSensor; status: string; reading: number }[] {
   const typeById = new Map(types.map((t) => [t.id, t]));
   const out: {
@@ -184,14 +193,15 @@ export function crossings(
     if (!m) continue;
 
     const reading = roundTo(raw, m.decimals);
-    const status = statusFor(type, reading);
+    const roomType = roomTypeOf?.(sensor.roomId);
+    const status = statusFor(type, reading, roomType);
     if (!status || status === sensor.status) continue;
 
     // Both edges of the margin have to agree, or we are sitting on a boundary.
     const margin = (m.max - m.min) * HYSTERESIS;
     if (
-      statusFor(type, reading - margin) !== status ||
-      statusFor(type, reading + margin) !== status
+      statusFor(type, reading - margin, roomType) !== status ||
+      statusFor(type, reading + margin, roomType) !== status
     ) {
       continue;
     }

@@ -9,7 +9,7 @@
 // Pure, and tested at every band edge: whether 27 is "normal" or "warm" is
 // the kind of thing that is quietly wrong forever.
 
-import type { SensorBand, SensorTypeDef } from "@/lib/types";
+import type { RoomType, SensorBand, SensorTypeDef } from "@/lib/types";
 
 /** Whether this type reads a number at all. A door lock does not. */
 export function isMeasuring(type: SensorTypeDef | undefined): boolean {
@@ -27,23 +27,52 @@ export function isMeasuring(type: SensorTypeDef | undefined): boolean {
 export function bandFor(
   type: SensorTypeDef | undefined,
   reading: number,
+  roomType?: RoomType,
 ): SensorBand | null {
-  const m = type?.measurement;
-  if (!m || !Number.isFinite(reading)) return null;
-  for (const band of m.bands) {
+  const bands = bandsFor(type, roomType);
+  if (bands.length === 0 || !Number.isFinite(reading)) return null;
+  for (const band of bands) {
     if (band.upTo === null || reading <= band.upTo) return band;
   }
   // Only reachable when the last band is not the null catch-all, which the
   // editor refuses to save. Falling back to the topmost band beats returning
   // nothing and leaving the sensor without a status.
-  return m.bands[m.bands.length - 1] ?? null;
+  return bands[bands.length - 1] ?? null;
+}
+
+/**
+ * The limits that apply in this kind of room: its own if it has an exception,
+ * the type's defaults otherwise.
+ *
+ * Exported because the threshold editor and the chart both have to draw the
+ * same bands a reading is judged against — a chart showing the estate default
+ * behind a server room's reading would be showing the wrong thresholds.
+ */
+export function bandsFor(
+  type: SensorTypeDef | undefined,
+  roomType?: RoomType,
+): SensorBand[] {
+  const m = type?.measurement;
+  if (!m) return [];
+  const override = roomType ? m.overrides?.[roomType] : undefined;
+  return override && override.length > 0 ? override : m.bands;
+}
+
+/** Whether this room type is judged by its own limits rather than the default. */
+export function hasOverride(
+  type: SensorTypeDef | undefined,
+  roomType: RoomType,
+): boolean {
+  const bands = type?.measurement?.overrides?.[roomType];
+  return Boolean(bands && bands.length > 0);
 }
 
 export function statusForReading(
   type: SensorTypeDef | undefined,
   reading: number,
+  roomType?: RoomType,
 ): string | null {
-  return bandFor(type, reading)?.statusId ?? null;
+  return bandFor(type, reading, roomType)?.statusId ?? null;
 }
 
 /** Keeps a reading inside the gauge, so a forced value cannot leave the dial. */

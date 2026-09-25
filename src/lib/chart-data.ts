@@ -14,7 +14,8 @@
 //
 // Pure, so the shaping is testable without Firestore, a clock or a browser.
 
-import type { LogBookEntry, SensorTypeDef } from "@/lib/types";
+import { bandsFor } from "@/lib/sensor-readings";
+import type { LogBookEntry, RoomType, SensorTypeDef } from "@/lib/types";
 
 /** One point on a reading chart. `at` is epoch ms, which is what a time axis wants. */
 export interface ReadingPoint {
@@ -82,12 +83,16 @@ export function liveSeries(
  * so the regions tile the plot exactly — `upTo: null` means "everything above",
  * which on a chart has to become a number.
  */
-export function bandZones(type: SensorTypeDef | undefined): BandZone[] {
+export function bandZones(
+  type: SensorTypeDef | undefined,
+  /** A server room's chart must show the server room's limits, not the estate's. */
+  roomType?: RoomType,
+): BandZone[] {
   const m = type?.measurement;
   if (!m) return [];
   let from = m.min;
   const zones: BandZone[] = [];
-  for (const band of m.bands) {
+  for (const band of bandsFor(type, roomType)) {
     const to = band.upTo === null ? m.max : Math.min(band.upTo, m.max);
     if (to > from) zones.push({ statusId: band.statusId, from, to });
     from = to;

@@ -711,6 +711,17 @@ export const SENSOR_TYPES: SensorTypeDef[] = [
         { upTo: 31, statusId: "warm" },
         { upTo: null, statusId: "overheating" },
       ],
+      // A plant room holds the server rack, and a rack does not care whether
+      // anyone is comfortable — it cares about staying under 25. On the estate
+      // default it would read "comfortable" at 26 and never raise anything.
+      overrides: {
+        plant: [
+          { upTo: 16, statusId: "cold" },
+          { upTo: 22, statusId: "comfortable" },
+          { upTo: 25, statusId: "warm" },
+          { upTo: null, statusId: "overheating" },
+        ],
+      },
     },
   },
   {

@@ -237,6 +237,21 @@ export interface SensorMeasurement {
   decimals: number;
   /** Ascending by `upTo`, ending with the null catch-all. */
   bands: SensorBand[];
+  /**
+   * Where a kind of room needs different numbers from the rest of the estate.
+   *
+   * One set of limits cannot serve a lecture hall and a server rack: at 27 °C
+   * the hall is uncomfortable and the rack is in trouble. Without this, either
+   * the server room under-alarms or every office over-alarms.
+   *
+   * **Sparse on purpose.** `bands` above is the default and covers every room;
+   * a room type appears here only where it genuinely differs, so the editor
+   * shows a short list of exceptions rather than a grid of every room type
+   * against every sensor type. The statuses do not change — only the
+   * boundaries between them move — so everything downstream still receives a
+   * status id and neither knows nor cares that a room was involved.
+   */
+  overrides?: Partial<Record<RoomType, SensorBand[]>>;
 }
 
 export interface SensorTypeDef {
