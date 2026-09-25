@@ -160,6 +160,8 @@ export type EquipmentHistoryEventType =
   | "moved"
   | "fault-reported"
   | "returned-to-service"
+  /** A control was changed rather than the asset — today, the HVAC block. */
+  | "setting-changed"
   | "decommissioned";
 
 export interface EquipmentHistoryEvent {
@@ -427,6 +429,20 @@ export interface LogBookEntry {
   targetId: string;
   buildingId?: string; // for filtering; absent for user/building-level actions
   refId?: string; // linked REQ-/EQ-/device id, where relevant
+  /**
+   * The number behind a sensor crossing, and its unit.
+   *
+   * `setSensorStatus` already had the reading and wrote it only to the sensor
+   * document, where it is a single scalar overwritten on the next crossing.
+   * Putting it on the entry as well costs nothing — the entry is being written
+   * either way — and turns the Log Book into a sparse but real series of
+   * numbers, which is what the reading charts draw their history from.
+   *
+   * Absent on every entry written before this existed, and on every entry that
+   * is not a sensor crossing. A chart skips those rather than guessing.
+   */
+  reading?: number;
+  readingUnit?: string;
   /**
    * What the actor typed when the action demanded a justification.
    *

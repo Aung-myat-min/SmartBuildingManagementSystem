@@ -676,6 +676,11 @@ export function AppStateProvider({
         buildingId: sensor?.buildingId,
         refId: sensorId,
         reason,
+        // The number, not only the state it put the sensor in. The entry is
+        // being written anyway, so this is the whole persisted history a
+        // reading chart has — see LogBookEntry.reading.
+        reading,
+        readingUnit: type?.measurement?.unit,
       });
       return written;
     },
@@ -1146,14 +1151,40 @@ export function AppStateProvider({
 
   const editUnit = React.useCallback(
     async (unitId: string, patch: Partial<Omit<EquipmentUnit, "id">>) => {
+      const before = equipmentUnits.find((u) => u.id === unitId);
       const written = await updateUnit(unitId, patch);
       if (!written.ok) return written;
-      const next = { ...equipmentUnits.find((u) => u.id === unitId), ...patch };
+      const next = { ...before, ...patch };
+
+      // Changing what a unit is *doing* is a thing that happened to it, so it
+      // gets a history row like every other such write — this was the one
+      // that did not, and without it there is no record of when a room was
+      // put on cooling, only that it is now.
+      if (patch.hvac) {
+        const h = patch.hvac;
+        await appendHistory({
+          equipmentUnitId: unitId,
+          type: "setting-changed",
+          at: new Date().toISOString(),
+          summary:
+            h.mode === "off"
+              ? "Switched off"
+              : `Set to ${h.mode} at ${h.setpointC} °C, fan ${h.fan}`,
+          actorName,
+        });
+      }
+
       log({
         source: "equipment",
         actionType: "equipment-status-changed",
-        title: "Unit details edited",
-        detail: `${next.tag ?? unitId} — registration saved.`,
+        title: patch.hvac ? "Climate control changed" : "Unit details edited",
+        detail: patch.hvac
+          ? `${next.tag ?? unitId} — ${
+              patch.hvac.mode === "off"
+                ? "switched off"
+                : `${patch.hvac.mode} to ${patch.hvac.setpointC} °C, fan ${patch.hvac.fan}`
+            }.`
+          : `${next.tag ?? unitId} — registration saved.`,
         targetType: "equipment",
         targetId: unitId,
         buildingId: next.buildingId,
@@ -1161,7 +1192,7 @@ export function AppStateProvider({
       });
       return written;
     },
-    [equipmentUnits, log],
+    [actorName, equipmentUnits, log],
   );
 
   const removeUnit = React.useCallback(

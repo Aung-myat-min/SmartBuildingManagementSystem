@@ -50,6 +50,8 @@ export function toLogEntry(
     buildingId: d.buildingId,
     refId: d.refId,
     reason: d.reason,
+    reading: typeof d.reading === "number" ? d.reading : undefined,
+    readingUnit: d.readingUnit,
   };
 }
 
