@@ -9,8 +9,12 @@ import type {
   SensorTypeDef,
 } from "@/lib/types";
 
-/** How often the estate is re-read. Slow enough to watch, fast enough to feel live. */
-const TICK_SECONDS = 3;
+/**
+ * How often the estate is re-read. Slow enough to watch, fast enough to feel
+ * live. Exported because the reading chart reconstructs timestamps from it —
+ * the series is a fixed-length window with no stamps of its own.
+ */
+export const TICK_SECONDS = 3;
 
 /** Points kept per sensor — two minutes of history at the tick above. */
 const HISTORY = 40;

@@ -29,13 +29,16 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { FormDrawer, WideSheet } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
 import { PulseDot } from "@/components/shared/pulse-dot";
+import { ReadingChart } from "@/components/shared/reading-chart";
 import { SensorTypeRegistry } from "@/components/shared/sensor-type-registry";
 import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { useCountUp } from "@/hooks/use-count-up";
 import { useLiveClock } from "@/hooks/use-live-clock";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { TICK_SECONDS } from "@/hooks/use-simulation";
 import { useAppState } from "@/lib/app-state";
+import { bandZones, liveSeries, recordedSeries } from "@/lib/chart-data";
 import { isSensorOffline, statusTone } from "@/lib/derive";
 import { formatRelative } from "@/lib/format";
 import { sensorIcon } from "@/lib/icons";
@@ -1035,7 +1038,7 @@ function MonitoringStrip() {
         </button>
       </div>
 
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid items-start gap-2.5 sm:grid-cols-2 xl:grid-cols-3">
         {measuring.map((s) => (
           <ReadingCard
             key={s.id}
@@ -1088,6 +1091,8 @@ function ReadingCard({
   onRelease: () => void;
 }) {
   const [open, setOpen] = React.useState(false);
+  const [range, setRange] = React.useState<Range>("live");
+  const { equipmentUnits } = useAppState();
   const type = sensorType(sensor.typeId);
   const m = type?.measurement;
   const value = reading ?? m?.min ?? 0;
@@ -1101,6 +1106,20 @@ function ReadingCard({
   const def = type?.statuses.find((st) => st.id === band?.statusId);
   const tone = def?.tone ?? "neutral";
   const Icon = sensorIcon(type?.icon ?? "activity");
+  // The HVAC unit in this room, if one is running. `stepReadings` drives the
+  // temperature toward its setpoint, so the setpoint belongs on the chart —
+  // same unit, same axis, and the convergence is the thing worth watching.
+  const setpoint =
+    type?.id === "temperature"
+      ? equipmentUnits.find(
+          (u) =>
+            u.roomId === sensor.roomId &&
+            u.hvac &&
+            u.hvac.mode !== "off" &&
+            u.condition !== "faulty" &&
+            u.condition !== "decommissioned",
+        )?.hvac?.setpointC
+      : undefined;
   const next = nextThreshold(type, value);
   const nextLabel = next
     ? type?.statuses.find((st) => st.id === next.statusId)?.label
@@ -1171,8 +1190,17 @@ function ReadingCard({
               {sensor.id}
             </span>
             <div className="flex-1" />
-            <Sparkline values={history} tone={tone} />
+            <RangeSwitch value={range} onChange={setRange} />
           </div>
+
+          <ReadingHistory
+            sensor={sensor}
+            type={type}
+            range={range}
+            live={history}
+            setpoint={setpoint}
+          />
+
           <label className="flex flex-col gap-1">
             <span className="text-muted-foreground text-[10px]">
               Drag to force a reading across a threshold
@@ -1203,6 +1231,103 @@ function ReadingCard({
   );
 }
 
+/**
+ * How far back a reading chart looks.
+ *
+ * Live and the other two are not the same kind of data and are deliberately
+ * never on one axis — see lib/chart-data.ts. This switch is what keeps that
+ * difference in front of the reader rather than hiding it in a join.
+ */
+type Range = "live" | "24h" | "7d";
+
+const RANGES: { id: Range; label: string }[] = [
+  { id: "live", label: "Live" },
+  { id: "24h", label: "24h" },
+  { id: "7d", label: "7 days" },
+];
+
+function RangeSwitch({
+  value,
+  onChange,
+}: {
+  value: Range;
+  onChange: (next: Range) => void;
+}) {
+  return (
+    <div className="border-input bg-card flex shrink-0 items-center rounded border p-[2px]">
+      {RANGES.map((r) => (
+        <button
+          key={r.id}
+          type="button"
+          onClick={() => onChange(r.id)}
+          className={cn(
+            "interactive focus-ring cursor-pointer rounded-[3px] px-1.75 py-0.75 text-[10px] font-medium",
+            value === r.id
+              ? "bg-primary text-primary-foreground"
+              : "text-foreground/70",
+          )}
+        >
+          {r.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The chart, and the honest empty state behind it.
+ *
+ * Live draws the in-memory window as a curve. The other two draw Log Book
+ * crossings as a step, because that is what the record is — the moments a
+ * reading changed band, not a continuous measurement. When there is nothing to
+ * draw the panel says *why*, and the reason differs: live is about to have
+ * data, history may genuinely never have had any.
+ */
+function ReadingHistory({
+  sensor,
+  type,
+  range,
+  live,
+  setpoint,
+}: {
+  sensor: EnvironmentalSensor;
+  type: SensorTypeDef | undefined;
+  range: Range;
+  live: number[];
+  setpoint?: number;
+}) {
+  const { logBook } = useAppState();
+  const zones = React.useMemo(() => bandZones(type), [type]);
+
+  const points = React.useMemo(() => {
+    if (range === "live") return liveSeries(live, TICK_SECONDS, Date.now());
+    const days = range === "24h" ? 1 : 7;
+    return recordedSeries(logBook, sensor.id, Date.now() - days * 86_400_000);
+  }, [range, live, logBook, sensor.id]);
+
+  if (points.length < 2) {
+    return (
+      <div className="border-divider text-muted-foreground flex h-[168px] items-center justify-center rounded border border-dashed px-4 text-center text-[10.5px] leading-relaxed">
+        {range === "live"
+          ? "Watching — the line starts once a few readings are in."
+          : `Nothing recorded for this device in the last ${
+              range === "24h" ? "24 hours" : "7 days"
+            }. Only a change of band is written down, so a device sitting steady leaves no trace.`}
+      </div>
+    );
+  }
+
+  return (
+    <ReadingChart
+      type={type}
+      points={points}
+      zones={zones}
+      mode={range === "live" ? "live" : "recorded"}
+      setpoint={setpoint}
+    />
+  );
+}
+
 /** Tone → the left edge that makes a card scannable without being read. */
 const BAND_EDGE: Record<Tone, string> = {
   success: "border-l-success",
@@ -1211,12 +1336,6 @@ const BAND_EDGE: Record<Tone, string> = {
   info: "border-l-info",
   neutral: "border-l-neutral-foreground/40",
 };
-
-/**
- * Longer than any sparkline path, so one dash covers the whole line and
- * offsetting by it hides the line completely.
- */
-const SPARK_DASH = 260;
 
 /**
  * The type's thresholds, drawn to scale, with the reading marked on them.
@@ -1316,72 +1435,4 @@ const BAND_FILL: Record<Tone, string> = {
   danger: "bg-danger",
   info: "bg-info",
   neutral: "bg-neutral-foreground/40",
-};
-
-/** A hand-drawn line, as the Dashboard's bars are — no chart dependency. */
-function Sparkline({ values, tone }: { values: number[]; tone: Tone }) {
-  // Drawn in once, when the series first has enough points to be a line. After
-  // that the points change every tick and redrawing each time would flicker.
-  const [drawing, setDrawing] = React.useState(true);
-  const ready = values.length >= 2;
-  React.useEffect(() => {
-    if (!ready) return;
-    const timer = setTimeout(() => setDrawing(false), 600);
-    return () => clearTimeout(timer);
-  }, [ready]);
-
-  if (values.length < 2) {
-    return (
-      <span className="text-muted-foreground font-mono text-[9.5px]">
-        collecting…
-      </span>
-    );
-  }
-  const w = 84;
-  const h = 22;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const points = values
-    .map((v, i) => {
-      const x = (i / (values.length - 1)) * w;
-      const y = h - ((v - min) / span) * h;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-
-  return (
-    <svg
-      width={w}
-      height={h}
-      viewBox={`0 0 ${w} ${h}`}
-      aria-hidden="true"
-      className="shrink-0 overflow-visible"
-    >
-      <polyline
-        points={points}
-        fill="none"
-        strokeWidth={1.5}
-        strokeLinejoin="round"
-        strokeLinecap="round"
-        className={cn(SPARK_STROKE[tone], drawing && "animate-sb-draw")}
-        style={
-          drawing
-            ? {
-                strokeDasharray: SPARK_DASH,
-                strokeDashoffset: SPARK_DASH,
-              }
-            : undefined
-        }
-      />
-    </svg>
-  );
-}
-
-const SPARK_STROKE: Record<Tone, string> = {
-  success: "stroke-success",
-  warning: "stroke-warning",
-  danger: "stroke-danger",
-  info: "stroke-info",
-  neutral: "stroke-neutral-foreground",
 };
