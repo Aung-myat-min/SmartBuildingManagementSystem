@@ -1651,6 +1651,45 @@ operator tooling, not everyday reading. They are editable in the sensor type dra
 status per band, and a catch-all at the end, without which some readings would
 land in no band and the sensor would silently stop updating.
 
+### Charts
+
+**Recharts 3.10**, measured at **+101 KB gzipped** (666 KB → 767 KB across all
+chunks). 2.x is not React 19 clean. The wrapper is hand-written rather than
+`npx shadcn add chart`, which would pull Radix into a Base UI codebase.
+
+**Colours are passed as `var(--success)`, never hex.** They resolve inside SVG
+and `.dark` redefines them, so a chart follows the theme with no JavaScript —
+verified by toggling the class and watching the line flip. The `--color-*`
+aliases from the `@theme inline` layer do **not** resolve; that is the trap the
+comments in records and reports warn about, and it applies to chart props too.
+
+`lib/chart-data.ts` (pure, 14 tests) keeps apart two things that must never
+share an axis:
+
+| | Live | Recorded |
+| --- | --- | --- |
+| Source | the in-memory simulation window | Log Book crossings |
+| Density | one point every 3s, 2 minutes | only moments a band changed |
+| Drawn as | a curve | a **step** |
+| Survives reload | no | yes |
+
+A `Live / 24h / 7 days` switch makes the reader choose, rather than joining
+them and implying a resolution the record does not have. `readingDomain` frames
+the data rather than the dial, and takes a `keepInView` value so an HVAC
+setpoint the room never reaches is not clipped out of the chart it is the point
+of.
+
+**Every band is labelled, and that is load-bearing.** Running the dataviz
+validator on the app's status tones: amber↔green measure ΔE 6.2 under
+protanopia and red↔amber 14.4 at normal vision, below the 15 floor. The words
+are what carry the difference; hue alone does not.
+
+**No multi-series chart exists, deliberately** — so none of this needs a
+categorical palette. If one is ever added, the `--chart-1..5` already in
+`globals.css` must be re-stepped first; they fail the validator in both modes
+(light: normal-vision floor and chroma; dark: three of five outside the
+lightness band).
+
 ### Pending states
 
 `lib/pending.ts` — `withMinDuration(promise, floorMs?)` and `remainingFloor`,
