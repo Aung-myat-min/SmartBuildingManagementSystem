@@ -182,6 +182,21 @@ describe("readingDomain", () => {
     expect(high).toBeGreaterThan(low);
   });
 
+  it("keeps a setpoint in frame even when the data never reaches it", () => {
+    // A cooler set to 22 in a room sitting at 19 never gets there, and the
+    // line it is set by was being framed out of the chart entirely.
+    const [low, high] = readingDomain(
+      temperature,
+      [
+        { at: 1, value: 19 },
+        { at: 2, value: 19.2 },
+      ],
+      22,
+    );
+    expect(high).toBeGreaterThanOrEqual(22);
+    expect(low).toBeLessThanOrEqual(19);
+  });
+
   it("never runs past the dial", () => {
     const [low, high] = readingDomain(temperature, [
       { at: 1, value: 5 },

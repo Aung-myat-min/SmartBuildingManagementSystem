@@ -54,7 +54,7 @@ export function ReadingChart({
 }) {
   const reduced = useReducedMotion();
   const m = type?.measurement;
-  const domain = readingDomain(type, points);
+  const domain = readingDomain(type, points, setpoint);
   const unit = m?.unit ?? "";
   const decimals = m?.decimals ?? 0;
 
@@ -86,9 +86,13 @@ export function ReadingChart({
               fillOpacity={0.09}
               stroke="none"
               ifOverflow="hidden"
+              // Top-right of each band, with the setpoint's own label sent to
+              // the opposite corner: a horizontal line's label and a band
+              // label both centred on the right-hand edge landed on top of
+              // each other the first time this drew.
               label={{
                 value: label,
-                position: "insideRight",
+                position: "insideTopRight",
                 fill: "var(--muted-foreground)",
                 fontSize: 9,
               }}
@@ -104,7 +108,7 @@ export function ReadingChart({
             strokeDasharray="4 3"
             label={{
               value: `Setpoint ${setpoint} ${unit}`,
-              position: "insideTopLeft",
+              position: "insideBottomLeft",
               fill: "var(--primary)",
               fontSize: 9.5,
             }}

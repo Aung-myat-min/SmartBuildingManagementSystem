@@ -190,6 +190,37 @@ describe("HVAC", () => {
     }
   });
 
+  it("does not warm a room it was told to cool", () => {
+    // "Cool to 22" in a 19 °C room used to heat it to 22, because the step
+    // asked which way the setpoint was and never what the machine can do.
+    const out = run({
+      current: { S1: 19 },
+      units: [ac({ hvac: { mode: "cool", setpointC: 22, fan: 3 } })],
+      seconds: 30,
+    });
+    expect(out.S1).toBeLessThanOrEqual(19.5);
+  });
+
+  it("does not cool a room it was told to heat", () => {
+    const out = run({
+      current: { S1: 26 },
+      units: [ac({ hvac: { mode: "heat", setpointC: 22, fan: 3 } })],
+      seconds: 30,
+    });
+    expect(out.S1).toBeGreaterThanOrEqual(25.5);
+  });
+
+  it("holds the setpoint instead of sliding back to ambient", () => {
+    // Rest is 19 °C. A cooler sitting on 21 cannot pull the room back up, so
+    // without damping the settle term the room would drift to 19 and the unit
+    // would have nothing to say about it.
+    let current = { S1: 21 };
+    for (let i = 0; i < 200; i += 1) {
+      current = run({ current, units: [ac()], seconds: 3 }) as { S1: number };
+    }
+    expect(current.S1).toBeCloseTo(21, 1);
+  });
+
   it("warms a cold room when heating", () => {
     const out = run({
       current: { S1: 12 },

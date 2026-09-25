@@ -101,23 +101,40 @@ export function stepReadings(input: SimulationInput): Record<string, number> {
     // Only temperature answers to HVAC. Humidity and air quality would need a
     // model this demo does not have, and inventing one would be dressing.
     let forced = 0;
+    let conditioned = false;
     if (type.id === "temperature") {
       const hvac = hvacFor(sensor.roomId, input.units);
       if (hvac) {
+        conditioned = true;
         const target =
           hvac.mode === "fan" ? restingValue(type) : hvac.setpointC;
         const rate = HVAC_PER_SECOND * hvac.fan * dt;
         const gap = target - from;
+        // A cooler cools. Setting "cool" to 22 in a 19 °C room used to *warm*
+        // it to 22, because the step only asked which way the setpoint was and
+        // never what the machine can do. Each mode may push one way only; with
+        // the setpoint already passed there is nothing to do and the room is
+        // left to its own drift.
+        const allowed =
+          hvac.mode === "cool"
+            ? Math.min(0, gap)
+            : hvac.mode === "heat"
+              ? Math.max(0, gap)
+              : gap;
         // Move toward the setpoint without stepping past it, or the reading
         // would oscillate around the target instead of settling on it.
-        forced = Math.sign(gap) * Math.min(Math.abs(gap), rate);
+        forced = Math.sign(allowed) * Math.min(Math.abs(allowed), rate);
       }
     }
 
-    // With HVAC running its pull dominates: a unit holding a room at 21 °C
-    // should not be undone by the room's own drift.
-    const moved =
-      forced !== 0 ? from + forced + wander * 0.2 : from + wander + settle;
+    // A room with a unit running in it is a conditioned room: its pull
+    // dominates, and the settle term — which drags an unattended room back to
+    // ambient — is off entirely. Keyed on the unit running rather than on it
+    // currently having work to do, or a cooler that has reached its setpoint
+    // would let the room slide to ambient and then have to chase it back.
+    const moved = conditioned
+      ? from + forced + wander * 0.2
+      : from + wander + settle;
     next[sensor.id] = clampToRange(type, moved);
   }
 

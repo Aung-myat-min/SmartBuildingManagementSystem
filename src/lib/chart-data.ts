@@ -107,12 +107,21 @@ export function bandZones(type: SensorTypeDef | undefined): BandZone[] {
 export function readingDomain(
   type: SensorTypeDef | undefined,
   points: ReadingPoint[],
+  /**
+   * A line that has to stay in frame even when the data never goes near it —
+   * an HVAC setpoint, which is the whole point of the chart it sits on and was
+   * being clipped out of view by the framing below.
+   */
+  keepInView?: number,
 ): [number, number] {
   const m = type?.measurement;
   if (!m) return [0, 1];
   if (points.length === 0) return [m.min, m.max];
 
   const values = points.map((p) => p.value);
+  if (keepInView !== undefined && Number.isFinite(keepInView)) {
+    values.push(keepInView);
+  }
   const low = Math.min(...values);
   const high = Math.max(...values);
   // A pad proportional to the spread, with a floor so a dead-flat series still
