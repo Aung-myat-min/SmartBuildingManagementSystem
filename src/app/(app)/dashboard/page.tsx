@@ -3,6 +3,7 @@
 import { Bell, Lock } from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/shared/empty-state";
+import { PowerChart } from "@/components/shared/power-chart";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
@@ -82,7 +83,6 @@ export default function DashboardPage() {
   const eqTotal = Math.max(1, eq.total);
 
   const bars = powerSeries(activeBuildingId);
-  const maxBar = Math.max(...bars);
   const kwNow = bars[bars.length - 1];
   const kwhToday =
     Math.round(bars.reduce((a, b) => a + b, 0) / bars.length) * 24;
@@ -225,8 +225,12 @@ export default function DashboardPage() {
               <span className="text-muted-foreground font-mono text-[10.5px] tracking-wider">
                 POWER CONSUMPTION
               </span>
-              <span className="text-success-foreground flex items-center gap-1 font-mono text-[9.5px]">
-                <PulseDot tone="success" pulse /> LIVE
+              {/* Not LIVE. `powerSeries` is a seeded random walk under a
+                  sine curve — there is no meter behind it. A pulsing dot on
+                  invented numbers is the one claim this dashboard should not
+                  make, and the better chart below made it louder. */}
+              <span className="text-muted-foreground font-mono text-[9.5px]">
+                SIMULATED
               </span>
             </div>
             <div className="flex items-baseline gap-1.5">
@@ -237,18 +241,9 @@ export default function DashboardPage() {
                 kW demand
               </span>
             </div>
-            <div className="flex h-8.5 items-end gap-[3px]">
-              {bars.map((v, i) => (
-                <div
-                  // biome-ignore lint/suspicious/noArrayIndexKey: fixed-length hourly series, no natural id
-                  key={i}
-                  className="bg-primary/70 flex-1 rounded-[1px]"
-                  style={{ height: `${Math.max(6, (v / maxBar) * 100)}%` }}
-                />
-              ))}
-            </div>
+            <PowerChart values={bars} />
             <div className="border-border text-muted-foreground flex justify-between border-t pt-2.5 text-[11px]">
-              <span>Last 24h</span>
+              <span>Last 24h · modelled load profile</span>
               <span className="text-foreground font-mono font-medium">
                 {kwhToday.toLocaleString()} kWh today
               </span>
