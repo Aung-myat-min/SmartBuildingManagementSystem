@@ -344,6 +344,15 @@ const AppStateContext = React.createContext<AppState | null>(null);
  * unmount is what stops one person's work leaking into the next person's
  * session in the same tab.
  */
+/**
+ * The shortest gap between two automated entries for the same device.
+ *
+ * Long enough that a flapping sensor cannot bury the journal, short enough
+ * that a real sequence — a room warming through three bands over an evening —
+ * is still recorded in full. Alarms ignore it entirely.
+ */
+const AUTO_LOG_FLOOR_MS = 2 * 60_000;
+
 export function AppStateProvider({
   user,
   children,
@@ -645,6 +654,19 @@ export function AppStateProvider({
   // answering for them after everything else went live.
   setAssetSource({ units: equipmentUnits, sensors });
 
+  /**
+   * When each sensor last had an automated crossing written down.
+   *
+   * Hysteresis and a sane resting value are what stop a sensor flapping, and
+   * both have been wrong at least once — the first time leaving 82% of the Log
+   * Book as one drifting thermometer. This is the backstop: a floor between
+   * automated entries per device, so a badly set threshold costs a handful of
+   * rows an hour rather than a thousand. The sensor document is written every
+   * time regardless, so the live screen never lags; only the journal entry is
+   * dropped.
+   */
+  const lastAutoLog = React.useRef<Record<string, number>>({});
+
   const setSensorStatus = React.useCallback(
     async (
       sensorId: string,
@@ -664,6 +686,22 @@ export function AppStateProvider({
       if (!written.ok) return written;
       const type = sensor ? sensorType(sensor.typeId) : undefined;
       const def = type?.statuses.find((st) => st.id === status);
+
+      // The simulation always hands over the reading that caused the crossing;
+      // a person resetting an alarm never does. That is the only thing telling
+      // the two callers apart, so it is what decides whether this entry is the
+      // estate talking or somebody acting.
+      const automated = reading !== undefined;
+      // An alarm is never held back: a fire detector triggering is the one
+      // sensor event nobody may miss because a neighbour was noisy.
+      if (automated && !def?.isAlarm) {
+        const now = Date.now();
+        if (now - (lastAutoLog.current[sensorId] ?? 0) < AUTO_LOG_FLOOR_MS) {
+          return written;
+        }
+        lastAutoLog.current[sensorId] = now;
+      }
+
       log({
         source: def?.isAlarm ? "alert" : "sensor",
         actionType: "sensor-status-changed",
@@ -681,6 +719,7 @@ export function AppStateProvider({
         // reading chart has — see LogBookEntry.reading.
         reading,
         readingUnit: type?.measurement?.unit,
+        automated,
       });
       return written;
     },

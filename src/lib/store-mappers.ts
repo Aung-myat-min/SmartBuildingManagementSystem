@@ -52,6 +52,7 @@ export function toLogEntry(
     reason: d.reason,
     reading: typeof d.reading === "number" ? d.reading : undefined,
     readingUnit: d.readingUnit,
+    automated: d.automated === true,
   };
 }
 

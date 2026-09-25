@@ -459,6 +459,19 @@ export interface LogBookEntry {
   reading?: number;
   readingUnit?: string;
   /**
+   * Written by the estate itself rather than by a person.
+   *
+   * A sensor crossing a band is an observation, not a record of anything
+   * anyone did, and there are far more of them than there are actions — at one
+   * point 82% of this collection was drifting temperatures, and the Log Book's
+   * 200-entry window reached back two days while holding ten human actions.
+   *
+   * An explicit flag rather than inferring it from `reading` or the actor,
+   * because the same `setSensorStatus` serves both the simulation and a person
+   * resetting an alarm, and the entries are otherwise identical.
+   */
+  automated?: boolean;
+  /**
    * What the actor typed when the action demanded a justification.
    *
    * A field, not a sentence folded into `detail`: the whole point of asking is

@@ -2,7 +2,7 @@
 // lets through has to be decided once and stay decided.
 
 import { describe, expect, it } from "vitest";
-import { isEstateRecord, isSignificant } from "./records";
+import { isEstateRecord, isRoutineReading, isSignificant } from "./records";
 import type { LogActionType, LogBookEntry, LogBookSource } from "./types";
 
 function entry(over: Partial<LogBookEntry> = {}): LogBookEntry {
@@ -88,5 +88,37 @@ describe("isSignificant", () => {
       isSignificant(entry({ reason: "Decommissioned — beyond repair" })),
     ).toBe(true);
     expect(isSignificant(entry())).toBe(false);
+  });
+});
+
+describe("isRoutineReading", () => {
+  it("takes an automated crossing as routine", () => {
+    expect(
+      isRoutineReading(
+        entry({ source: "sensor", automated: true, reading: 24.1 }),
+      ),
+    ).toBe(true);
+  });
+
+  it("never treats an alarm as routine, whatever wrote it", () => {
+    // A fire detector triggering is an event whoever is reading this needs.
+    expect(isRoutineReading(entry({ source: "alert", automated: true }))).toBe(
+      false,
+    );
+  });
+
+  it("leaves anything a person did alone", () => {
+    // Same collection, same source, same action type — a device removed by
+    // hand is not an observation.
+    expect(
+      isRoutineReading(
+        entry({ source: "sensor", title: "Sensor removed", reason: "Faulty" }),
+      ),
+    ).toBe(false);
+  });
+
+  it("treats a legacy entry with no marker as a real one", () => {
+    // Safer to show a routine crossing than to hide a real action.
+    expect(isRoutineReading(entry({ source: "sensor" }))).toBe(false);
   });
 });

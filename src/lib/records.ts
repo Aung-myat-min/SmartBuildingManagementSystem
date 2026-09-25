@@ -65,3 +65,22 @@ export function isSignificant(entry: LogBookEntry): boolean {
   if (entry.source === "alert") return true;
   return ALWAYS_SIGNIFICANT.includes(entry.actionType);
 }
+
+/**
+ * An observation the estate made about itself, rather than a record of
+ * anything anyone did.
+ *
+ * The Log Book is an audit trail, and a temperature crossing a band does not
+ * belong in it next to "Building deleted — reason: …". At one point these were
+ * **82% of the collection**: the 200-entry live feed reached back two days and
+ * held ten human actions, so the thing the page exists for was buried under
+ * one drifting thermometer.
+ *
+ * They are still written — the reading charts have no other history to draw —
+ * so this hides them from the journal rather than deleting them. An **alarm is
+ * never routine**: a fire detector triggering is an event whoever is reading
+ * this needs, whatever wrote it.
+ */
+export function isRoutineReading(entry: LogBookEntry): boolean {
+  return entry.automated === true && entry.source !== "alert";
+}

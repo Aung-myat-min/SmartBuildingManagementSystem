@@ -1,6 +1,6 @@
 "use client";
 
-import { Link2, Pause, Play, Search } from "lucide-react";
+import { Eye, EyeOff, Link2, Pause, Play, Search } from "lucide-react";
 import { AnimatePresence, m } from "motion/react";
 import * as React from "react";
 import { AccessDenied } from "@/components/shared/access-denied";
@@ -33,6 +33,7 @@ import {
   isBuildingLocked,
   roleLabel,
 } from "@/lib/permissions";
+import { isRoutineReading } from "@/lib/records";
 import type { LogBookEntry, LogBookSource, UserRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +85,10 @@ export default function LogBookPage() {
   const [buildingFilter, setBuildingFilter] = React.useState(
     isBuildingLocked(role) ? activeBuildingId : "all",
   );
+  const [hideRoutine, setHideRoutine] = usePersistedState(
+    "logbook.hideRoutine",
+    true,
+  );
   const [sourceFilter, setSourceFilter] = usePersistedState<
     LogBookSource | "all"
   >("logbook.source", "all");
@@ -94,7 +99,13 @@ export default function LogBookPage() {
   const locked = isBuildingLocked(role);
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
 
+  const routineCount = logBook.filter(isRoutineReading).length;
+
   const filtered = logBook.filter((e) => {
+    // Sensor drift is an observation the estate made about itself, not a
+    // record of anything anyone did. Hidden by default because at one point it
+    // was 82% of this collection and the journal was unreadable.
+    if (hideRoutine && isRoutineReading(e)) return false;
     if (effectiveBuilding !== "all" && e.buildingId !== effectiveBuilding)
       return false;
     if (sourceFilter !== "all" && e.source !== sourceFilter) return false;
@@ -242,6 +253,34 @@ export default function LogBookPage() {
                 className="w-full bg-transparent py-1.5 pr-3 pl-8 text-[12px] outline-none"
               />
             </div>
+            <button
+              type="button"
+              onClick={() => setHideRoutine(!hideRoutine)}
+              aria-pressed={hideRoutine}
+              title={
+                hideRoutine
+                  ? `${routineCount} automated sensor reading${routineCount === 1 ? "" : "s"} hidden. They are still recorded — the reading charts draw their history from them.`
+                  : "Hide the readings the estate wrote about itself, and keep what people did"
+              }
+              className={cn(
+                "interactive focus-ring pressable flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium",
+                hideRoutine
+                  ? "border-primary bg-accent/40 text-accent-foreground"
+                  : "border-border text-neutral-foreground hover:border-primary",
+              )}
+            >
+              {hideRoutine ? (
+                <EyeOff className="size-3.5" />
+              ) : (
+                <Eye className="size-3.5" />
+              )}
+              {hideRoutine ? "Actions only" : "Everything"}
+              {hideRoutine && routineCount > 0 && (
+                <span className="text-muted-foreground font-mono text-[10px]">
+                  {routineCount} hidden
+                </span>
+              )}
+            </button>
             <Select
               value={effectiveBuilding}
               onValueChange={(v) => setBuildingFilter(v ?? "all")}
