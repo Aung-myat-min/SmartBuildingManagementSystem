@@ -1092,9 +1092,47 @@ rather than unmounted when nothing is selected, so it animates out.
 **Local helpers:** `typeLabel(typeId)`, `Chip`, `ViewButton`, and the
 `COLUMN_META` / `BOARD_ORDER` tables.
 
-### 8.4 `/sensors` (785 lines)
+### 8.4 `/sensors`
 
-Fire detection and door hardware, grouped by building.
+**Two tabs, because the page does two jobs.** Watching the estate and setting
+the limits it is watched against are not the same job and nobody arrives
+wanting both. The choice is persisted per uid (`sensors.tab`).
+
+**Monitoring** leads with the building rather than the devices:
+
+- a **KPI row** — comfort, attention, average temperature, average air quality;
+- the **climate grid** (`shared/climate-grid.tsx`), every room by floor coloured
+  by its worst reading, floors top-down so it has the shape of the building.
+  Clicking a room opens the device that is actually complaining;
+- the **status donut** (`shared/status-donut.tsx`), counts and shares in the
+  legend;
+- the **attention queue**, worst and longest-standing first, with the duration
+  from `statusChangedAt` and a *Raise a request* button that opens
+  `/requests?new=1&room=<id>` — the drawer arrives seeded with that room;
+- then **each building**, carrying its own measuring cards (see below) with the
+  categorical devices listed underneath.
+
+All four summaries are views of `lib/climate.ts`, so they cannot disagree.
+
+**The reading card.** Ordered by the questions somebody actually asks: the room
+(not the device id), a coloured edge and a status word, the number, a trend
+from `trendOf`, a compact **graph** with the bands tinted behind it, and one
+line from `nextThreshold` — "Poor ventilation above 1500 ppm" — which is what
+replaces asking a reader to interpret a scale. The chart keeps the next
+boundary in frame, or the domain hugs the reading and the graph is a flat
+tinted block. Until two readings exist there is no shape to draw, so the band
+strip stands in.
+
+Behind the chevron, for an operator rather than a reader: the device id, the
+full chart with axes and a `Live / 24h / 7 days` switch, and the dial that
+forces a value across a threshold.
+
+**Thresholds** reads as one sentence per measuring type, with only the room
+types that disagree listed under it, each marked as an exception. Editing is in
+the type drawer — see *Sensor thresholds* above.
+
+Fire detection and door hardware stay a compact list per building: a door is
+locked or it is not, and a chart of that says nothing.
 
 **Suspense split.** `SensorsPage` is a two-line component that renders
 `<React.Suspense fallback={null}><SensorsView /></React.Suspense>`. This is not
@@ -1120,9 +1158,12 @@ counter, "Polled every 30s · <clock>" from `useLiveClock()`, and + New sensor.
 
 **Body:** one collapsible card per building (only the user's building for Office
 Staff), headed by name, `BUILDING_META` code, an "<n> in alarm" pulsing badge
-and a device count. Inside, a two-column grid — **one column per
-`SENSOR_TYPES` entry** — so fire detection and door hardware sit side by side
-and collapse to one column under `lg`.
+and a device count. Inside, that building's **measuring cards** first, then a
+two-column grid — one column per *non-measuring* registry entry — so fire
+detection and door hardware sit side by side and collapse to one column under
+`lg`. The measuring cards used to live in a single "Live monitoring" strip
+above every building at once, which put the estate's readings somewhere other
+than the estate.
 
 Each device row shows a `PulseDot` (pulsing only in alarm), the device id, its
 room and `formatRelative(updatedAt)`, and a status `ToneBadge`.
@@ -1636,20 +1677,76 @@ A threshold is the reading at which one status becomes the next.
 `SensorMeasurement` holds the unit, the dial's floor and ceiling, the decimals
 and the ascending `bands`; a reading takes the first band whose `upTo` is null
 or at least the reading, and that band's `statusId` is what the sensor shows.
-Everything downstream — tone, `isAlarm`, the banner, the Log Book — reads the
-status, exactly as it does for a door lock that has no number at all.
 
-They are visible on the Sensors page, where the card is built around what a
-reader asks rather than what the record holds: the room (not the device id),
-a coloured left edge and a status word, the number, a trend from `trendOf`,
-and one line from `nextThreshold` — "Poor ventilation above 1400 ppm" — which
-is what replaces asking someone to read a scale. Only the band the reading
-sits in is drawn at full strength. The device id, the numbered scale, the
-sparkline and the dial that forces a value are behind the card's chevron:
-operator tooling, not everyday reading. They are editable in the sensor type drawer, a sentence per row
-("Up to 18 °C → Cold"), guarded by `bandsRefusal` — ascending limits, a real
-status per band, and a catch-all at the end, without which some readings would
-land in no band and the sensor would silently stop updating.
+**Limits can differ by kind of room.** `measurement.overrides` is a sparse map
+of `RoomType` to bands, and `bandsFor(type, roomType)` is the single place the
+choice is made. One set of limits cannot serve a lecture hall and a server
+rack: at 27 °C the hall is uncomfortable and the rack is in trouble, and before
+this the rack read "comfortable" at 26 °C and said nothing.
+
+It is sparse on purpose. The type's own `bands` cover every room and a room
+type appears only where it genuinely differs, so the Thresholds tab shows one
+sentence per type and a short exceptions list rather than a grid of five room
+types against every sensor type that nobody would fill in. Exceptions are
+created and edited in the sensor type drawer; a new one starts as a copy of the
+default, and each is validated by `bandsRefusal` on save exactly as the default
+is — a set of bands with no catch-all would leave readings in *that kind of
+room* with no status at all.
+
+The statuses never change, only the boundaries between them, so everything
+downstream receives a status id and neither knows nor cares that a room was
+involved. `bandFor`, `statusForReading`, `bandZones` and **`crossings`** all
+take the room. `crossings` taking it is the load-bearing part: that is what
+makes an exception fire a real alarm, rather than only changing what the screen
+says while the Log Book records the estate default.
+
+Seeded exceptions: plant rooms (which hold the server rack) get tighter
+temperature and CO2 limits.
+
+### Where a reading rests
+
+`restingValue` in `simulation.ts` is the middle of the band the type calls
+good — the first band whose status tone is `success` — falling back to 35% of
+the dial for a type with no good band at all.
+
+It used to be that 35% unconditionally, which is not a fact about anything. For
+CO2 on a 350–2500 dial that put the resting point at **1102 ppm, above the
+fresh threshold**, so every room in the estate drifted into a warning state and
+stayed there. The thresholds took the blame and were retuned twice before the
+model was the thing at fault. The good band is a real statement about the
+measure, so it is the honest anchor.
+
+CO2 bands are 1000 / 1500 (outdoor air is ~420 ppm and an occupied room sits
+comfortably in the 700–1000 band), with 800 / 1200 in plant rooms, which are
+unoccupied and where CO2 is a ventilation check rather than a comfort one.
+
+### The estate, rolled up
+
+`lib/climate.ts` (pure, 15 tests) turns rooms + sensors + readings into one row
+per room. Every summary on the Monitoring tab is a view of that one list — the
+floor grid, the status donut, the KPI row, the attention queue — so they cannot
+disagree about how many rooms are in trouble.
+
+| Rule | Why |
+| --- | --- |
+| **Worst wins** | A room comfortable on temperature and choking on CO2 is not comfortable |
+| **`monitored` ≠ `offline`** | A room with no sensors is a coverage gap; a room whose sensors are dark is a fault. On this estate the first outnumbers everything else four to one, so it has to recede rather than bury the rest |
+| **Comfort is a share of what reports** | A building half of whose sensors are dark is not half comfortable; it is unknown, and the offline count beside it says so |
+| **`averageOf` returns null, not 0** | "0 ppm" is a reading. A dashboard showing one while every sensor is dark is lying rather than silent |
+
+### Icons
+
+Two maps, each in one place so a thing does not become a different shape on a
+different screen. Lucide, not emoji: they inherit `currentColor`, scale with
+the text, and render the same everywhere.
+
+- **`TONE_ICONS`** (via `toneIcon()` in `shared/tone-badge.tsx`) — the glyph for
+  a status tone. **Load-bearing, not decoration**: the app's amber and green
+  measure ΔE 6.2 apart under protanopia, so wherever a tone is the whole
+  message it ships as icon *and* word.
+- **`ROOM_TYPE_ICONS` / `ROOM_TYPE_LABELS`** — a glyph and a name per room kind.
+  `RoomType` is a closed union, so the compiler will not let a new one ship
+  without both.
 
 ### Charts
 
