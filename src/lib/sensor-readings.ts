@@ -77,6 +77,66 @@ export function formatReading(
 }
 
 /**
+ * The nearest boundary that matters, said as a direction.
+ *
+ * A scale with numbers under it asks the reader to work out where they are on
+ * it. This answers the question they actually have — "how far am I from
+ * trouble?" — as "Warm above 26". For a reading already in the top band there
+ * is nothing above, so it points the other way: "Warm below 31" is what tells
+ * an overheating room when it is back to merely warm.
+ *
+ * Null when the type does not measure, or has a single band with nowhere to go.
+ */
+export function nextThreshold(
+  type: SensorTypeDef | undefined,
+  reading: number,
+): { statusId: string; at: number; direction: "above" | "below" } | null {
+  const m = type?.measurement;
+  if (!m || !Number.isFinite(reading)) return null;
+  const i = m.bands.findIndex((b) => b.upTo === null || reading <= b.upTo);
+  if (i < 0) return null;
+
+  const here = m.bands[i];
+  const above = m.bands[i + 1];
+  // Not the top band: the interesting edge is this band's own ceiling.
+  if (above && here.upTo !== null) {
+    return { statusId: above.statusId, at: here.upTo, direction: "above" };
+  }
+  // Top band: the interesting edge is the one it came over.
+  const below = m.bands[i - 1];
+  if (below?.upTo !== null && below?.upTo !== undefined) {
+    return { statusId: below.statusId, at: below.upTo, direction: "below" };
+  }
+  return null;
+}
+
+/** How far a reading must move before the sensor says something different. */
+const TREND_DEADBAND = 0.01;
+
+/**
+ * Which way a reading is going, from its recent history.
+ *
+ * The sparkline drew this in 84 pixels and nobody could read it. Two words can:
+ * the mean of the last three points against the three before them, with a
+ * deadband so a bounded random walk does not report a direction it does not
+ * have.
+ */
+export function trendOf(
+  type: SensorTypeDef | undefined,
+  values: number[],
+): "rising" | "falling" | "steady" {
+  const m = type?.measurement;
+  if (!m || values.length < 6) return "steady";
+  const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  const recent = mean(values.slice(-3));
+  const before = mean(values.slice(-6, -3));
+  const move = (recent - before) / (m.max - m.min || 1);
+  if (move > TREND_DEADBAND) return "rising";
+  if (move < -TREND_DEADBAND) return "falling";
+  return "steady";
+}
+
+/**
  * Why a set of bands cannot be saved, or null when they can.
  *
  * Ascending and ending in a catch-all is what makes `bandFor` total. Without

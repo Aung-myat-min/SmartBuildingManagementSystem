@@ -58,9 +58,10 @@ import {
 } from "@/lib/permissions";
 import {
   bandFor,
-  formatReading,
   gaugeFraction,
   isMeasuring,
+  nextThreshold,
+  trendOf,
 } from "@/lib/sensor-readings";
 import type {
   EnvironmentalSensor,
@@ -1001,15 +1002,28 @@ function MonitoringStrip() {
   );
   if (measuring.length === 0) return null;
 
+  // The summary the strip leads with: how many are not in a success band.
+  // Twelve cards is a wall; one number in front of them is a glance.
+  const attention = measuring.filter((s) => {
+    const type = sensorType(s.typeId);
+    const value = readings[s.id] ?? s.reading;
+    if (value === undefined) return false;
+    const def = type?.statuses.find(
+      (st) => st.id === bandFor(type, value)?.statusId,
+    );
+    return def ? def.tone !== "success" : false;
+  }).length;
+
   return (
     <div className="border-border bg-card flex flex-col gap-3 rounded-[5px] border p-3">
       <div className="flex flex-wrap items-center gap-2">
         <PulseDot tone={paused ? "neutral" : "success"} pulse={!paused} />
         <span className="text-[12.5px] font-semibold">Live monitoring</span>
         <span className="text-muted-foreground text-[11.5px] leading-snug">
-          {measuring.length} measuring device
-          {measuring.length === 1 ? "" : "s"}. Drag a dial to hold a value and
-          push it across a threshold.
+          {attention === 0
+            ? `All ${measuring.length} rooms reading normally.`
+            : `${attention} of ${measuring.length} need attention.`}{" "}
+          Open a card for its device, scale and manual control.
         </span>
         <div className="flex-1" />
         <button
@@ -1038,6 +1052,26 @@ function MonitoringStrip() {
   );
 }
 
+/**
+ * One measuring device, read the way somebody actually asks about it.
+ *
+ * The first version of this card put seven things on screen — a device id, a
+ * number, a unit, a status chip, a sparkline, a scale with four numbers under
+ * it, a slider and a word about the simulation — and the one thing it never
+ * said was what any of it meant. "STUFFY" was the smallest text on it.
+ *
+ * The order now matches the questions, in the order they are asked:
+ *
+ *   1. Where is this?        the room, not the device id
+ *   2. Is it all right?      a colour down the edge, and a word
+ *   3. What is the number?   still there, just no longer the headline
+ *   4. Where is it heading?  a trend, in a word
+ *   5. When should I care?   "Poor ventilation above 1400 ppm"
+ *
+ * Everything an operator needs and a reader does not — the device id, the
+ * numbered scale, the history, the dial that forces a value — is one click
+ * away, not on screen by default.
+ */
 function ReadingCard({
   sensor,
   reading,
@@ -1053,6 +1087,7 @@ function ReadingCard({
   onHold: (value: number) => void;
   onRelease: () => void;
 }) {
+  const [open, setOpen] = React.useState(false);
   const type = sensorType(sensor.typeId);
   const m = type?.measurement;
   const value = reading ?? m?.min ?? 0;
@@ -1065,64 +1100,117 @@ function ReadingCard({
   const band = bandFor(type, value);
   const def = type?.statuses.find((st) => st.id === band?.statusId);
   const tone = def?.tone ?? "neutral";
+  const Icon = sensorIcon(type?.icon ?? "activity");
+  const next = nextThreshold(type, value);
+  const nextLabel = next
+    ? type?.statuses.find((st) => st.id === next.statusId)?.label
+    : undefined;
+  const trend = held ? "steady" : trendOf(type, history);
 
   return (
     <div
       className={cn(
-        "border-divider bg-background flex flex-col gap-2 rounded border p-2.75",
-        def?.isAlarm && "border-danger/50 bg-danger-muted/40",
+        "border-divider bg-background flex flex-col gap-2 rounded border border-l-[3px] p-2.75",
+        // The edge does the scanning work: twelve cards at a glance, and the
+        // eye finds the one that is not green without reading a word.
+        BAND_EDGE[tone],
+        def?.isAlarm && "border-danger bg-danger-muted/40",
       )}
     >
       <div className="flex items-center gap-1.5">
-        <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
-          {sensor.id}
-        </span>
-        <span className="text-muted-foreground truncate text-[10.5px]">
+        <Icon className="text-muted-foreground size-3.25 shrink-0" />
+        <span className="min-w-0 flex-1 truncate text-[12px] font-[450]">
           {roomLabel(sensor.roomId)}
         </span>
+        {trend !== "steady" && (
+          <span className="text-muted-foreground shrink-0 text-[10.5px]">
+            {trend === "rising" ? "↑ rising" : "↓ falling"}
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          aria-expanded={open}
+          title={open ? "Hide the detail" : "Device, scale and manual control"}
+          className="interactive focus-ring text-muted-foreground hover:text-foreground shrink-0 cursor-pointer rounded"
+        >
+          <ChevronDown
+            className={cn(
+              "size-3.5 transition-transform",
+              open && "rotate-180",
+            )}
+          />
+        </button>
+      </div>
+
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-[21px] leading-none font-semibold tabular-nums">
+          {shown.toFixed(m.decimals)}
+        </span>
+        <span className="text-muted-foreground text-[11px]">{m.unit}</span>
         <div className="flex-1" />
         <ToneBadge tone={tone}>{def?.label ?? "—"}</ToneBadge>
       </div>
 
-      <div className="flex items-end gap-2">
-        <span className="font-mono text-[21px] leading-none font-semibold tabular-nums">
-          {formatReading(type, shown)}
-        </span>
-        <div className="flex-1" />
-        <Sparkline values={history} tone={tone} />
-      </div>
+      <BandScale type={type} value={value} showNumbers={open} />
 
-      <BandScale type={type} value={value} />
+      {/* The line that replaces reading a scale: not where you are, but what
+          happens next and when. */}
+      <span className="text-muted-foreground text-[10.5px] leading-snug">
+        {held
+          ? "Held at this value — it is not drifting."
+          : nextLabel && next
+            ? `${nextLabel} ${next.direction} ${next.at} ${m.unit}`
+            : "No threshold beyond this one."}
+      </span>
 
-      <input
-        type="range"
-        aria-label={`Force a reading for ${sensor.id}`}
-        min={m.min}
-        max={m.max}
-        step={m.decimals > 0 ? 0.1 : 1}
-        value={value}
-        onChange={(e) => onHold(Number(e.target.value))}
-        className="accent-primary -mt-0.5 w-full cursor-pointer"
-      />
-
-      <div className="flex items-center gap-2">
-        <span className="text-muted-foreground text-[10.5px]">
-          {held ? "Held — not drifting" : "Drifting"}
-        </span>
-        <div className="flex-1" />
-        {held && (
-          <button
-            type="button"
-            onClick={onRelease}
-            className="interactive focus-ring text-primary cursor-pointer text-[10.5px] font-medium hover:underline"
-          >
-            Release
-          </button>
-        )}
-      </div>
+      {open && (
+        <div className="border-divider mt-0.5 flex flex-col gap-2 border-t pt-2.5">
+          <div className="flex items-center gap-2">
+            <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
+              {sensor.id}
+            </span>
+            <div className="flex-1" />
+            <Sparkline values={history} tone={tone} />
+          </div>
+          <label className="flex flex-col gap-1">
+            <span className="text-muted-foreground text-[10px]">
+              Drag to force a reading across a threshold
+            </span>
+            <input
+              type="range"
+              aria-label={`Force a reading for ${sensor.id}`}
+              min={m.min}
+              max={m.max}
+              step={m.decimals > 0 ? 0.1 : 1}
+              value={value}
+              onChange={(e) => onHold(Number(e.target.value))}
+              className="accent-primary w-full cursor-pointer"
+            />
+          </label>
+          {held && (
+            <button
+              type="button"
+              onClick={onRelease}
+              className="interactive focus-ring text-primary w-fit cursor-pointer text-[10.5px] font-medium hover:underline"
+            >
+              Release and let it drift
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
+
+/** Tone → the left edge that makes a card scannable without being read. */
+const BAND_EDGE: Record<Tone, string> = {
+  success: "border-l-success",
+  warning: "border-l-warning",
+  danger: "border-l-danger",
+  info: "border-l-info",
+  neutral: "border-l-neutral-foreground/40",
+};
 
 /**
  * Longer than any sparkline path, so one dash covers the whole line and
@@ -1143,13 +1231,17 @@ const SPARK_DASH = 260;
 function BandScale({
   type,
   value,
+  showNumbers = false,
 }: {
   type: SensorTypeDef | undefined;
   value: number;
+  /** Off by default: the colours answer the question, the numbers only add. */
+  showNumbers?: boolean;
 }) {
   const m = type?.measurement;
   if (!m) return null;
   const span = m.max - m.min || 1;
+  const current = bandFor(type, value)?.statusId;
 
   // A band runs from the previous band's ceiling to its own; the last has no
   // ceiling, so it runs to the top of the dial.
@@ -1167,9 +1259,10 @@ function BandScale({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="relative flex h-1.5 overflow-hidden rounded-full">
+      <div className="relative flex h-1 overflow-hidden rounded-full">
         {segments.map((seg) => {
           const def = type?.statuses.find((st) => st.id === seg.statusId);
+          const here = seg.statusId === current;
           return (
             <span
               key={seg.statusId}
@@ -1177,33 +1270,41 @@ function BandScale({
                 seg.upTo === null ? ` — above ${from}` : ` — up to ${seg.upTo}`
               } ${m.unit}`}
               style={{ width: `${seg.width}%` }}
-              className={BAND_FILL[def?.tone ?? "neutral"]}
+              // Only the band the reading is in is at full strength. Painting
+              // all four was a rainbow that drew the eye harder than the
+              // number did, and said nothing the left edge had not already.
+              className={cn(
+                BAND_FILL[def?.tone ?? "neutral"],
+                !here && "opacity-20",
+              )}
             />
           );
         })}
         <span
           aria-hidden
           style={{ left: `${gaugeFraction(type, value) * 100}%` }}
-          className="border-foreground bg-card absolute top-[-1px] h-[calc(100%+2px)] w-[3px] -translate-x-1/2 rounded-full border"
+          className="bg-foreground absolute top-[-2px] h-[calc(100%+4px)] w-[2px] -translate-x-1/2 rounded-full"
         />
       </div>
-      <div className="text-muted-foreground relative h-2.5 font-mono text-[9px]">
-        <span className="absolute left-0">{m.min}</span>
-        {segments.slice(0, -1).map((seg, i) => (
-          <span
-            key={seg.statusId}
-            style={{
-              left: `${segments.slice(0, i + 1).reduce((a, x) => a + x.width, 0)}%`,
-            }}
-            className="absolute -translate-x-1/2"
-          >
-            {seg.upTo}
+      {showNumbers && (
+        <div className="text-muted-foreground relative h-2.5 font-mono text-[9px]">
+          <span className="absolute left-0">{m.min}</span>
+          {segments.slice(0, -1).map((seg, i) => (
+            <span
+              key={seg.statusId}
+              style={{
+                left: `${segments.slice(0, i + 1).reduce((a, x) => a + x.width, 0)}%`,
+              }}
+              className="absolute -translate-x-1/2"
+            >
+              {seg.upTo}
+            </span>
+          ))}
+          <span className="absolute right-0">
+            {m.max} {m.unit}
           </span>
-        ))}
-        <span className="absolute right-0">
-          {m.max} {m.unit}
-        </span>
-      </div>
+        </div>
+      )}
     </div>
   );
 }
