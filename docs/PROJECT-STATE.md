@@ -1639,9 +1639,14 @@ or at least the reading, and that band's `statusId` is what the sensor shows.
 Everything downstream — tone, `isAlarm`, the banner, the Log Book — reads the
 status, exactly as it does for a door lock that has no number at all.
 
-They are visible on the Sensors page: each reading card draws its type's bands
-to scale, coloured by tone, with the reading marked and the boundaries
-numbered. They are editable in the sensor type drawer, a sentence per row
+They are visible on the Sensors page, where the card is built around what a
+reader asks rather than what the record holds: the room (not the device id),
+a coloured left edge and a status word, the number, a trend from `trendOf`,
+and one line from `nextThreshold` — "Poor ventilation above 1400 ppm" — which
+is what replaces asking someone to read a scale. Only the band the reading
+sits in is drawn at full strength. The device id, the numbered scale, the
+sparkline and the dial that forces a value are behind the card's chevron:
+operator tooling, not everyday reading. They are editable in the sensor type drawer, a sentence per row
 ("Up to 18 °C → Cold"), guarded by `bandsRefusal` — ascending limits, a real
 status per band, and a catch-all at the end, without which some readings would
 land in no band and the sensor would silently stop updating.
