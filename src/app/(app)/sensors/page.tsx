@@ -472,7 +472,7 @@ function SensorsView() {
                                 className="border-divider border-r last:border-r-0 max-lg:border-r-0 max-lg:border-b"
                               >
                                 <div className="border-divider text-muted-foreground flex items-center gap-2 border-b px-4 py-2.25">
-                                  <Icon className="size-3.25" />
+                                  <Icon className="size-3.75" />
                                   <span className="flex-1 font-mono text-[10px] tracking-[0.06em] uppercase">
                                     {type.label}
                                   </span>
@@ -1138,7 +1138,7 @@ function ThresholdsTab() {
         return (
           <Card key={type.id} className="gap-3 p-3.5">
             <div className="flex items-center gap-2">
-              <Icon className="text-muted-foreground size-3.5 shrink-0" />
+              <Icon className="text-muted-foreground size-4.5 shrink-0" />
               <span className="flex-1 text-[12.5px] font-semibold">
                 {type.label}
               </span>
@@ -1208,7 +1208,7 @@ function BandTable({
       )}
     >
       <div className="bg-surface-subtle border-divider text-muted-foreground flex items-center gap-1.5 border-b px-2.5 py-1.5 font-mono text-[10px] tracking-[0.06em] uppercase">
-        <Icon aria-hidden className="size-3 shrink-0" />
+        <Icon aria-hidden className="size-3.5 shrink-0" />
         <span className="flex-1">{caption}</span>
         {exception && (
           <span className="text-warning-foreground">Exception</span>
@@ -1232,7 +1232,7 @@ function BandTable({
                 <ToneBadge tone={def?.tone ?? "neutral"}>
                   {React.createElement(toneIcon(def?.tone ?? "neutral"), {
                     "aria-hidden": true,
-                    className: "size-2.5 shrink-0",
+                    className: "size-3 shrink-0",
                   })}
                   {def?.label ?? band.statusId}
                 </ToneBadge>
@@ -1265,6 +1265,7 @@ function AttentionRow({
 }) {
   const worst = climate.worst;
   if (!worst) return null;
+  const WorstIcon = toneIcon(worst.tone);
   return (
     <li
       className={cn(
@@ -1284,7 +1285,10 @@ function AttentionRow({
         <span className="text-muted-foreground text-[10px]">{worst.unit}</span>
       </div>
       <div className="text-muted-foreground flex items-center gap-1.5 text-[10.5px]">
-        <ToneBadge tone={worst.tone}>{worst.statusLabel}</ToneBadge>
+        <ToneBadge tone={worst.tone}>
+          <WorstIcon aria-hidden className="size-3 shrink-0" />
+          {worst.statusLabel}
+        </ToneBadge>
         {worst.since && <span>for {formatAge(worst.since)}</span>}
       </div>
       <div className="flex gap-1.5">
@@ -1545,7 +1549,7 @@ function Kpi({
   return (
     <Card className="gap-1 p-3.5">
       <span className="text-muted-foreground flex items-center gap-1.5 font-mono text-[10px] tracking-[0.06em] uppercase">
-        <Icon aria-hidden className={cn("size-3 shrink-0", KPI_TONE[tone])} />
+        <Icon aria-hidden className={cn("size-4 shrink-0", KPI_TONE[tone])} />
         {label}
       </span>
       <span
@@ -1662,7 +1666,7 @@ function ReadingCard({
       )}
     >
       <div className="flex items-center gap-1.5">
-        <Icon className="text-muted-foreground size-3.25 shrink-0" />
+        <Icon className="text-muted-foreground size-4 shrink-0" />
         <span className="min-w-0 flex-1 truncate text-[12px] font-[450]">
           {roomLabel(sensor.roomId)}
         </span>

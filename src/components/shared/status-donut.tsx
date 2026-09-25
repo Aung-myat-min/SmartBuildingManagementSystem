@@ -85,7 +85,7 @@ export function StatusDonut({
                 and the two sit 6.2 ΔE apart under protanopia. */}
               <Icon
                 aria-hidden
-                className={cn("size-3 shrink-0", TONE_INK[s.tone])}
+                className={cn("size-3.5 shrink-0", TONE_INK[s.tone])}
               />
               <span className="min-w-0 flex-1 truncate">{s.label}</span>
               <span className="font-mono font-medium tabular-nums">

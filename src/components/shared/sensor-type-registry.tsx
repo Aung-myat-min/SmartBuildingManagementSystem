@@ -22,10 +22,16 @@ import {
 import { RowButton, SelectInput, TextInput } from "@/components/shared/inputs";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { type RegistryResult, slugify, useAppState } from "@/lib/app-state";
-import { SENSOR_ICON_KEYS, sensorIcon } from "@/lib/icons";
+import {
+  ROOM_TYPE_ICONS,
+  ROOM_TYPE_LABELS,
+  SENSOR_ICON_KEYS,
+  sensorIcon,
+} from "@/lib/icons";
 import { roleLabel } from "@/lib/permissions";
 import { bandsRefusal } from "@/lib/sensor-readings";
 import type {
+  RoomType,
   SensorAction,
   SensorBand,
   SensorIconKey,
@@ -244,14 +250,30 @@ type ActionDraft = SensorAction & { isNew?: boolean };
  * field you cannot clear to retype is the classic numeric-input bug, and
  * `Number("")` is 0, which would silently set a threshold to zero.
  */
+type BandDraft = { upTo: string; statusId: string };
+
 type MeasurementDraft = {
   unit: string;
   min: string;
   max: string;
   decimals: string;
   /** The last band's `upTo` is ignored; it is always the catch-all. */
-  bands: { upTo: string; statusId: string }[];
+  bands: BandDraft[];
+  /**
+   * Rooms that need different numbers from the rest of the estate.
+   *
+   * An array rather than the stored `Partial<Record<RoomType, …>>`, because a
+   * list is what the editor shows and a list is what it reorders and removes
+   * from; it converts back on save.
+   */
+  overrides: { roomType: RoomType; bands: BandDraft[] }[];
 };
+
+const toBandDrafts = (bands: SensorBand[]): BandDraft[] =>
+  bands.map((b) => ({
+    upTo: b.upTo === null ? "" : String(b.upTo),
+    statusId: b.statusId,
+  }));
 
 function toDraft(m: SensorMeasurement | undefined): MeasurementDraft | null {
   if (!m) return null;
@@ -260,10 +282,10 @@ function toDraft(m: SensorMeasurement | undefined): MeasurementDraft | null {
     min: String(m.min),
     max: String(m.max),
     decimals: String(m.decimals),
-    bands: m.bands.map((b) => ({
-      upTo: b.upTo === null ? "" : String(b.upTo),
-      statusId: b.statusId,
-    })),
+    bands: toBandDrafts(m.bands),
+    overrides: (Object.entries(m.overrides ?? {}) as [RoomType, SensorBand[]][])
+      .filter(([, bands]) => bands.length > 0)
+      .map(([roomType, bands]) => ({ roomType, bands: toBandDrafts(bands) })),
   };
 }
 
@@ -280,6 +302,7 @@ function blankMeasurement(statuses: StatusDraft[]): MeasurementDraft {
       { upTo: "25", statusId: first },
       { upTo: "", statusId: last },
     ],
+    overrides: [],
   };
 }
 
@@ -406,20 +429,35 @@ function SensorTypeDrawer({
         // at all, and the sensor silently stops updating.
         let reading: SensorMeasurement | undefined;
         if (measurement) {
-          const bands = measurement.bands.map((b, i) => ({
-            upTo:
-              i === measurement.bands.length - 1
-                ? null
-                : Number(b.upTo === "" ? Number.NaN : b.upTo),
-            statusId: remap.get(b.statusId) ?? b.statusId,
-          })) satisfies SensorBand[];
-          const refusal = bandsRefusal(
-            bands,
-            cleaned.map((st) => st.id),
-          );
+          const statusIds = cleaned.map((st) => st.id);
+          const toBands = (drafts: typeof measurement.bands): SensorBand[] =>
+            drafts.map((b, i) => ({
+              upTo:
+                i === drafts.length - 1
+                  ? null
+                  : Number(b.upTo === "" ? Number.NaN : b.upTo),
+              statusId: remap.get(b.statusId) ?? b.statusId,
+            }));
+
+          const bands = toBands(measurement.bands);
+          const refusal = bandsRefusal(bands, statusIds);
           if (refusal) {
             setError(refusal);
             return;
+          }
+
+          // An exception is judged exactly as the default is. A set of bands
+          // that does not end in a catch-all leaves some readings in that kind
+          // of room with no status at all, and only those rooms would break.
+          const overrides: Partial<Record<RoomType, SensorBand[]>> = {};
+          for (const o of measurement.overrides) {
+            const theirs = toBands(o.bands);
+            const bad = bandsRefusal(theirs, statusIds);
+            if (bad) {
+              setError(`${ROOM_TYPE_LABELS[o.roomType]}: ${bad}`);
+              return;
+            }
+            overrides[o.roomType] = theirs;
           }
           const min = Number(measurement.min);
           const max = Number(measurement.max);
@@ -439,6 +477,7 @@ function SensorTypeDrawer({
             max,
             decimals: Number(measurement.decimals) || 0,
             bands,
+            ...(Object.keys(overrides).length > 0 ? { overrides } : {}),
           };
         }
         const outcome = await onSubmit({
@@ -769,17 +808,6 @@ function ThresholdsSection({
     onChange({ ...value, ...over });
   };
 
-  const patchBand = (
-    i: number,
-    over: Partial<MeasurementDraft["bands"][0]>,
-  ) => {
-    if (!value) return;
-    onChange({
-      ...value,
-      bands: value.bands.map((b, j) => (j === i ? { ...b, ...over } : b)),
-    });
-  };
-
   return (
     <div className="border-divider flex flex-col gap-1.75 border-t pt-2.5">
       <div className="flex items-center gap-2">
@@ -830,85 +858,222 @@ function ThresholdsSection({
             </ThresholdField>
           </div>
 
-          <div className="mt-1.5 flex flex-col gap-1.25">
-            {value.bands.map((band, i) => {
-              const last = i === value.bands.length - 1;
-              return (
-                <div
-                  key={`band-${i + 1}`}
-                  className="border-divider bg-surface-subtle flex items-center gap-1.5 rounded border px-2 py-1.5"
-                >
-                  {last ? (
-                    <span className="text-muted-foreground w-24.5 shrink-0 text-[10.5px]">
-                      Anything higher
-                    </span>
-                  ) : (
-                    <>
-                      <span className="text-muted-foreground shrink-0 text-[10.5px]">
-                        Up to
-                      </span>
-                      <input
-                        inputMode="decimal"
-                        value={band.upTo}
-                        onChange={(e) => patchBand(i, { upTo: e.target.value })}
-                        aria-label={`Band ${i + 1} upper limit`}
-                        className="interactive focus-ring border-input bg-card w-14 shrink-0 rounded border px-1.5 py-1 text-center font-mono text-[11px] outline-none"
-                      />
-                      <span className="text-muted-foreground w-7 shrink-0 font-mono text-[10px]">
-                        {value.unit}
-                      </span>
-                    </>
-                  )}
-                  <span className="text-muted-foreground shrink-0 text-[11px]">
-                    →
-                  </span>
-                  <SelectInput
-                    value={band.statusId}
-                    onChange={(e) => patchBand(i, { statusId: e.target.value })}
-                    aria-label={`Band ${i + 1} status`}
-                    className="min-w-0 flex-1"
-                  >
-                    {statuses.map((st) => (
-                      <option key={st.id} value={st.id}>
-                        {st.label.trim() || st.id}
-                      </option>
-                    ))}
-                  </SelectInput>
-                  <RowButton
-                    danger
-                    // The catch-all is what makes every reading land
-                    // somewhere, so it is the one row that cannot go.
-                    disabled={last || value.bands.length <= 2}
-                    onClick={() =>
-                      patch({
-                        bands: value.bands.filter((_, j) => j !== i),
-                      })
-                    }
-                  >
-                    <Trash2 className="size-2.75" />
-                  </RowButton>
-                </div>
-              );
-            })}
-            <button
-              type="button"
-              onClick={() =>
-                patch({
-                  bands: [
-                    ...value.bands.slice(0, -1),
-                    { upTo: "", statusId: statuses[0]?.id ?? "" },
-                    ...value.bands.slice(-1),
-                  ],
-                })
-              }
-              className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary flex w-fit cursor-pointer items-center gap-1 rounded border px-2 py-1.25 text-[10.5px] leading-none font-medium"
-            >
-              <Plus className="size-2.75" />
-              Add a band
-            </button>
-          </div>
+          <BandRows
+            bands={value.bands}
+            unit={value.unit}
+            statuses={statuses}
+            onChange={(bands) => patch({ bands })}
+          />
+
+          <ExceptionsEditor
+            value={value}
+            statuses={statuses}
+            onChange={onChange}
+          />
         </>
       )}
+    </div>
+  );
+}
+
+/**
+ * One set of limits, as a sentence per row.
+ *
+ * Extracted so an exception edits exactly the way the estate default does —
+ * two editors for the same shape would eventually disagree about what a valid
+ * band is, and the validation only lives in one of them.
+ */
+function BandRows({
+  bands,
+  unit,
+  statuses,
+  onChange,
+}: {
+  bands: BandDraft[];
+  unit: string;
+  statuses: StatusDraft[];
+  onChange: (next: BandDraft[]) => void;
+}) {
+  const patchBand = (i: number, over: Partial<BandDraft>) =>
+    onChange(bands.map((b, j) => (j === i ? { ...b, ...over } : b)));
+
+  return (
+    <div className="mt-1.5 flex flex-col gap-1.25">
+      {bands.map((band, i) => {
+        const last = i === bands.length - 1;
+        return (
+          <div
+            key={`band-${i + 1}`}
+            className="border-divider bg-surface-subtle flex items-center gap-1.5 rounded border px-2 py-1.5"
+          >
+            {last ? (
+              <span className="text-muted-foreground w-24.5 shrink-0 text-[10.5px]">
+                Anything higher
+              </span>
+            ) : (
+              <>
+                <span className="text-muted-foreground shrink-0 text-[10.5px]">
+                  Up to
+                </span>
+                <input
+                  inputMode="decimal"
+                  value={band.upTo}
+                  onChange={(e) => patchBand(i, { upTo: e.target.value })}
+                  aria-label={`Band ${i + 1} upper limit`}
+                  className="interactive focus-ring border-input bg-card w-14 shrink-0 rounded border px-1.5 py-1 text-center font-mono text-[11px] outline-none"
+                />
+                <span className="text-muted-foreground w-7 shrink-0 font-mono text-[10px]">
+                  {unit}
+                </span>
+              </>
+            )}
+            <span className="text-muted-foreground shrink-0 text-[11px]">
+              →
+            </span>
+            <SelectInput
+              value={band.statusId}
+              onChange={(e) => patchBand(i, { statusId: e.target.value })}
+              aria-label={`Band ${i + 1} status`}
+              className="min-w-0 flex-1"
+            >
+              {statuses.map((st) => (
+                <option key={st.id} value={st.id}>
+                  {st.label.trim() || st.id}
+                </option>
+              ))}
+            </SelectInput>
+            <RowButton
+              danger
+              // The catch-all is what makes every reading land somewhere, so
+              // it is the one row that cannot go.
+              disabled={last || bands.length <= 2}
+              onClick={() => onChange(bands.filter((_, j) => j !== i))}
+            >
+              <Trash2 className="size-3" />
+            </RowButton>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() =>
+          onChange([
+            ...bands.slice(0, -1),
+            { upTo: "", statusId: statuses[0]?.id ?? "" },
+            ...bands.slice(-1),
+          ])
+        }
+        className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary flex w-fit cursor-pointer items-center gap-1 rounded border px-2 py-1.25 text-[10.5px] leading-none font-medium"
+      >
+        <Plus className="size-3" />
+        Add a band
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Rooms that need different numbers from the rest of the estate.
+ *
+ * Sparse by design: a room type appears only once somebody says it differs,
+ * which is why this is a short list with an add button rather than five rows
+ * that are identical until edited. A new exception starts as a copy of the
+ * estate default, because that is what it is until it is changed.
+ */
+function ExceptionsEditor({
+  value,
+  statuses,
+  onChange,
+}: {
+  value: MeasurementDraft;
+  statuses: StatusDraft[];
+  onChange: (next: MeasurementDraft) => void;
+}) {
+  const taken = new Set(value.overrides.map((o) => o.roomType));
+  const available = (Object.keys(ROOM_TYPE_LABELS) as RoomType[]).filter(
+    (rt) => !taken.has(rt),
+  );
+
+  return (
+    <div className="border-divider mt-2 flex flex-col gap-1.75 border-t pt-2.5">
+      <div className="flex items-center gap-2">
+        <span className="text-muted-foreground flex-1 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">
+          Room exceptions
+        </span>
+        {available.length > 0 && (
+          <SelectInput
+            value=""
+            aria-label="Add a room exception"
+            onChange={(e) => {
+              const rt = e.target.value as RoomType;
+              if (!rt) return;
+              onChange({
+                ...value,
+                overrides: [
+                  ...value.overrides,
+                  // A copy of the default: an exception that starts empty
+                  // would be a set of limits nobody chose.
+                  { roomType: rt, bands: value.bands.map((b) => ({ ...b })) },
+                ],
+              });
+            }}
+            className="w-44 shrink-0"
+          >
+            <option value="">Add an exception…</option>
+            {available.map((rt) => (
+              <option key={rt} value={rt}>
+                {ROOM_TYPE_LABELS[rt]}
+              </option>
+            ))}
+          </SelectInput>
+        )}
+      </div>
+      <p className="text-muted-foreground text-[10.5px] leading-relaxed">
+        One set of limits cannot serve a lecture hall and a server rack. Every
+        room uses the bands above unless its kind is listed here.
+      </p>
+
+      {value.overrides.map((o, i) => {
+        const Icon = ROOM_TYPE_ICONS[o.roomType];
+        return (
+          <div
+            key={o.roomType}
+            className="border-divider border-l-warning rounded border border-l-[3px] px-2 py-2"
+          >
+            <div className="flex items-center gap-1.5">
+              <Icon className="text-muted-foreground size-3.5 shrink-0" />
+              <span className="flex-1 text-[11.5px] font-medium">
+                {ROOM_TYPE_LABELS[o.roomType]}
+              </span>
+              <RowButton
+                danger
+                onClick={() =>
+                  onChange({
+                    ...value,
+                    overrides: value.overrides.filter((_, j) => j !== i),
+                  })
+                }
+              >
+                <Trash2 className="size-3" />
+                Remove
+              </RowButton>
+            </div>
+            <BandRows
+              bands={o.bands}
+              unit={value.unit}
+              statuses={statuses}
+              onChange={(bands) =>
+                onChange({
+                  ...value,
+                  overrides: value.overrides.map((x, j) =>
+                    j === i ? { ...x, bands } : x,
+                  ),
+                })
+              }
+            />
+          </div>
+        );
+      })}
     </div>
   );
 }
