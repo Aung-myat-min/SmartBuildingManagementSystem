@@ -15,6 +15,7 @@ import {
   Undo2,
 } from "lucide-react";
 import { m } from "motion/react";
+import { useRouter, useSearchParams } from "next/navigation";
 import * as React from "react";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/shared/confirm-dialog";
@@ -36,6 +37,7 @@ import {
   buildingName,
   equipmentUnitLabel,
   equipmentUnits,
+  rooms as estateRooms,
   REQUEST_NEXT_ACTION,
   REQUEST_NEXT_STATUS,
   REQUEST_PREV_ACTION,
@@ -119,6 +121,15 @@ function equipmentLabel(equipmentId: string) {
 }
 
 export default function RequestsPage() {
+  // useSearchParams needs its own boundary or the route will not prerender.
+  return (
+    <React.Suspense fallback={null}>
+      <RequestsView />
+    </React.Suspense>
+  );
+}
+
+function RequestsView() {
   const {
     buildings,
     role,
@@ -152,6 +163,18 @@ export default function RequestsPage() {
     false,
   );
   const [newOpen, setNewOpen] = React.useState(false);
+
+  // Opened from somewhere else in the app — a hot room on the Sensors page
+  // says "raise a request" and means *this* room, so it arrives seeded rather
+  // than dropping you on an empty form to find it again.
+  const params = useSearchParams();
+  const router = useRouter();
+  const fromElsewhere = params.get("new") === "1";
+  const seedRoomId = params.get("room") ?? undefined;
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run when the link changes
+  React.useEffect(() => {
+    if (fromElsewhere) setNewOpen(true);
+  }, [fromElsewhere, seedRoomId]);
 
   const effectiveBuilding = locked ? activeBuildingId : buildingFilter;
 
@@ -597,8 +620,14 @@ export default function RequestsPage() {
 
       <NewRequestDrawer
         open={newOpen}
-        onOpenChange={setNewOpen}
+        onOpenChange={(next) => {
+          setNewOpen(next);
+          // Drop the query once it has been consumed, or closing and
+          // reopening the page would reopen the drawer.
+          if (!next && fromElsewhere) router.replace("/requests");
+        }}
         defaultBuildingId={locked ? activeBuildingId : buildings[0].id}
+        defaultRoomId={seedRoomId}
         existingIds={requestIds}
         onCreate={addRequest}
         submittedBy={currentUser}
@@ -800,6 +829,7 @@ function NewRequestDrawer({
   open,
   onOpenChange,
   defaultBuildingId,
+  defaultRoomId,
   submittedBy,
   existingIds,
   onCreate,
@@ -807,6 +837,8 @@ function NewRequestDrawer({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultBuildingId: string;
+  /** Seeded when the drawer was opened from a room that already has a problem. */
+  defaultRoomId?: string;
   /** Every id already in use, so a new one cannot collide with one of them. */
   existingIds: string[];
   submittedBy: { uid: string; name: string };
@@ -822,13 +854,19 @@ function NewRequestDrawer({
 
   React.useEffect(() => {
     if (!open) return;
-    setBuildingId(defaultBuildingId);
-    setRoomId(roomsForBuilding(defaultBuildingId)[0]?.id ?? "");
+    // A seeded room decides the building too — they have to agree, and the
+    // room is the more specific of the two.
+    const seededIn = defaultRoomId
+      ? estateRooms().find((r) => r.id === defaultRoomId)?.buildingId
+      : undefined;
+    const startIn = seededIn ?? defaultBuildingId;
+    setBuildingId(startIn);
+    setRoomId(defaultRoomId ?? roomsForBuilding(startIn)[0]?.id ?? "");
     setEquipmentId("");
     setIssue("");
     setPriority("normal");
     setError(null);
-  }, [open, defaultBuildingId]);
+  }, [open, defaultBuildingId, defaultRoomId]);
 
   const rooms = roomsForBuilding(buildingId);
   const units = equipmentUnits().filter((u) => u.roomId === roomId);
