@@ -66,10 +66,14 @@ export function PageToolbar({
 }) {
   const [sheetOpen, setSheetOpen] = React.useState(false);
 
-  // A page with no search box has room for its tabs in the bar itself, and a
-  // bar holding two buttons at one end with the rest empty looks broken. Only
-  // where search already claims the row do the views drop to a rail below it.
-  const viewsOnRail = Boolean(views && search);
+  // The views drop to their own rail whenever the bar has anything else to
+  // hold. Keeping Sensors' two tabs beside its three buttons fitted a 500px
+  // screen and overflowed a 360px one, which is the width that matters.
+  //
+  // The exception is a bar that would otherwise be empty — Administration has
+  // tabs and a count and nothing else, and an empty 34px card above a rail is
+  // worse than a bar with two tabs in it.
+  const viewsOnRail = Boolean(views && (search || filters || actions));
 
   return (
     <>
