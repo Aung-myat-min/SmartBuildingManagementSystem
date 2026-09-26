@@ -421,95 +421,102 @@ function RequestsView() {
       </StickyToolbar>
 
       {view === "board" ? (
-        <div
-          className="grid items-start gap-3"
-          style={{
-            // Completed collapses sideways to a rail rather than disappearing,
-            // so the board keeps its width for active work.
-            gridTemplateColumns: doneCollapsed
-              ? "repeat(4, minmax(0,1fr)) 46px"
-              : "repeat(5, minmax(0,1fr))",
-          }}
-        >
-          {COLUMNS.map((col) => {
-            const cards = filtered.filter((r) => r.status === col.status);
-            const collapsible = col.status === "completed";
+        // `minmax(0,…)` let five columns shrink until each held one word per
+        // line. A kanban column has a width below which it stops being one, so
+        // the columns keep it and the board scrolls sideways instead — which
+        // is what every board does on a narrow screen. `scroll-x-edges` fades
+        // the edge so it is visible there is more board to the right.
+        <div className="scroll-x-edges -mx-1 overflow-x-auto px-1 pb-1">
+          <div
+            className="grid items-start gap-3"
+            style={{
+              // Completed collapses sideways to a rail rather than disappearing,
+              // so the board keeps its width for active work.
+              gridTemplateColumns: doneCollapsed
+                ? `repeat(4, minmax(${BOARD_COL_MIN}, 1fr)) 46px`
+                : `repeat(5, minmax(${BOARD_COL_MIN}, 1fr))`,
+            }}
+          >
+            {COLUMNS.map((col) => {
+              const cards = filtered.filter((r) => r.status === col.status);
+              const collapsible = col.status === "completed";
 
-            if (collapsible && doneCollapsed) {
+              if (collapsible && doneCollapsed) {
+                return (
+                  <button
+                    type="button"
+                    key={col.status}
+                    title="Expand completed requests"
+                    onClick={() => setDoneCollapsed(false)}
+                    className={cn(
+                      "interactive focus-ring pressable bg-neutral-muted hover:bg-neutral-muted/70 border-border flex min-h-85 cursor-pointer flex-col items-center gap-2.75 rounded-[5px] border border-t-2 px-0 pt-2.75 pb-3.5",
+                      TONE_BORDER[col.tone],
+                    )}
+                  >
+                    <span className="border-input text-neutral-foreground bg-card flex size-5.5 items-center justify-center rounded-[3px] border font-mono text-[13px] leading-none font-medium">
+                      ‹
+                    </span>
+                    <span className="text-neutral-foreground border-border bg-card rounded-[3px] border px-1.5 py-1 font-mono text-[10.5px] leading-none font-semibold">
+                      {cards.length}
+                    </span>
+                    <span
+                      className={cn(
+                        "size-1.75 shrink-0 rounded-full",
+                        TONE_DOT[col.tone],
+                      )}
+                    />
+                    <span className="text-neutral-foreground text-[11.5px] font-semibold tracking-[0.03em] [writing-mode:vertical-rl]">
+                      {col.label}
+                    </span>
+                  </button>
+                );
+              }
+
               return (
-                <button
-                  type="button"
+                <div
                   key={col.status}
-                  title="Expand completed requests"
-                  onClick={() => setDoneCollapsed(false)}
                   className={cn(
-                    "interactive focus-ring pressable bg-neutral-muted hover:bg-neutral-muted/70 border-border flex min-h-85 cursor-pointer flex-col items-center gap-2.75 rounded-[5px] border border-t-2 px-0 pt-2.75 pb-3.5",
+                    "border-border bg-card overflow-hidden rounded-[5px] border border-t-2",
                     TONE_BORDER[col.tone],
                   )}
                 >
-                  <span className="border-input text-neutral-foreground bg-card flex size-5.5 items-center justify-center rounded-[3px] border font-mono text-[13px] leading-none font-medium">
-                    ‹
-                  </span>
-                  <span className="text-neutral-foreground border-border bg-card rounded-[3px] border px-1.5 py-1 font-mono text-[10.5px] leading-none font-semibold">
-                    {cards.length}
-                  </span>
-                  <span
-                    className={cn(
-                      "size-1.75 shrink-0 rounded-full",
-                      TONE_DOT[col.tone],
+                  <div className="border-divider flex items-center gap-2 border-b px-3 py-2.5">
+                    <span
+                      className={cn(
+                        "size-1.75 shrink-0 rounded-full",
+                        TONE_DOT[col.tone],
+                      )}
+                    />
+                    <span className="flex-1 text-[11px] leading-none font-semibold">
+                      {col.label}
+                    </span>
+                    <ToneBadge tone={col.tone}>{cards.length}</ToneBadge>
+                    {collapsible && (
+                      <button
+                        type="button"
+                        title="Collapse completed requests"
+                        onClick={() => setDoneCollapsed(true)}
+                        className="interactive focus-ring text-muted-foreground hover:text-foreground cursor-pointer px-0.5 font-mono text-[13px] leading-none"
+                      >
+                        ›
+                      </button>
                     )}
-                  />
-                  <span className="text-neutral-foreground text-[11.5px] font-semibold tracking-[0.03em] [writing-mode:vertical-rl]">
-                    {col.label}
-                  </span>
-                </button>
+                  </div>
+
+                  <div className="flex min-h-30 flex-col gap-2 p-2.5">
+                    {cards.map((r) => (
+                      <RequestCard key={r.id} request={r} actions={actions} />
+                    ))}
+                    {cards.length === 0 && (
+                      <div className="text-muted-foreground px-0.5 py-2 text-[11px]">
+                        Nothing in this column
+                      </div>
+                    )}
+                  </div>
+                </div>
               );
-            }
-
-            return (
-              <div
-                key={col.status}
-                className={cn(
-                  "border-border bg-card overflow-hidden rounded-[5px] border border-t-2",
-                  TONE_BORDER[col.tone],
-                )}
-              >
-                <div className="border-divider flex items-center gap-2 border-b px-3 py-2.5">
-                  <span
-                    className={cn(
-                      "size-1.75 shrink-0 rounded-full",
-                      TONE_DOT[col.tone],
-                    )}
-                  />
-                  <span className="flex-1 text-[11px] leading-none font-semibold">
-                    {col.label}
-                  </span>
-                  <ToneBadge tone={col.tone}>{cards.length}</ToneBadge>
-                  {collapsible && (
-                    <button
-                      type="button"
-                      title="Collapse completed requests"
-                      onClick={() => setDoneCollapsed(true)}
-                      className="interactive focus-ring text-muted-foreground hover:text-foreground cursor-pointer px-0.5 font-mono text-[13px] leading-none"
-                    >
-                      ›
-                    </button>
-                  )}
-                </div>
-
-                <div className="flex min-h-30 flex-col gap-2 p-2.5">
-                  {cards.map((r) => (
-                    <RequestCard key={r.id} request={r} actions={actions} />
-                  ))}
-                  {cards.length === 0 && (
-                    <div className="text-muted-foreground px-0.5 py-2 text-[11px]">
-                      Nothing in this column
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+            })}
+          </div>
         </div>
       ) : (
         <div className="border-border scroll-x-edges overflow-x-auto rounded-[5px] border">
@@ -715,6 +722,15 @@ function MoveButtons({
     </>
   );
 }
+
+/**
+ * The narrowest a board column may be before it stops being one.
+ *
+ * At `minmax(0,…)` five columns on a tablet shrank to about sixty pixels each
+ * and every card wrapped to one word per line. Below roughly this the card
+ * cannot hold an id, an issue and two buttons, so the board scrolls instead.
+ */
+const BOARD_COL_MIN = "232px";
 
 /** How a request card travels when it advances a step. */
 const CARD_MOVE = { duration: 0.24, ease: [0.22, 1, 0.36, 1] } as const;

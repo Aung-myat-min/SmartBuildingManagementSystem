@@ -110,6 +110,9 @@ function typeLabel(typeId: string) {
   return equipmentTypes().find((t) => t.id === typeId)?.label ?? typeId;
 }
 
+/** The narrowest a board column may be before it stops being one. */
+const BOARD_COL_MIN = "208px";
+
 /**
  * How a card travels between columns. Short, and eased rather than sprung —
  * this is a register, not a toy.
@@ -428,133 +431,137 @@ export default function EquipmentPage() {
           )}
         </div>
       ) : (
-        <div
-          className="grid items-start gap-3"
-          style={{
-            gridTemplateColumns: `repeat(${boardColumns.length}, minmax(0,1fr))`,
-          }}
-        >
-          {boardColumns.map((col) => {
-            const items = units.filter((u) => boardColumnFor(u) === col);
-            const meta = COLUMN_META[col];
-            return (
-              // A labelled section rather than a bare div: dragging is a
-              // pointer-only accelerator, and every condition it can set is
-              // also a button in the unit's detail drawer.
-              <section
-                key={col}
-                aria-label={`${meta.label} — ${items.length} units`}
-                onDragOver={(e) => {
-                  if (!dragId) return;
-                  e.preventDefault();
-                  setOverCol(col);
-                }}
-                onDragLeave={() => setOverCol((c) => (c === col ? null : c))}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (dragId) void dropOn(col, dragId);
-                }}
-                className={cn(
-                  "border-border bg-card overflow-hidden rounded-[5px] border transition-colors",
-                  overCol === col &&
-                    (col === "due-service"
-                      ? "border-danger/50 bg-danger-muted/30"
-                      : "border-primary bg-surface-hover"),
-                )}
-              >
-                <div
+        // Same fix as the requests board: a column has a width below which it
+        // stops being a column, so it keeps it and the board scrolls.
+        <div className="scroll-x-edges -mx-1 overflow-x-auto px-1 pb-1">
+          <div
+            className="grid items-start gap-3"
+            style={{
+              gridTemplateColumns: `repeat(${boardColumns.length}, minmax(${BOARD_COL_MIN}, 1fr))`,
+            }}
+          >
+            {boardColumns.map((col) => {
+              const items = units.filter((u) => boardColumnFor(u) === col);
+              const meta = COLUMN_META[col];
+              return (
+                // A labelled section rather than a bare div: dragging is a
+                // pointer-only accelerator, and every condition it can set is
+                // also a button in the unit's detail drawer.
+                <section
+                  key={col}
+                  aria-label={`${meta.label} — ${items.length} units`}
+                  onDragOver={(e) => {
+                    if (!dragId) return;
+                    e.preventDefault();
+                    setOverCol(col);
+                  }}
+                  onDragLeave={() => setOverCol((c) => (c === col ? null : c))}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (dragId) void dropOn(col, dragId);
+                  }}
                   className={cn(
-                    "border-divider flex items-center gap-2 border-t-[3px] border-b px-3 py-2.5",
-                    meta.accent,
+                    "border-border bg-card overflow-hidden rounded-[5px] border transition-colors",
+                    overCol === col &&
+                      (col === "due-service"
+                        ? "border-danger/50 bg-danger-muted/30"
+                        : "border-primary bg-surface-hover"),
                   )}
                 >
-                  <span className="flex-1 text-[11px] leading-none font-semibold">
-                    {meta.label}
-                  </span>
-                  <ToneBadge tone={meta.tone}>{items.length}</ToneBadge>
-                </div>
-                <div className="flex min-h-30 flex-col gap-2 p-2.5">
-                  {items.map((u) => {
-                    const days = daysUntilService(u);
-                    return (
-                      // layoutId, so a card dropped into another column
-                      // travels there instead of vanishing here and appearing
-                      // over there. It is the one thing the stylesheet could
-                      // not do, and the reason the library is in the project.
-                      //
-                      // The wrapper carries it rather than the button itself,
-                      // because motion claims `onDragStart` for its own
-                      // gesture system and this card uses the native HTML5
-                      // drag the board was already built on.
-                      <m.div
-                        key={u.id}
-                        layoutId={u.id}
-                        transition={BOARD_MOVE}
-                        className="flex"
-                      >
-                        <button
-                          type="button"
-                          draggable
-                          onDragStart={(e) => {
-                            setDragId(u.id);
-                            e.dataTransfer.effectAllowed = "move";
-                          }}
-                          onDragEnd={() => {
-                            setDragId(null);
-                            setOverCol(null);
-                          }}
-                          onClick={() => setSelectedId(u.id)}
-                          className={cn(
-                            // cursor-grab, not cursor-pointer: the card is
-                            // draggable, and before this it only said so once
-                            // you were already dragging it.
-                            "interactive focus-ring border-divider hover:border-primary hover:shadow-sm bg-card w-full cursor-grab rounded border border-l-[3px] px-2.75 py-2.5 text-left",
-                            "active:cursor-grabbing",
-                            dragId === u.id && "opacity-40 shadow-md",
-                            col === "faulty"
-                              ? "border-l-danger"
-                              : col === "due-service"
-                                ? "border-l-warning"
-                                : "border-l-transparent",
-                          )}
+                  <div
+                    className={cn(
+                      "border-divider flex items-center gap-2 border-t-[3px] border-b px-3 py-2.5",
+                      meta.accent,
+                    )}
+                  >
+                    <span className="flex-1 text-[11px] leading-none font-semibold">
+                      {meta.label}
+                    </span>
+                    <ToneBadge tone={meta.tone}>{items.length}</ToneBadge>
+                  </div>
+                  <div className="flex min-h-30 flex-col gap-2 p-2.5">
+                    {items.map((u) => {
+                      const days = daysUntilService(u);
+                      return (
+                        // layoutId, so a card dropped into another column
+                        // travels there instead of vanishing here and appearing
+                        // over there. It is the one thing the stylesheet could
+                        // not do, and the reason the library is in the project.
+                        //
+                        // The wrapper carries it rather than the button itself,
+                        // because motion claims `onDragStart` for its own
+                        // gesture system and this card uses the native HTML5
+                        // drag the board was already built on.
+                        <m.div
+                          key={u.id}
+                          layoutId={u.id}
+                          transition={BOARD_MOVE}
+                          className="flex"
                         >
-                          <div className="flex items-center gap-1.75">
-                            <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
-                              {u.tag}
-                            </span>
-                            <div className="flex-1" />
-                            <span
-                              className={cn(
-                                "font-mono text-[10px] font-medium",
-                                col === "due-service"
-                                  ? "text-warning-foreground"
-                                  : "text-muted-foreground",
-                              )}
-                            >
-                              {days < 0
-                                ? `${Math.abs(days)}d over`
-                                : `${days}d`}
-                            </span>
-                          </div>
-                          <div className="mt-1.75 text-[12px] leading-snug font-[450]">
-                            {typeLabel(u.typeId)}
-                          </div>
-                          <div className="text-muted-foreground mt-0.75 text-[10.5px] leading-snug">
-                            {roomLabel(u.roomId)}
-                          </div>
-                        </button>
-                      </m.div>
-                    );
-                  })}
-                  {items.length === 0 && (
-                    <div className="text-muted-foreground px-0.5 py-2 text-[11px]">
-                      Nothing here.
-                    </div>
-                  )}
-                </div>
-              </section>
-            );
-          })}
+                          <button
+                            type="button"
+                            draggable
+                            onDragStart={(e) => {
+                              setDragId(u.id);
+                              e.dataTransfer.effectAllowed = "move";
+                            }}
+                            onDragEnd={() => {
+                              setDragId(null);
+                              setOverCol(null);
+                            }}
+                            onClick={() => setSelectedId(u.id)}
+                            className={cn(
+                              // cursor-grab, not cursor-pointer: the card is
+                              // draggable, and before this it only said so once
+                              // you were already dragging it.
+                              "interactive focus-ring border-divider hover:border-primary hover:shadow-sm bg-card w-full cursor-grab rounded border border-l-[3px] px-2.75 py-2.5 text-left",
+                              "active:cursor-grabbing",
+                              dragId === u.id && "opacity-40 shadow-md",
+                              col === "faulty"
+                                ? "border-l-danger"
+                                : col === "due-service"
+                                  ? "border-l-warning"
+                                  : "border-l-transparent",
+                            )}
+                          >
+                            <div className="flex items-center gap-1.75">
+                              <span className="text-accent-foreground font-mono text-[10.5px] font-medium">
+                                {u.tag}
+                              </span>
+                              <div className="flex-1" />
+                              <span
+                                className={cn(
+                                  "font-mono text-[10px] font-medium",
+                                  col === "due-service"
+                                    ? "text-warning-foreground"
+                                    : "text-muted-foreground",
+                                )}
+                              >
+                                {days < 0
+                                  ? `${Math.abs(days)}d over`
+                                  : `${days}d`}
+                              </span>
+                            </div>
+                            <div className="mt-1.75 text-[12px] leading-snug font-[450]">
+                              {typeLabel(u.typeId)}
+                            </div>
+                            <div className="text-muted-foreground mt-0.75 text-[10.5px] leading-snug">
+                              {roomLabel(u.roomId)}
+                            </div>
+                          </button>
+                        </m.div>
+                      );
+                    })}
+                    {items.length === 0 && (
+                      <div className="text-muted-foreground px-0.5 py-2 text-[11px]">
+                        Nothing here.
+                      </div>
+                    )}
+                  </div>
+                </section>
+              );
+            })}
+          </div>
         </div>
       )}
 
