@@ -1,11 +1,16 @@
 "use client";
 
-import { Download, Search } from "lucide-react";
+import { Download } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/shared/empty-state";
 import { PageLoader } from "@/components/shared/loader";
-import { StickyToolbar } from "@/components/shared/sticky-toolbar";
+import {
+  activeCount,
+  PageToolbar,
+  ToolbarSearch,
+  ToolbarSegment,
+} from "@/components/shared/page-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -175,137 +180,157 @@ export default function HistoricalRecordsPage() {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* The whole paragraph is the answer to "why is this not the Log
+          Book". On a phone it was five lines standing between the page and
+          its first record, so there it keeps the sentence that answers the
+          question and drops the rest. */}
       <div className="border-border bg-card rounded-[5px] border px-3 py-2.25">
         <span className="text-muted-foreground text-[11.5px] leading-snug">
           <span className="text-foreground font-[450]">
             The Log Book, filtered.
           </span>{" "}
-          The same record, kept to what someone would look up months later —
-          anything that needed a written reason, every alarm, and anything
-          refused, withdrawn, deleted or archived. Switch to{" "}
-          <span className="font-medium">All activity</span> for the rest.
-          Personnel changes are never here; those are in the Log Book.
+          The same record, kept to what someone would look up months later.
+          <span className="max-md:hidden">
+            {" "}
+            Anything that needed a written reason, every alarm, and anything
+            refused, withdrawn, deleted or archived. Switch to{" "}
+            <span className="font-medium">All activity</span> for the rest.
+            Personnel changes are never here; those are in the Log Book.
+          </span>
         </span>
       </div>
 
-      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
-          <Search className="text-muted-foreground size-3.25 shrink-0" />
-          <input
+      <PageToolbar
+        activeFilters={activeCount(
+          range !== 30,
+          !locked && buildingFilter !== "all",
+          typeFilter !== "all",
+        )}
+        onReset={() => {
+          setRange(30);
+          if (!locked) setBuildingFilter("all");
+          setTypeFilter("all");
+        }}
+        search={
+          <ToolbarSearch
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
             placeholder="Search records, devices or people"
-            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
-        </div>
-        <div className="bg-secondary flex items-center gap-1 rounded-md p-[3px]">
-          {RANGES.map((r) => (
-            <button
-              type="button"
-              key={r.days}
-              onClick={() => setRange(r.days)}
-              className={cn(
-                "interactive focus-ring rounded px-2.5 py-1 font-mono text-[11px] font-medium",
-                range === r.days
-                  ? "bg-primary text-primary-foreground"
-                  : "text-foreground/70",
-              )}
-            >
-              {r.label}
-            </button>
-          ))}
-        </div>
-        <div className="border-input bg-card flex shrink-0 items-center rounded border p-[3px]">
-          {[
-            { on: true, label: "Important" },
-            { on: false, label: "All activity" },
-          ].map((opt) => (
-            <button
-              type="button"
-              key={opt.label}
-              onClick={() => setImportantOnly(opt.on)}
+        }
+        views={
+          <ToolbarSegment
+            value={importantOnly ? "important" : "all"}
+            onChange={(v) => setImportantOnly(v === "important")}
+            options={[
+              {
+                id: "important",
+                label: "Important",
+                title:
+                  "Decisions, refusals, alarms and anything that needed a written reason",
+              },
+              {
+                id: "all",
+                label: "All activity",
+                title: "Every entry the Log Book holds, personnel aside",
+              },
+            ]}
+          />
+        }
+        filters={
+          <>
+            <div className="bg-secondary flex items-center gap-1 rounded-md p-[3px]">
+              {RANGES.map((r) => (
+                <button
+                  type="button"
+                  key={r.days}
+                  onClick={() => setRange(r.days)}
+                  aria-pressed={range === r.days}
+                  className={cn(
+                    "interactive focus-ring flex-1 cursor-pointer rounded px-2.5 py-1 font-mono text-[11px] font-medium",
+                    range === r.days
+                      ? "bg-primary text-primary-foreground"
+                      : "text-foreground/70",
+                  )}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            <select
+              value={effectiveBuilding}
+              aria-label="Building"
+              onChange={(e) => setBuildingFilter(e.target.value)}
+              disabled={locked}
               title={
-                opt.on
-                  ? "Decisions, refusals, alarms and anything that needed a written reason"
-                  : "Every entry the Log Book holds, personnel aside"
+                locked
+                  ? "Office Staff are scoped to their own building."
+                  : undefined
               }
-              className={cn(
-                "interactive focus-ring cursor-pointer rounded-[3px] px-2.5 py-1 text-[11px] font-medium",
-                importantOnly === opt.on
-                  ? "bg-primary text-primary-foreground"
-                  : "text-foreground/70",
-              )}
+              className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <select
-          value={effectiveBuilding}
-          onChange={(e) => setBuildingFilter(e.target.value)}
-          disabled={locked}
-          title={
-            locked
-              ? "Office Staff are scoped to their own building."
-              : undefined
-          }
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="all">All buildings</option>
-          {buildings.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value as typeof typeFilter)}
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="all">All types</option>
-          {TYPE_ORDER.map((t) => (
-            <option key={t} value={t}>
-              {LOG_BOOK_SOURCE_META[t].label}
-            </option>
-          ))}
-        </select>
-        <div className="bg-border h-5.5 w-px" />
-        <ToneBadge tone="info">{filtered.length} in range</ToneBadge>
-        {/*<div className="flex-1" />*/}
-        <button
-          type="button"
-          onClick={() => {
-            // The filtered set, not the whole ledger: what is exported is what
-            // is on screen, or the file disagrees with the count beside it.
-            downloadCsv(stampedFilename("historical-records"), filtered, [
-              { header: "Timestamp", value: (r) => r.timestamp },
-              {
-                header: "Type",
-                value: (r) => LOG_BOOK_SOURCE_META[r.source].label,
-              },
-              {
-                header: "Building",
-                value: (r) =>
-                  r.buildingId ? buildingName(r.buildingId) : "Estate",
-              },
-              { header: "Record", value: (r) => r.title },
-              { header: "Detail", value: (r) => r.detail },
-              { header: "Reason given", value: (r) => r.reason ?? "" },
-              { header: "Reference", value: (r) => r.refId ?? "" },
-              { header: "Recorded by", value: (r) => r.actorName },
-            ]);
-            toast.success(
-              `Exported ${filtered.length} record${filtered.length === 1 ? "" : "s"} to CSV`,
-            );
-          }}
-          className="interactive border-border hover:border-primary hover:text-info-foreground flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium"
-        >
-          <Download className="size-3" /> Export CSV
-        </button>
-      </StickyToolbar>
+              <option value="all">All buildings</option>
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={typeFilter}
+              aria-label="Record type"
+              onChange={(e) =>
+                setTypeFilter(e.target.value as typeof typeFilter)
+              }
+              className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="all">All types</option>
+              {TYPE_ORDER.map((t) => (
+                <option key={t} value={t}>
+                  {LOG_BOOK_SOURCE_META[t].label}
+                </option>
+              ))}
+            </select>
+          </>
+        }
+        status={<ToneBadge tone="info">{filtered.length} in range</ToneBadge>}
+        actions={
+          <button
+            type="button"
+            title="Export the filtered records to CSV"
+            onClick={() => {
+              // The filtered set, not the whole ledger: what is exported is what
+              // is on screen, or the file disagrees with the count beside it.
+              downloadCsv(stampedFilename("historical-records"), filtered, [
+                { header: "Timestamp", value: (r) => r.timestamp },
+                {
+                  header: "Type",
+                  value: (r) => LOG_BOOK_SOURCE_META[r.source].label,
+                },
+                {
+                  header: "Building",
+                  value: (r) =>
+                    r.buildingId ? buildingName(r.buildingId) : "Estate",
+                },
+                { header: "Record", value: (r) => r.title },
+                { header: "Detail", value: (r) => r.detail },
+                { header: "Reason given", value: (r) => r.reason ?? "" },
+                { header: "Reference", value: (r) => r.refId ?? "" },
+                { header: "Recorded by", value: (r) => r.actorName },
+              ]);
+              toast.success(
+                `Exported ${filtered.length} record${filtered.length === 1 ? "" : "s"} to CSV`,
+              );
+            }}
+            className="interactive focus-ring border-border hover:border-primary hover:text-info-foreground flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium md:min-h-0 md:py-1.5"
+          >
+            <Download className="size-3" />{" "}
+            <span className="max-md:hidden">Export CSV</span>
+          </button>
+        }
+      />
 
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {kpis.map((k) => (
           <Card key={k.label} className="gap-1 p-3.5">
             <div className="text-muted-foreground font-mono text-[10px] tracking-wider">

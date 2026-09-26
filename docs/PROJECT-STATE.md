@@ -1888,7 +1888,14 @@ geometry** (bar heights, grid templates).
 - Containers are fixed: fields → form drawer, record+history → detail drawer,
   decision → confirm modal, result → one toast (bottom-left, six seconds, no
   undo).
-- Page toolbars must `flex-wrap`. Wide tables scroll inside their card
+- Page toolbars go through `shared/page-toolbar.tsx` (`PageToolbar`), which
+  slots controls by what they do — `search` / `views` / `filters` / `status` /
+  `actions` — and answers a phone differently: views drop to a scrolling rail,
+  filters move into a bottom sheet behind a button carrying how many are set,
+  status becomes one muted line, actions go icon-only. Every bar is one 34px
+  row at 500px; Equipment's was 143px. The breakpoint switch is CSS
+  (`hidden md:contents`), never `useIsMobile()`, which reports desktop on the
+  first render and would flash the wide bar. Wide tables scroll inside their card
   (`overflow-x-auto` + a `min-w-*`) and never push the page sideways — see the
   Administration room table and the user table.
 - `useSearchParams()` needs its own `<Suspense>` boundary or the route fails to

@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, EyeOff, Link2, Pause, Play, Search } from "lucide-react";
+import { Eye, EyeOff, Link2, Pause, Play } from "lucide-react";
 import { AnimatePresence, m } from "motion/react";
 import * as React from "react";
 import { AccessDenied } from "@/components/shared/access-denied";
@@ -11,8 +11,12 @@ import {
   withinRange,
 } from "@/components/shared/date-range-filter";
 import { EmptyState } from "@/components/shared/empty-state";
+import {
+  activeCount,
+  PageToolbar,
+  ToolbarSearch,
+} from "@/components/shared/page-toolbar";
 import { PulseDot } from "@/components/shared/pulse-dot";
-import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import {
@@ -210,106 +214,128 @@ export default function LogBookPage() {
   return (
     <div className="grid items-start gap-4 xl:grid-cols-[1fr_296px]">
       <div className="flex min-w-0 flex-col gap-3.5">
-        <Card className="flex-row items-center gap-3 p-3.5">
-          <ToneBadge tone={paused ? "neutral" : "success"} className="gap-1.5">
-            <PulseDot tone={paused ? "neutral" : "success"} pulse={!paused} />{" "}
-            {paused ? "PAUSED" : "LIVE"}
-          </ToneBadge>
-          <div>
-            <div className="text-[12px] font-medium">
-              System-written activity feed
-            </div>
-            <div className="text-muted-foreground text-[11px]">
-              Picks up actions taken across the app as they happen.
-            </div>
-          </div>
-          <div className="flex-1" />
-          <span className="text-muted-foreground font-mono text-[11px]">
-            {clock ?? "—"}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPaused((p) => !p)}
-            title={paused ? "Resume live feed" : "Pause live feed"}
-            className="focus-ring interactive border-border hover:border-primary hover:text-info-foreground flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium"
-          >
-            {paused ? (
-              <Play className="size-3" />
-            ) : (
-              <Pause className="size-3" />
-            )}
-            {paused ? "Resume" : "Pause"}
-          </button>
-        </Card>
-
-        <StickyToolbar>
-          <Card className="flex-row flex-wrap items-center gap-2 p-2.5">
-            <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary relative min-w-32 flex-1 rounded-md border">
-              <Search className="text-muted-foreground absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search entries"
-                className="w-full bg-transparent py-1.5 pr-3 pl-8 text-[12px] outline-none"
-              />
-            </div>
+        {/* The LIVE badge, the strapline and the clock used to have a card
+            of their own above the filters. On a phone that was a second bar
+            of chrome before a single entry; it folds into the toolbar's
+            status line, and Pause becomes one of its actions. */}
+        <PageToolbar
+          spread
+          activeFilters={activeCount(
+            // The feed *defaults* to actions only, so it is showing
+            // everything that counts as a filter away from default here.
+            !hideRoutine,
+            !locked && buildingFilter !== "all",
+            range.from !== "" || range.to !== "",
+          )}
+          onReset={() => {
+            setHideRoutine(true);
+            if (!locked) setBuildingFilter("all");
+            setRange(EMPTY_RANGE);
+          }}
+          filtersNote="The feed is everything the app writes down. These narrow what is on screen; nothing is deleted."
+          search={
+            <ToolbarSearch
+              value={query}
+              onChange={setQuery}
+              placeholder="Search entries"
+            />
+          }
+          filters={
+            <>
+              <button
+                type="button"
+                onClick={() => setHideRoutine(!hideRoutine)}
+                aria-pressed={hideRoutine}
+                title={
+                  hideRoutine
+                    ? `${routineCount} automated sensor reading${routineCount === 1 ? "" : "s"} hidden. They are still recorded — the reading charts draw their history from them.`
+                    : "Hide the readings the estate wrote about itself, and keep what people did"
+                }
+                className={cn(
+                  "interactive focus-ring pressable flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium",
+                  hideRoutine
+                    ? "border-primary bg-accent/40 text-accent-foreground"
+                    : "border-border text-neutral-foreground hover:border-primary",
+                )}
+              >
+                {hideRoutine ? (
+                  <EyeOff className="size-3.5" />
+                ) : (
+                  <Eye className="size-3.5" />
+                )}
+                {hideRoutine ? "Actions only" : "Everything"}
+                {hideRoutine && routineCount > 0 && (
+                  <span className="text-muted-foreground font-mono text-[10px]">
+                    {routineCount} hidden
+                  </span>
+                )}
+              </button>
+              <Select
+                value={effectiveBuilding}
+                onValueChange={(v) => setBuildingFilter(v ?? "all")}
+                disabled={locked}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="shrink-0 text-[12px] font-medium"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All buildings</SelectItem>
+                  {buildings.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <DateRangeFilter value={range} onChange={setRange} withTime />
+            </>
+          }
+          status={
+            <>
+              <ToneBadge
+                tone={paused ? "neutral" : "success"}
+                className="gap-1.5"
+              >
+                <PulseDot
+                  tone={paused ? "neutral" : "success"}
+                  pulse={!paused}
+                />{" "}
+                {paused ? "PAUSED" : "LIVE"}
+              </ToneBadge>
+              <ToneBadge tone="info" title="Entries shown">
+                {filtered.length} shown
+              </ToneBadge>
+              {alertCount > 0 && (
+                <ToneBadge tone="danger" title="Alert-level entries in view">
+                  {alertCount} alerts
+                </ToneBadge>
+              )}
+              <span className="text-muted-foreground font-mono text-[11px]">
+                {clock ?? "—"}
+              </span>
+            </>
+          }
+          actions={
             <button
               type="button"
-              onClick={() => setHideRoutine(!hideRoutine)}
-              aria-pressed={hideRoutine}
-              title={
-                hideRoutine
-                  ? `${routineCount} automated sensor reading${routineCount === 1 ? "" : "s"} hidden. They are still recorded — the reading charts draw their history from them.`
-                  : "Hide the readings the estate wrote about itself, and keep what people did"
-              }
-              className={cn(
-                "interactive focus-ring pressable flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[11px] font-medium",
-                hideRoutine
-                  ? "border-primary bg-accent/40 text-accent-foreground"
-                  : "border-border text-neutral-foreground hover:border-primary",
-              )}
+              onClick={() => setPaused((p) => !p)}
+              title={paused ? "Resume live feed" : "Pause live feed"}
+              className="focus-ring interactive border-border hover:border-primary hover:text-info-foreground flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-medium md:min-h-0 md:py-1.5"
             >
-              {hideRoutine ? (
-                <EyeOff className="size-3.5" />
+              {paused ? (
+                <Play className="size-3" />
               ) : (
-                <Eye className="size-3.5" />
+                <Pause className="size-3" />
               )}
-              {hideRoutine ? "Actions only" : "Everything"}
-              {hideRoutine && routineCount > 0 && (
-                <span className="text-muted-foreground font-mono text-[10px]">
-                  {routineCount} hidden
-                </span>
-              )}
+              <span className="max-md:hidden">
+                {paused ? "Resume" : "Pause"}
+              </span>
             </button>
-            <Select
-              value={effectiveBuilding}
-              onValueChange={(v) => setBuildingFilter(v ?? "all")}
-              disabled={locked}
-            >
-              <SelectTrigger size="sm" className="text-[12px] font-medium">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All buildings</SelectItem>
-                {buildings.map((b) => (
-                  <SelectItem key={b.id} value={b.id}>
-                    {b.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <DateRangeFilter value={range} onChange={setRange} withTime />
-            <div className="bg-border h-5.5 w-px" />
-            <ToneBadge tone="info" title="Entries shown">
-              {filtered.length} shown
-            </ToneBadge>
-            {alertCount > 0 && (
-              <ToneBadge tone="danger" title="Alert-level entries in view">
-                {alertCount} alerts
-              </ToneBadge>
-            )}
-          </Card>
-        </StickyToolbar>
+          }
+        />
 
         <div className="flex flex-col gap-3">
           {grouped.length === 0 &&

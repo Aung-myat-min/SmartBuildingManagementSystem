@@ -4,7 +4,7 @@ import {
   Building2,
   Camera,
   Lock,
-  Search,
+  Plus,
   Users as UsersIcon,
 } from "lucide-react";
 import { m } from "motion/react";
@@ -21,7 +21,7 @@ import {
 import { Hint } from "@/components/shared/hint";
 import { RowButton, SelectInput, TextInput } from "@/components/shared/inputs";
 import { Loader } from "@/components/shared/loader";
-import { StickyToolbar } from "@/components/shared/sticky-toolbar";
+import { PageToolbar, ToolbarSearch } from "@/components/shared/page-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -136,32 +136,42 @@ export default function AdministrationPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="bg-secondary border-border flex items-center gap-1 rounded-[5px] border p-[3px]">
-          <TabButton
-            icon={mayEstate ? Building2 : Lock}
-            label="Buildings"
-            active={tab === "buildings"}
-            disabled={!mayEstate}
-            title={mayEstate ? undefined : ESTATE_LOCK_REASON}
-            onClick={() => setTab("buildings")}
-          />
-          <TabButton
-            icon={UsersIcon}
-            label="User Accounts"
-            active={tab === "users"}
-            onClick={() => setTab("users")}
-          />
-        </div>
-        <span className="bg-divider h-5.5 w-px shrink-0" />
-        <span className="text-muted-foreground text-[11.5px] leading-snug">
-          {tabNote}
-        </span>
-        <div className="flex-1" />
-        <span className="bg-primary text-primary-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium">
-          {tabCount}
-        </span>
-      </StickyToolbar>
+      {/* `tabNote` is a whole sentence sitting in a toolbar — on a desktop it
+          fills the gap between the tabs and the count, and on a phone it was
+          what pushed this bar to three rows. The heading above already says
+          it. */}
+      <PageToolbar
+        spread
+        views={
+          <div className="bg-secondary border-border flex shrink-0 items-center gap-1 rounded-[5px] border p-[3px]">
+            <TabButton
+              icon={mayEstate ? Building2 : Lock}
+              label="Buildings"
+              active={tab === "buildings"}
+              disabled={!mayEstate}
+              title={mayEstate ? undefined : ESTATE_LOCK_REASON}
+              onClick={() => setTab("buildings")}
+            />
+            <TabButton
+              icon={UsersIcon}
+              label="User Accounts"
+              active={tab === "users"}
+              onClick={() => setTab("users")}
+            />
+          </div>
+        }
+        status={
+          <>
+            <span className="text-muted-foreground text-[11.5px] leading-snug max-md:hidden">
+              {tabNote}
+            </span>
+            <div className="hidden flex-1 md:block" />
+            <span className="bg-primary text-primary-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium">
+              {tabCount}
+            </span>
+          </>
+        }
+      />
 
       {tab === "buildings" ? (
         <BuildingsTab
@@ -1076,41 +1086,49 @@ function UsersTab({
 
   return (
     <div className="flex flex-col gap-3">
-      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-35 flex-1 items-center gap-1.5 rounded border px-2">
-          <Search className="text-muted-foreground size-3.25 shrink-0" />
-          <input
+      <PageToolbar
+        activeFilters={roleFilter === "all" ? 0 : 1}
+        onReset={() => setRoleFilter("all")}
+        search={
+          <ToolbarSearch
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
             placeholder="Search name, email or building"
-            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
-        </div>
-        <select
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value as "all" | UserRole)}
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-        >
-          <option value="all">All roles</option>
-          <option value="office-staff">Office Staff</option>
-          <option value="admin-manager">Admin Manager</option>
-          <option value="ceo-super-admin">CEO / Super Admin</option>
-        </select>
-        <span className="bg-divider h-5.5 w-px shrink-0" />
-        <span
-          title="Accounts shown"
-          className="bg-neutral-muted text-neutral-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium"
-        >
-          {filtered.length} OF {users.length}
-        </span>
-        <button
-          type="button"
-          onClick={() => setNewOpen(true)}
-          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3.5 py-2 text-[11.5px] leading-none font-medium"
-        >
-          + New account
-        </button>
-      </StickyToolbar>
+        }
+        filters={
+          <select
+            value={roleFilter}
+            aria-label="Role"
+            onChange={(e) => setRoleFilter(e.target.value as "all" | UserRole)}
+            className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+          >
+            <option value="all">All roles</option>
+            <option value="office-staff">Office Staff</option>
+            <option value="admin-manager">Admin Manager</option>
+            <option value="ceo-super-admin">CEO / Super Admin</option>
+          </select>
+        }
+        status={
+          <span
+            title="Accounts shown"
+            className="bg-neutral-muted text-neutral-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium"
+          >
+            {filtered.length} OF {users.length}
+          </span>
+        }
+        actions={
+          <button
+            type="button"
+            title="Create an account"
+            onClick={() => setNewOpen(true)}
+            className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded border px-2.5 text-[11.5px] leading-none font-medium md:min-h-0 md:px-3.5 md:py-2"
+          >
+            <Plus className="size-3.5" />
+            <span className="max-md:hidden">New account</span>
+          </button>
+        }
+      />
 
       <div className="border-border scroll-x-edges overflow-x-auto rounded-[5px] border">
         <div className="bg-surface-subtle border-divider text-muted-foreground flex min-w-260 border-b px-4 py-2.25 font-mono text-[10px] font-medium tracking-[0.06em] uppercase">

@@ -9,8 +9,8 @@ import {
   LayoutGrid,
   Lock,
   MapPin,
+  Plus,
   Receipt,
-  Search,
   Table as TableIcon,
   Undo2,
 } from "lucide-react";
@@ -22,7 +22,12 @@ import { useConfirm } from "@/components/shared/confirm-dialog";
 import { EmptyState } from "@/components/shared/empty-state";
 import { FormDrawer, FormField } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
-import { StickyToolbar } from "@/components/shared/sticky-toolbar";
+import {
+  activeCount,
+  PageToolbar,
+  ToolbarSearch,
+  ToolbarSegment,
+} from "@/components/shared/page-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
@@ -305,120 +310,106 @@ function RequestsView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
-          <Search className="text-muted-foreground size-3.25 shrink-0" />
-          <input
+      <PageToolbar
+        activeFilters={activeCount(
+          !locked && buildingFilter !== "all",
+          sort !== "time",
+        )}
+        onReset={() => {
+          if (!locked) setBuildingFilter("all");
+          setSort("time");
+        }}
+        search={
+          <ToolbarSearch
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
             placeholder="Search id, issue, room or person"
-            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
-          {query && (
-            <button
-              type="button"
-              title="Clear search"
-              onClick={() => setQuery("")}
-              className="interactive focus-ring text-muted-foreground hover:text-foreground cursor-pointer px-0.5 text-[15px] leading-none"
+        }
+        views={
+          <ToolbarSegment
+            value={view}
+            onChange={setView}
+            options={[
+              { id: "board", label: "Board", icon: LayoutGrid },
+              { id: "table", label: "Table", icon: TableIcon },
+            ]}
+          />
+        }
+        filters={
+          <>
+            <select
+              value={effectiveBuilding}
+              disabled={locked}
+              aria-label="Building"
+              title={
+                locked
+                  ? "Office Staff are scoped to their own building."
+                  : undefined
+              }
+              onChange={(e) => setBuildingFilter(e.target.value)}
+              className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
             >
-              ×
-            </button>
-          )}
-        </div>
+              <option value="all">All buildings</option>
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
 
-        <select
-          value={effectiveBuilding}
-          disabled={locked}
-          title={
-            locked
-              ? "Office Staff are scoped to their own building."
-              : undefined
-          }
-          onChange={(e) => setBuildingFilter(e.target.value)}
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="all">All buildings</option>
-          {buildings.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={sort}
-          title="High priority first, or oldest first"
-          onChange={(e) => setSort(e.target.value as "time" | "priority")}
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-        >
-          <option value="time">Time open</option>
-          <option value="priority">Priority</option>
-        </select>
-
-        <span className="bg-divider h-5.5 w-px shrink-0" />
-
-        <span
-          title="All requests in scope"
-          className="bg-primary shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium text-white"
-        >
-          {filtered.length}
-        </span>
-        <span
-          title="High priority"
-          className="bg-warning-muted text-warning-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium"
-        >
-          !{highCount}
-        </span>
-        <span
-          title={`Aging — high priority unresolved past ${ESCALATION_WINDOW_HOURS}h`}
-          className={cn(
-            "flex shrink-0 items-center gap-1 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium",
-            agingCount > 0
-              ? "bg-danger-muted text-danger-foreground"
-              : "bg-neutral-muted text-neutral-foreground",
-          )}
-        >
-          <Clock className="size-3" />
-          {agingCount}
-        </span>
-
-        <div className="bg-secondary border-border flex shrink-0 items-center gap-1 rounded-[5px] border p-[3px]">
+            <select
+              value={sort}
+              aria-label="Sort order"
+              title="High priority first, or oldest first"
+              onChange={(e) => setSort(e.target.value as "time" | "priority")}
+              className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+            >
+              <option value="time">Time open</option>
+              <option value="priority">Priority</option>
+            </select>
+          </>
+        }
+        status={
+          <>
+            <span
+              title="All requests in scope"
+              className="bg-primary shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium text-white"
+            >
+              {filtered.length}
+            </span>
+            <span
+              title="High priority"
+              className="bg-warning-muted text-warning-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium"
+            >
+              !{highCount}
+            </span>
+            <span
+              title={`Aging — high priority unresolved past ${ESCALATION_WINDOW_HOURS}h`}
+              className={cn(
+                "flex shrink-0 items-center gap-1 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium",
+                agingCount > 0
+                  ? "bg-danger-muted text-danger-foreground"
+                  : "bg-neutral-muted text-neutral-foreground",
+              )}
+            >
+              <Clock className="size-3" />
+              {agingCount}
+            </span>
+          </>
+        }
+        actions={
           <button
             type="button"
-            title="Board view"
-            onClick={() => setView("board")}
-            className={cn(
-              "interactive focus-ring cursor-pointer rounded-[3px] px-2.5 py-1.75",
-              view === "board"
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground/70",
-            )}
+            title="Raise a maintenance request"
+            onClick={() => setNewOpen(true)}
+            className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded border px-2.5 text-[11.5px] leading-none font-medium md:min-h-0 md:px-3 md:py-2"
           >
-            <LayoutGrid className="size-3.5" />
+            <Plus className="size-3.5" />
+            <span className="max-md:hidden">New request</span>
           </button>
-          <button
-            type="button"
-            title="Table view"
-            onClick={() => setView("table")}
-            className={cn(
-              "interactive focus-ring cursor-pointer rounded-[3px] px-2.5 py-1.75",
-              view === "table"
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground/70",
-            )}
-          >
-            <TableIcon className="size-3.5" />
-          </button>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setNewOpen(true)}
-          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
-        >
-          New request
-        </button>
-      </StickyToolbar>
+        }
+      />
 
       {view === "board" ? (
         // `minmax(0,…)` let five columns shrink until each held one word per

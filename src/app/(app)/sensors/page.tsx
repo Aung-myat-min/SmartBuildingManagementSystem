@@ -1,14 +1,18 @@
 "use client";
 
 import {
+  Activity,
   Bell,
+  Boxes,
   Building2,
   ChevronDown,
   Gauge,
   Lock,
   LockOpen,
   type LucideIcon,
+  Plus,
   RotateCcw,
+  SlidersHorizontal,
   Thermometer,
   Trash2,
   TriangleAlert,
@@ -35,11 +39,11 @@ import {
 import { EmptyState } from "@/components/shared/empty-state";
 import { FormDrawer, WideSheet } from "@/components/shared/form-drawer";
 import { Hint } from "@/components/shared/hint";
+import { PageToolbar, ToolbarSegment } from "@/components/shared/page-toolbar";
 import { PulseDot } from "@/components/shared/pulse-dot";
 import { ReadingChart } from "@/components/shared/reading-chart";
 import { SensorTypeRegistry } from "@/components/shared/sensor-type-registry";
 import { StatusDonut } from "@/components/shared/status-donut";
-import { StickyToolbar } from "@/components/shared/sticky-toolbar";
 import { type Tone, ToneBadge, toneIcon } from "@/components/shared/tone-badge";
 import { Card } from "@/components/ui/card";
 import { useCountUp } from "@/hooks/use-count-up";
@@ -284,143 +288,141 @@ function SensorsView() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* One bar. The page does two jobs — watching the estate, and setting the
-          limits it is watched against — and which job you are on belongs
+      {/* One bar. The page does two jobs — watching the estate, and setting
+          the limits it is watched against — and which job you are on belongs
           beside the controls for it, not stacked above them in a box of its
-          own. The rule after the tabs is what keeps "which view" from reading
-          as just another filter. */}
-      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="bg-surface-subtle border-divider flex shrink-0 items-center rounded-[4px] border p-[2px]">
-          {(
-            [
-              ["monitoring", "Monitoring"],
-              ["thresholds", "Thresholds"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              aria-pressed={tab === id}
-              className={cn(
-                "interactive focus-ring cursor-pointer rounded-[3px] px-3 py-1.5 text-[11.5px] leading-none font-medium",
-                tab === id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-foreground/70 hover:text-foreground",
-              )}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        <span className="bg-divider mx-0.5 h-6 w-px shrink-0" />
-
-        {tab === "thresholds" ? (
-          <span className="text-muted-foreground text-[11.5px]">
-            {measuringTypeCount} measuring type
-            {measuringTypeCount === 1 ? "" : "s"}
-            {exceptionCount > 0
-              ? ` · ${exceptionCount} room exception${exceptionCount === 1 ? "" : "s"}`
-              : " · no room exceptions"}
-          </span>
-        ) : (
-          <>
-            <span className="text-muted-foreground font-mono text-[10px] tracking-[0.07em] uppercase">
-              Show
+          own. On a phone the two tabs drop to their own rail, because the
+          control that changes what the page *is* must never read as one more
+          filter chip. */}
+      <PageToolbar
+        spread
+        activeFilters={tab === "monitoring" && filter !== "all" ? 1 : 0}
+        onReset={() => setFilter("all")}
+        views={
+          <ToolbarSegment
+            value={tab}
+            onChange={setTab}
+            options={[
+              { id: "monitoring", label: "Monitoring", icon: Activity },
+              {
+                id: "thresholds",
+                label: "Thresholds",
+                icon: SlidersHorizontal,
+              },
+            ]}
+          />
+        }
+        filters={
+          tab === "monitoring" ? (
+            <>
+              <span className="text-muted-foreground shrink-0 font-mono text-[10px] tracking-[0.07em] uppercase max-md:hidden">
+                Show
+              </span>
+              {(
+                [
+                  ["all", "All devices"],
+                  ["alarms", "Alarms only"],
+                  ["offline", "Offline"],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setFilter(id)}
+                  aria-pressed={filter === id}
+                  className={cn(
+                    "focus-ring interactive cursor-pointer rounded border px-2.5 py-1.75 text-[11.5px] leading-none font-medium",
+                    filter === id
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-input text-neutral-foreground hover:border-primary",
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </>
+          ) : undefined
+        }
+        status={
+          tab === "thresholds" ? (
+            <span className="text-muted-foreground text-[11.5px]">
+              {measuringTypeCount} measuring type
+              {measuringTypeCount === 1 ? "" : "s"}
+              {exceptionCount > 0
+                ? ` · ${exceptionCount} room exception${exceptionCount === 1 ? "" : "s"}`
+                : " · no room exceptions"}
             </span>
-            {(
-              [
-                ["all", "All devices"],
-                ["alarms", "Alarms only"],
-                ["offline", "Offline"],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setFilter(id)}
+          ) : (
+            <>
+              <span
+                title="Devices in an alarm state"
                 className={cn(
-                  "focus-ring interactive cursor-pointer rounded border px-2.5 py-1.75 text-[11.5px] leading-none font-medium",
-                  filter === id
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input text-neutral-foreground hover:border-primary",
+                  "flex shrink-0 items-center gap-1.5 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium",
+                  alarmCount > 0
+                    ? "bg-danger-muted text-danger-foreground"
+                    : "bg-neutral-muted text-neutral-foreground",
                 )}
               >
-                {label}
+                <Bell className="size-3" />
+                {alarmCount}
+              </span>
+              <span
+                title="Devices not reporting"
+                className="bg-neutral-muted text-neutral-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium"
+              >
+                OFFLINE {offlineCount}
+              </span>
+              <span
+                title="Devices in scope"
+                className="bg-primary shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium text-white"
+              >
+                {inScope.length}
+              </span>
+              <span className="text-muted-foreground shrink-0 text-[11px]">
+                Polled every 30s · {clock ?? "—"}
+              </span>
+            </>
+          )
+        }
+        actions={
+          <>
+            {canManageSensorTypes(role) ? (
+              <button
+                type="button"
+                title="Add, rename or archive the kinds of device this estate has"
+                onClick={() => setTypesOpen(true)}
+                className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded border px-2.5 text-[11.5px] leading-none font-medium md:min-h-0 md:px-3 md:py-2"
+              >
+                <Boxes className="size-3.5 md:hidden" />
+                <span className="max-md:hidden">Manage types</span>
               </button>
-            ))}
+            ) : (
+              <Hint text={SENSOR_TYPE_LOCK_REASON}>
+                <button
+                  type="button"
+                  aria-disabled
+                  className="interactive focus-ring border-border text-muted-foreground bg-card flex min-h-9 shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-2.5 text-[11.5px] leading-none font-medium opacity-45 md:min-h-0 md:px-3 md:py-2"
+                >
+                  <Lock className="size-2.75" />
+                  <span className="max-md:hidden">Manage types</span>
+                </button>
+              </Hint>
+            )}
 
-            <span className="bg-divider h-5.5 w-px shrink-0" />
-
-            <span
-              title="Devices in an alarm state"
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium",
-                alarmCount > 0
-                  ? "bg-danger-muted text-danger-foreground"
-                  : "bg-neutral-muted text-neutral-foreground",
-              )}
-            >
-              <Bell className="size-3" />
-              {alarmCount}
-            </span>
-            <span
-              title="Devices not reporting"
-              className="bg-neutral-muted text-neutral-foreground shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium"
-            >
-              OFFLINE {offlineCount}
-            </span>
-            <span
-              title="Devices in scope"
-              className="bg-primary shrink-0 rounded-[3px] px-2 py-1.75 font-mono text-[10.5px] leading-none font-medium text-white"
-            >
-              {inScope.length}
-            </span>
-
-            <div className="flex-1" />
-
-            <span className="text-muted-foreground shrink-0 text-[11px]">
-              Polled every 30s · {clock ?? "—"}
-            </span>
+            {canAct(role) && (
+              <button
+                type="button"
+                title="Register a new sensor on the network"
+                onClick={() => setFormOpen(true)}
+                className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded border px-2.5 text-[11.5px] leading-none font-medium md:min-h-0 md:px-3 md:py-2"
+              >
+                <Plus className="size-3.5" />
+                <span className="max-md:hidden">New sensor</span>
+              </button>
+            )}
           </>
-        )}
-
-        {tab === "thresholds" && <div className="flex-1" />}
-
-        {canManageSensorTypes(role) ? (
-          <button
-            type="button"
-            title="Add, rename or archive the kinds of device this estate has"
-            onClick={() => setTypesOpen(true)}
-            className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
-          >
-            Manage types
-          </button>
-        ) : (
-          <Hint text={SENSOR_TYPE_LOCK_REASON}>
-            <button
-              type="button"
-              aria-disabled
-              className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
-            >
-              <Lock className="size-2.75" />
-              Manage types
-            </button>
-          </Hint>
-        )}
-
-        {canAct(role) && (
-          <button
-            type="button"
-            title="Register a new sensor on the network"
-            onClick={() => setFormOpen(true)}
-            className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
-          >
-            + New sensor
-          </button>
-        )}
-      </StickyToolbar>
+        }
+      />
 
       {tab === "thresholds" ? (
         <ThresholdsTab />
@@ -1398,7 +1400,7 @@ function ClimateOverview({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
         <Kpi
           icon={Gauge}
           label="Comfortable"

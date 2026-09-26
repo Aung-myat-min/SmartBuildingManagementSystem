@@ -39,7 +39,10 @@ export function DateRangeFilter({
       className={cn(
         // The inputs carry outline-none, so the box around them shows the
         // focus. Without this, tabbing into a date range was invisible.
-        "focus-ring-within interactive border-input bg-card flex shrink-0 items-center gap-1.5 rounded border px-2 py-1",
+        // Two datetime-local inputs are the widest control on any toolbar.
+        // In the phone filter sheet they are allowed to wrap onto a second
+        // line rather than squeeze each other into unreadability.
+        "focus-ring-within interactive border-input bg-card flex shrink-0 flex-wrap items-center gap-1.5 rounded border px-2 py-1 md:flex-nowrap",
         active && "border-primary",
         className,
       )}
@@ -54,7 +57,7 @@ export function DateRangeFilter({
         max={value.to || undefined}
         aria-label={`${label} — from`}
         onChange={(e) => onChange({ ...value, from: e.target.value })}
-        className="text-neutral-foreground min-w-0 bg-transparent py-1 text-[11.5px] font-medium outline-none"
+        className="text-neutral-foreground min-w-0 flex-1 basis-35 bg-transparent py-1 text-[11.5px] font-medium outline-none md:flex-none md:basis-auto"
       />
       <span className="text-muted-foreground shrink-0 text-[11px]">→</span>
       <input
@@ -63,7 +66,7 @@ export function DateRangeFilter({
         min={value.from || undefined}
         aria-label={`${label} — to`}
         onChange={(e) => onChange({ ...value, to: e.target.value })}
-        className="text-neutral-foreground min-w-0 bg-transparent py-1 text-[11.5px] font-medium outline-none"
+        className="text-neutral-foreground min-w-0 flex-1 basis-35 bg-transparent py-1 text-[11.5px] font-medium outline-none md:flex-none md:basis-auto"
       />
       {active && (
         <button

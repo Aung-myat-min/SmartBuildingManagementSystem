@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Download, Info, Search } from "lucide-react";
+import { ArrowLeft, Download, Info, Plus } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { AccessDenied } from "@/components/shared/access-denied";
@@ -11,7 +11,11 @@ import {
   withinRange,
 } from "@/components/shared/date-range-filter";
 import { EmptyState } from "@/components/shared/empty-state";
-import { StickyToolbar } from "@/components/shared/sticky-toolbar";
+import {
+  activeCount,
+  PageToolbar,
+  ToolbarSearch,
+} from "@/components/shared/page-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -239,53 +243,70 @@ export default function ReportsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
-          <Search className="text-muted-foreground size-3.25 shrink-0" />
-          <input
+      <PageToolbar
+        activeFilters={activeCount(
+          buildingFilter !== "all",
+          kindFilter !== "all",
+          range.from !== "" || range.to !== "",
+        )}
+        onReset={() => {
+          setBuildingFilter("all");
+          setKindFilter("all");
+          setRange(EMPTY_RANGE);
+        }}
+        search={
+          <ToolbarSearch
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
             placeholder="Search reports"
-            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
-        </div>
-        <select
-          value={buildingFilter}
-          onChange={(e) => setBuildingFilter(e.target.value)}
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-        >
-          <option value="all">All buildings</option>
-          {buildings.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={kindFilter}
-          onChange={(e) => setKindFilter(e.target.value as typeof kindFilter)}
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-        >
-          <option value="all">All kinds</option>
-          {(Object.keys(KIND_LABEL) as ReportKind[]).map((k) => (
-            <option key={k} value={k}>
-              {KIND_LABEL[k]}
-            </option>
-          ))}
-        </select>
-        <DateRangeFilter
-          value={range}
-          onChange={setRange}
-          withTime
-          label="Generated"
-        />
-        <div className="bg-border h-5.5 w-px" />
-        <ToneBadge tone="info">{filtered.length} reports</ToneBadge>
-        {/*<div className="flex-1" />*/}
-        <Button size="sm" onClick={() => setGenOpen(true)}>
-          + Generate report
-        </Button>
-      </StickyToolbar>
+        }
+        filters={
+          <>
+            <select
+              value={buildingFilter}
+              aria-label="Building"
+              onChange={(e) => setBuildingFilter(e.target.value)}
+              className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+            >
+              <option value="all">All buildings</option>
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={kindFilter}
+              aria-label="Report kind"
+              onChange={(e) =>
+                setKindFilter(e.target.value as typeof kindFilter)
+              }
+              className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+            >
+              <option value="all">All kinds</option>
+              {(Object.keys(KIND_LABEL) as ReportKind[]).map((k) => (
+                <option key={k} value={k}>
+                  {KIND_LABEL[k]}
+                </option>
+              ))}
+            </select>
+            <DateRangeFilter
+              value={range}
+              onChange={setRange}
+              withTime
+              label="Generated"
+            />
+          </>
+        }
+        status={<ToneBadge tone="info">{filtered.length} reports</ToneBadge>}
+        actions={
+          <Button size="sm" onClick={() => setGenOpen(true)}>
+            <Plus className="size-3.5" />
+            <span className="max-md:hidden">Generate report</span>
+          </Button>
+        }
+      />
 
       {groups.length === 0 && (
         <EmptyState className="p-6">
@@ -673,7 +694,7 @@ function ReportDetailView({
         </div>
       </Card>
 
-      <div className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3.5 xl:grid-cols-4">
         {detail.kpis.map((k) => (
           <Card
             key={k.label}

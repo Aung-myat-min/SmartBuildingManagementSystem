@@ -2,12 +2,13 @@
 
 import {
   Archive,
+  Boxes,
   Camera,
   CheckCircle2,
   LayoutGrid,
   Lock,
   MoveRight,
-  Search,
+  Plus,
   Table as TableIcon,
   Wrench,
 } from "lucide-react";
@@ -38,7 +39,12 @@ import {
 import { Hint } from "@/components/shared/hint";
 import { RowButton, TextInput } from "@/components/shared/inputs";
 import { Loader } from "@/components/shared/loader";
-import { StickyToolbar } from "@/components/shared/sticky-toolbar";
+import {
+  activeCount,
+  PageToolbar,
+  ToolbarSearch,
+  ToolbarSegment,
+} from "@/components/shared/page-toolbar";
 import { type Tone, ToneBadge } from "@/components/shared/tone-badge";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useAppState } from "@/lib/app-state";
@@ -229,124 +235,141 @@ export default function EquipmentPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
-        <div className="interactive focus-within:ring-3 focus-within:ring-primary/15 border-input focus-within:border-primary bg-card flex min-w-45 flex-1 items-center gap-1.5 rounded border px-2">
-          <Search className="text-muted-foreground size-3.25 shrink-0" />
-          <input
+      <PageToolbar
+        activeFilters={activeCount(
+          !locked && buildingFilter !== "all",
+          typeFilter !== "all",
+          showDecommissioned,
+        )}
+        onReset={() => {
+          if (!locked) setBuildingFilter("all");
+          setTypeFilter("all");
+          setShowDecommissioned(false);
+        }}
+        search={
+          <ToolbarSearch
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={setQuery}
             placeholder="Search tag, type or room"
-            className="min-w-0 flex-1 bg-transparent py-2 text-[12px] outline-none"
           />
-        </div>
-
-        <select
-          value={effectiveBuilding}
-          disabled={locked}
-          title={
-            locked
-              ? "Office Staff are scoped to their own building."
-              : undefined
-          }
-          onChange={(e) => setBuildingFilter(e.target.value)}
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <option value="all">All buildings</option>
-          {buildings.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
-        >
-          <option value="all">All types</option>
-          {equipmentTypes().map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.label}
-            </option>
-          ))}
-        </select>
-
-        <button
-          type="button"
-          title="Decommissioned units are hidden by default"
-          onClick={() => setShowDecommissioned((s) => !s)}
-          className={cn(
-            "focus-ring interactive shrink-0 cursor-pointer rounded border px-2.5 py-2 text-[11.5px] leading-none font-medium",
-            showDecommissioned
-              ? "border-primary bg-accent text-accent-foreground"
-              : "border-input text-neutral-foreground hover:border-primary",
-          )}
-        >
-          {showDecommissioned ? "Hide" : "Show"} decommissioned
-        </button>
-
-        <span className="bg-divider h-5.5 w-px shrink-0" />
-
-        <Chip title="Units in scope" className="bg-primary text-white">
-          {units.length}
-        </Chip>
-        <Chip title="Faulty" className="bg-danger-muted text-danger-foreground">
-          !{faultyCount}
-        </Chip>
-        <Chip
-          title={`Service due within ${DUE_SERVICE_DAYS} days`}
-          className="bg-warning-muted text-warning-foreground"
-        >
-          {dueCount}
-        </Chip>
-
-        <div className="bg-secondary border-border flex shrink-0 items-center gap-1 rounded-[5px] border p-[3px]">
-          <ViewButton
-            icon={TableIcon}
-            title="Register"
-            active={view === "register"}
-            onClick={() => setView("register")}
+        }
+        views={
+          <ToolbarSegment
+            value={view}
+            onChange={setView}
+            options={[
+              { id: "register", label: "Register", icon: TableIcon },
+              { id: "board", label: "Condition board", icon: LayoutGrid },
+            ]}
           />
-          <ViewButton
-            icon={LayoutGrid}
-            title="Condition board"
-            active={view === "board"}
-            onClick={() => setView("board")}
-          />
-        </div>
+        }
+        filters={
+          <>
+            <select
+              value={effectiveBuilding}
+              disabled={locked}
+              aria-label="Building"
+              title={
+                locked
+                  ? "Office Staff are scoped to their own building."
+                  : undefined
+              }
+              onChange={(e) => setBuildingFilter(e.target.value)}
+              className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <option value="all">All buildings</option>
+              {buildings.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
 
-        {canManageEquipmentTypes(role) ? (
-          <button
-            type="button"
-            title="Add, rename or archive the kinds of asset this estate holds"
-            onClick={() => setTypesOpen(true)}
-            className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
-          >
-            Manage types
-          </button>
-        ) : (
-          <Hint text={EQUIPMENT_TYPE_LOCK_REASON}>
+            <select
+              value={typeFilter}
+              aria-label="Equipment type"
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="border-input bg-card text-neutral-foreground shrink-0 cursor-pointer rounded border px-2 py-2 text-[11.5px] font-medium"
+            >
+              <option value="all">All types</option>
+              {equipmentTypes().map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </select>
+
             <button
               type="button"
-              aria-disabled
-              className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
+              title="Decommissioned units are hidden by default"
+              onClick={() => setShowDecommissioned((s) => !s)}
+              className={cn(
+                "focus-ring interactive shrink-0 cursor-pointer rounded border px-2.5 py-2 text-[11.5px] leading-none font-medium",
+                showDecommissioned
+                  ? "border-primary bg-accent text-accent-foreground"
+                  : "border-input text-neutral-foreground hover:border-primary",
+              )}
             >
-              <Lock className="size-2.75" />
-              Manage types
+              {showDecommissioned ? "Hide" : "Show"} decommissioned
             </button>
-          </Hint>
-        )}
+          </>
+        }
+        status={
+          <>
+            <Chip title="Units in scope" className="bg-primary text-white">
+              {units.length}
+            </Chip>
+            <Chip
+              title="Faulty"
+              className="bg-danger-muted text-danger-foreground"
+            >
+              !{faultyCount}
+            </Chip>
+            <Chip
+              title={`Service due within ${DUE_SERVICE_DAYS} days`}
+              className="bg-warning-muted text-warning-foreground"
+            >
+              {dueCount}
+            </Chip>
+          </>
+        }
+        actions={
+          <>
+            {canManageEquipmentTypes(role) ? (
+              <button
+                type="button"
+                title="Add, rename or archive the kinds of asset this estate holds"
+                onClick={() => setTypesOpen(true)}
+                className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground flex min-h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded border px-2.5 text-[11.5px] leading-none font-medium md:min-h-0 md:px-3 md:py-2"
+              >
+                <Boxes className="size-3.5 md:hidden" />
+                <span className="max-md:hidden">Manage types</span>
+              </button>
+            ) : (
+              <Hint text={EQUIPMENT_TYPE_LOCK_REASON}>
+                <button
+                  type="button"
+                  aria-disabled
+                  className="interactive focus-ring border-border text-muted-foreground bg-card flex min-h-9 shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-2.5 text-[11.5px] leading-none font-medium opacity-45 md:min-h-0 md:px-3 md:py-2"
+                >
+                  <Lock className="size-2.75" />
+                  <span className="max-md:hidden">Manage types</span>
+                </button>
+              </Hint>
+            )}
 
-        <button
-          type="button"
-          title="Add a unit to the register"
-          onClick={() => setNewOpen(true)}
-          className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
-        >
-          + New unit
-        </button>
-      </StickyToolbar>
+            <button
+              type="button"
+              title="Add a unit to the register"
+              onClick={() => setNewOpen(true)}
+              className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 flex min-h-9 shrink-0 cursor-pointer items-center gap-1 rounded border px-2.5 text-[11.5px] leading-none font-medium md:min-h-0 md:px-3 md:py-2"
+            >
+              <Plus className="size-3.5" />
+              <span className="max-md:hidden">New unit</span>
+            </button>
+          </>
+        }
+      />
 
       {view === "register" ? (
         <div className="border-border bg-card overflow-hidden rounded-[5px] border">
@@ -766,34 +789,6 @@ function Chip({
     >
       {children}
     </span>
-  );
-}
-
-function ViewButton({
-  icon: Icon,
-  title,
-  active,
-  onClick,
-}: {
-  icon: React.ElementType;
-  title: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      className={cn(
-        "focus-ring interactive cursor-pointer rounded-[3px] px-2.5 py-1.75",
-        active
-          ? "bg-primary text-primary-foreground"
-          : "text-foreground/70 hover:text-foreground",
-      )}
-    >
-      <Icon className="size-3.5" />
-    </button>
   );
 }
 
