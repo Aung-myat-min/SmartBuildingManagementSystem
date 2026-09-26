@@ -1306,17 +1306,20 @@ The live, system-written feed. **Admin Manager and CEO only.**
 role and offering "Switch to Admin Manager for this demo" → `setRole()`. This is
 the reference implementation of a role-locked page.
 
-**Persisted:** `logbook.source` (the source filter). Pause, search and building
-filter are component state.
+**Persisted:** `logbook.source` (the source filter) and `logbook.hideRoutine`
+(**Actions only**, defaulted on). Pause, search and building filter are
+component state.
 
 **Layout:** `xl:grid-cols-[1fr_296px]` — feed plus a right rail.
 
 **Feed column:**
 - A status card: LIVE / PAUSED badge with a pulsing dot, a description, the live
   clock, and a Pause/Resume button.
-- A filter card: search (title, detail, actor, refId), a **shadcn `Select`** for
-  the building (disabled for Office Staff — though they cannot reach the page),
-  an "<n> shown" badge and an "<n> alerts" badge when alerts are in view.
+- A filter card: search (title, detail, actor, refId), the **Actions only**
+  toggle (with the hidden count on it — see *What belongs in the Log Book*), a
+  **shadcn `Select`** for the building (disabled for Office Staff — though they
+  cannot reach the page), an "<n> shown" badge and an "<n> alerts" badge when
+  alerts are in view.
 - Entries **grouped by day *and shift***: the group key is
   `` `${dayLabel(ts)} — ${shiftLabel(hour)}` ``, where `dayLabel` gives
   "Today"/"Yesterday"/weekday and `shiftLabel` gives Day (06–14), Evening
@@ -1670,6 +1673,44 @@ toolbar turns the filter off.
 `isEstateRecord` excludes personnel *actions* rather than the whole `admin`
 source, so a building deleted with a written reason reaches the page it was
 written for, while who was hired, promoted or suspended does not.
+
+### What belongs in the Log Book
+
+Measured on a working estate, before anything was done about it: **317 of 385
+entries were sensor chatter — 82%.** The live feed is capped at 200, and that
+window reached back 44.7 hours while holding **ten** human actions. Four
+temperature sensors wrote 283 of them. The audit trail was one drifting
+thermometer with the record buried underneath.
+
+Two causes, and only one is a design question:
+
+- **The volume was the resting-value bug** (see below). Those entries
+  accumulated while rest sat one degree above a band boundary, so the random
+  walk crossed it endlessly.
+- **The design point stands anyway.** A sensor crossing a band is an
+  observation the estate made about itself, not a record of anything anyone
+  did, and it does not belong beside "Building deleted — reason: …".
+
+Crossings are still written, because the reading charts have no other history
+to draw from. So `isRoutineReading()` hides them from the journal rather than
+deleting them: the Log Book defaults to **Actions only**, shows the hidden
+count, and reverses in one click. The source rail still reports true totals, so
+nothing is concealed. **An alarm is never hidden** — a fire detector triggering
+is an event whoever is reading this needs, whatever wrote it.
+
+`automated` is an explicit field, not something inferred. The same
+`setSensorStatus` serves the simulation and a person resetting an alarm and the
+entries are otherwise identical; the only thing telling them apart is that the
+simulation hands over the reading that caused the crossing and a person never
+does. 313 historical entries were backfilled by matching the crossing title
+shape (`"<Type> → <Status>"`), leaving the six hand-written device entries
+alone.
+
+**The backstop** is `AUTO_LOG_FLOOR_MS` — two minutes between automated entries
+per device. Hysteresis and the resting value have each been wrong once already,
+so a badly set threshold now costs a handful of rows an hour rather than a
+thousand. Alarms ignore it, and the sensor document is written every time
+regardless, so the live screen never lags; only the journal entry is dropped.
 
 ### Sensor thresholds
 
