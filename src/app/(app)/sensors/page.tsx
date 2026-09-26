@@ -157,6 +157,7 @@ function SensorsView() {
     role,
     activeBuildingId,
     sensors,
+    sensorTypeRegistry,
     removeSensor,
     setSensorStatus,
   } = useAppState();
@@ -165,6 +166,16 @@ function SensorsView() {
   const [tab, setTab] = usePersistedState<"monitoring" | "thresholds">(
     "sensors.tab",
     "monitoring",
+  );
+  // What the toolbar says while the Thresholds tab is open, so the bar still
+  // describes the view rather than going blank where the filters were.
+  const measuringTypes = sensorTypeRegistry.filter(
+    (t) => !t.archived && isMeasuring(t),
+  );
+  const measuringTypeCount = measuringTypes.length;
+  const exceptionCount = measuringTypes.reduce(
+    (n, t) => n + Object.keys(t.measurement?.overrides ?? {}).length,
+    0,
   );
 
   const locked = isBuildingLocked(role);
@@ -273,37 +284,48 @@ function SensorsView() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* The page does two jobs and they are not the same job: watching the
-          estate, and setting the limits it is watched against. Two tabs rather
-          than one long scroll, because nobody arrives wanting both. */}
-      <div className="border-border bg-card flex w-fit items-center rounded-[5px] border p-[3px]">
-        {(
-          [
-            ["monitoring", "Monitoring"],
-            ["thresholds", "Thresholds"],
-          ] as const
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={cn(
-              "interactive focus-ring cursor-pointer rounded-[3px] px-3.5 py-1.5 text-[12px] font-medium",
-              tab === id
-                ? "bg-primary text-primary-foreground"
-                : "text-foreground/70",
-            )}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* One bar. The page does two jobs — watching the estate, and setting the
+          limits it is watched against — and which job you are on belongs
+          beside the controls for it, not stacked above them in a box of its
+          own. The rule after the tabs is what keeps "which view" from reading
+          as just another filter. */}
+      <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+        <div className="bg-surface-subtle border-divider flex shrink-0 items-center rounded-[4px] border p-[2px]">
+          {(
+            [
+              ["monitoring", "Monitoring"],
+              ["thresholds", "Thresholds"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              aria-pressed={tab === id}
+              className={cn(
+                "interactive focus-ring cursor-pointer rounded-[3px] px-3 py-1.5 text-[11.5px] leading-none font-medium",
+                tab === id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground/70 hover:text-foreground",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-      {tab === "thresholds" ? (
-        <ThresholdsTab />
-      ) : (
-        <>
-          <StickyToolbar className="border-border bg-card flex flex-wrap items-center gap-2 rounded-[5px] border px-3 py-2.25">
+        <span className="bg-divider mx-0.5 h-6 w-px shrink-0" />
+
+        {tab === "thresholds" ? (
+          <span className="text-muted-foreground text-[11.5px]">
+            {measuringTypeCount} measuring type
+            {measuringTypeCount === 1 ? "" : "s"}
+            {exceptionCount > 0
+              ? ` · ${exceptionCount} room exception${exceptionCount === 1 ? "" : "s"}`
+              : " · no room exceptions"}
+          </span>
+        ) : (
+          <>
             <span className="text-muted-foreground font-mono text-[10px] tracking-[0.07em] uppercase">
               Show
             </span>
@@ -361,41 +383,49 @@ function SensorsView() {
             <span className="text-muted-foreground shrink-0 text-[11px]">
               Polled every 30s · {clock ?? "—"}
             </span>
+          </>
+        )}
 
-            {canManageSensorTypes(role) ? (
-              <button
-                type="button"
-                title="Add, rename or archive the kinds of device this estate has"
-                onClick={() => setTypesOpen(true)}
-                className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
-              >
-                Manage types
-              </button>
-            ) : (
-              <Hint text={SENSOR_TYPE_LOCK_REASON}>
-                <button
-                  type="button"
-                  aria-disabled
-                  className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
-                >
-                  <Lock className="size-2.75" />
-                  Manage types
-                </button>
-              </Hint>
-            )}
+        {tab === "thresholds" && <div className="flex-1" />}
 
-            {canAct(role) && (
-              <button
-                type="button"
-                title="Register a new sensor on the network"
-                onClick={() => setFormOpen(true)}
-                className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
-              >
-                + New sensor
-              </button>
-            )}
-          </StickyToolbar>
+        {canManageSensorTypes(role) ? (
+          <button
+            type="button"
+            title="Add, rename or archive the kinds of device this estate has"
+            onClick={() => setTypesOpen(true)}
+            className="interactive focus-ring pressable border-input bg-card text-neutral-foreground hover:border-primary hover:text-accent-foreground shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+          >
+            Manage types
+          </button>
+        ) : (
+          <Hint text={SENSOR_TYPE_LOCK_REASON}>
+            <button
+              type="button"
+              aria-disabled
+              className="interactive focus-ring border-border text-muted-foreground bg-card flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded border px-3 py-2 text-[11.5px] leading-none font-medium opacity-45"
+            >
+              <Lock className="size-2.75" />
+              Manage types
+            </button>
+          </Hint>
+        )}
 
+        {canAct(role) && (
+          <button
+            type="button"
+            title="Register a new sensor on the network"
+            onClick={() => setFormOpen(true)}
+            className="interactive focus-ring pressable border-primary bg-primary text-primary-foreground hover:bg-primary/90 shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium"
+          >
+            + New sensor
+          </button>
+        )}
+      </StickyToolbar>
+
+      {tab === "thresholds" ? (
+        <ThresholdsTab />
+      ) : (
+        <>
           <ClimateOverview onRoomPicked={setOpenId} />
 
           {visibleBuildings.map((b) => {
@@ -1075,8 +1105,9 @@ const ROOM_TYPES: { id: RoomType; label: string }[] = [
  * only holds the rooms that genuinely differ.
  */
 function ThresholdsTab() {
-  const { sensorTypeRegistry, rooms, role } = useAppState();
-  const [typesOpen, setTypesOpen] = React.useState(false);
+  // No Manage types button and no sheet of its own: both live on the page
+  // toolbar now, so the tab cannot open a second copy of the same registry.
+  const { sensorTypeRegistry, rooms } = useAppState();
   const measuring = sensorTypeRegistry.filter(
     (t) => !t.archived && isMeasuring(t),
   );
@@ -1086,40 +1117,16 @@ function ThresholdsTab() {
 
   return (
     <div className="flex flex-col gap-3">
-      <Card className="gap-2 p-3.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="text-[12.5px] font-semibold">
-              Limits every reading is judged against
-            </div>
-            <div className="text-muted-foreground text-[11px] leading-relaxed">
-              A reading takes the first band it fits, and that band decides the
-              status, the colour and whether anything raises an alarm. Changing
-              a number here changes what the estate reports — it does not change
-              any reading.
-            </div>
-          </div>
-          <Hint
-            text={
-              canManageSensorTypes(role)
-                ? "Add, rename or archive the kinds of device this estate has"
-                : SENSOR_TYPE_LOCK_REASON
-            }
-          >
-            <button
-              type="button"
-              aria-disabled={!canManageSensorTypes(role)}
-              onClick={() => canManageSensorTypes(role) && setTypesOpen(true)}
-              className={cn(
-                "interactive focus-ring pressable bg-card shrink-0 cursor-pointer rounded border px-3 py-2 text-[11.5px] leading-none font-medium",
-                canManageSensorTypes(role)
-                  ? "border-input text-neutral-foreground hover:border-primary hover:text-accent-foreground"
-                  : "border-border text-muted-foreground cursor-not-allowed opacity-45",
-              )}
-            >
-              Manage types
-            </button>
-          </Hint>
+      <Card className="gap-1 p-3.5">
+        <div className="text-[12.5px] font-semibold">
+          Limits every reading is judged against
+        </div>
+        <div className="text-muted-foreground text-[11px] leading-relaxed">
+          A reading takes the first band it fits, and that band decides the
+          status, the colour and whether anything raises an alarm. Changing a
+          number here changes what the estate reports — it does not change any
+          reading. Edit them under{" "}
+          <span className="font-medium">Manage types</span>.
         </div>
       </Card>
 
@@ -1176,8 +1183,6 @@ function ThresholdsTab() {
           </Card>
         );
       })}
-
-      <SensorTypeSheet open={typesOpen} onOpenChange={setTypesOpen} />
     </div>
   );
 }
