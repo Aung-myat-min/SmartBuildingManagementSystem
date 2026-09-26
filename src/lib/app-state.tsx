@@ -48,7 +48,11 @@ import {
   pendingDecisions,
   pruneReadIds,
 } from "@/lib/notifications";
-import { canActOnSensor, canAdvanceRequest } from "@/lib/permissions";
+import {
+  canAccessReports,
+  canActOnSensor,
+  canAdvanceRequest,
+} from "@/lib/permissions";
 import { createReport, useReports } from "@/lib/reports-store";
 import {
   CLEAR,
@@ -646,7 +650,7 @@ export function AppStateProvider({
     error: unitsError,
   } = useEquipmentUnits();
   const { items: equipmentHistory } = useEquipmentHistory();
-  const { items: reports } = useReports();
+  const { items: reports } = useReports(canAccessReports(role));
 
   // The third holder, beside the estate and the sensor registry:
   // sensorForEquipment / equipmentForSensor / buildingStats are module
