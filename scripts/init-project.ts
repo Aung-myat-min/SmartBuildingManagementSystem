@@ -23,6 +23,7 @@ import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline/promises";
 import { initializeApp } from "firebase/app";
 import {
+  connectAuthEmulator,
   createUserWithEmailAndPassword,
   deleteUser,
   getAuth,
@@ -31,8 +32,10 @@ import {
 } from "firebase/auth";
 import {
   collection,
+  connectFirestoreEmulator,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   getFirestore,
   serverTimestamp,
@@ -144,6 +147,15 @@ const app = initializeApp({
 });
 const auth = getAuth(app);
 const db = getFirestore(app);
+
+// The same flag the app reads, so `NEXT_PUBLIC_FIREBASE_EMULATORS=1 pnpm
+// init:project` fills the emulator suite rather than the real project — which
+// is how the security rules get exercised without deploying them.
+if (process.env.NEXT_PUBLIC_FIREBASE_EMULATORS === "1") {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectFirestoreEmulator(db, "127.0.0.1", 8080);
+  console.log("Using the local emulator suite (auth :9099, firestore :8080)\n");
+}
 
 /** Firestore caps a batch at 500 operations. */
 const BATCH_LIMIT = 500;
@@ -344,6 +356,13 @@ async function main(): Promise<void> {
 
     await signInWithEmailAndPassword(auth, ACCOUNTS[0].email, PASSWORD);
     for (const [i, a] of ACCOUNTS.entries()) {
+      // Nobody sets their own role, so the CEO cannot rewrite the profile they
+      // are signed in as. On a re-run it is already correct; on a first run it
+      // has to be seeded before the rules are live. Either way, skip it.
+      if (i === 0 && (await getDoc(doc(db, "users", uids[0]))).exists()) {
+        console.log(`  · ${a.email.padEnd(26)} own profile left as it is`);
+        continue;
+      }
       await setDoc(
         doc(db, "users", uids[i]),
         {

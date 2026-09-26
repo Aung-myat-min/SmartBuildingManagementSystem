@@ -75,6 +75,12 @@ service cloud.firestore {
         && (d.role == 'office-staff' ? d.buildingId is string : d.buildingId == null);
     }
 
+    // A profile is always written by somebody else, which means the FIRST one
+    // cannot be written through these rules at all: `isActive()` needs a
+    // profile that does not exist yet. Seeding a fresh project therefore has
+    // to happen before these rules are deployed, or through the console. There
+    // is deliberately no self-create carve-out — Email/Password signup is open,
+    // so one would let anybody sign up and make themselves CEO.
     match /users/{userId} {
       // Everyone reads their own doc — that read IS the identity resolution.
       // Account managers read the whole collection for Administration.
@@ -86,10 +92,14 @@ service cloud.firestore {
         && validUser(request.resource.data);
 
       allow update:
-        // The sign-in stamp. Without this carve-out every sign-in is denied.
+        // What a person may change about themselves: the sign-in stamp, the
+        // two fields Settings edits, and which notifications they have read.
+        // Their role, status, email and building are somebody else's to set —
+        // that is what stops an Admin Manager promoting themselves.
         if (isActive() && isSelf(userId)
              && request.resource.data.diff(resource.data)
-                  .affectedKeys().hasOnly(['lastActiveAt']))
+                  .affectedKeys().hasOnly(
+                    ['lastActiveAt', 'name', 'phone', 'readNotifications']))
         // canEditUser: never yourself; the target's CURRENT role must be one
         // you may touch, and its NEW role one you may assign — so an Admin
         // Manager can neither edit an Admin Manager nor promote anyone into it.
